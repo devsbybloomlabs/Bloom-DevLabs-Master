@@ -1,0 +1,62 @@
+[
+  {
+    "content": "Phase 1: Get design guidelines for landing page from design_agent",
+    "status": "in_progress"
+  },
+  {
+    "content": "Phase 1: Implement landing page (10 sections) with logo, favicon, TidyCal embed, PayPal placeholders",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 1: Mobile responsive QA + meta/OG tags",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 1: Test landing page end-to-end with testing_agent_v3",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 1: Fix any issues found and deliver",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2-Pre: POC scripts for OpenRouter + Emailit + TidyCal webhook (run + fix until working)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Get integration playbooks (Emailit, TidyCal)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Build admin dashboard - JWT auth, sidebar layout, all 7 admin pages",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: OpenRouter AI integration (routine, content, outreach, discovery prompts)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Block timer + notifications + daily auto-generation cron",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Test admin dashboard end-to-end with testing_agent_v3",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 3: Credibility Builder (case studies, testimonials w/ Emailit, authority metrics, milestones, themes, positioning checker)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 3: Test Credibility Builder end-to-end",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 4: Integration Layer (TidyCal webhook, internal sync, cron jobs, error handling)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 4: Final end-to-end testing",
+    "status": "pending"
+  }
+]
