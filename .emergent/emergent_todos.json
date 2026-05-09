@@ -32,11 +32,11 @@
     "status": "completed"
   },
   {
-    "content": "Phase 5 — End-to-end testing via testing_agent",
-    "status": "in_progress"
+    "content": "Phase 5 — End-to-end testing via testing_agent (67/67 backend + frontend verified)",
+    "status": "completed"
   },
   {
     "content": "Phase 5 — Update plan.md to mark Phase 5 COMPLETED",
-    "status": "pending"
+    "status": "completed"
   }
 ]
