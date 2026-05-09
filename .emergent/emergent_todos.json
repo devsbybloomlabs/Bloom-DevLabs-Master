@@ -1,19 +1,19 @@
 [
   {
     "content": "Phase 1: Get design guidelines for landing page from design_agent",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Phase 1: Implement landing page (10 sections) with logo, favicon, TidyCal embed, PayPal placeholders",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 1: Mobile responsive QA + meta/OG tags",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 1: Test landing page end-to-end with testing_agent_v3",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Phase 1: Fix any issues found and deliver",
