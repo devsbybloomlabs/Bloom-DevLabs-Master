@@ -199,8 +199,105 @@ async def _build_yesterday_summary(db) -> str:
     )
 
 
+async def _build_revenue_context(request: Request) -> str:
+    """Compose a short revenue context block from Agency Handy for AI routine prompts.
+
+    Returns an empty string if Agency Handy is not configured or unreachable.
+    """
+    try:
+        ah = getattr(request.app.state, "agencyhandy", None)
+        if not ah or not getattr(ah, "is_configured", False):
+            return ""
+        # Re-use the same calls used by /summary so we don't double-cache logic
+        subs_res = await ah.list_subscriptions()
+        props_res = await ah.list_quotations()
+        inv_res = await ah.list_invoices()
+        if not (subs_res.get("success") or props_res.get("success") or inv_res.get("success")):
+            return ""
+
+        from agencyhandy_routes import _normalize_proposal, _normalize_subscription  # local import
+        subs = [_normalize_subscription(s) for s in ((subs_res.get("data") or {}).get("data") or [])]
+        proposals = [_normalize_proposal(p) for p in ((props_res.get("data") or {}).get("data") or [])]
+        invoices = (inv_res.get("data") or {}).get("data") or []
+
+        cutoff = _now()
+        # Active MRR
+        mrr = round(sum(float(s.get("monthly_value") or 0) for s in subs if s.get("is_active")), 2)
+        active_subs = sum(1 for s in subs if s.get("is_active"))
+
+        # Proposals needing follow-up (sent >= 3 days ago, not accepted/rejected)
+        followups: List[Dict[str, Any]] = []
+        for p in proposals:
+            sent_at = p.get("sentAtDt")
+            if not sent_at or p.get("status") not in ("sent", "viewed", "opened"):
+                continue
+            age = (cutoff - sent_at).days
+            if age >= 3:
+                followups.append({**p, "age_days": age})
+        followups.sort(key=lambda x: -float(x.get("budget") or 0))
+
+        # Renewals in 7 days
+        renewals: List[Dict[str, Any]] = []
+        for s in subs:
+            nxt = s.get("next_payment_dt")
+            if not nxt or not s.get("is_active"):
+                continue
+            days = (nxt - cutoff).days
+            if 0 <= days <= 7:
+                renewals.append({**s, "days_until_renewal": days})
+
+        # Open / overdue invoices
+        open_inv_total = 0.0
+        overdue_total = 0.0
+        for inv in invoices:
+            status = (inv.get("status") or "").lower()
+            amt = float(inv.get("amount") or inv.get("total") or 0)
+            if status in ("draft", "sent", "unpaid", "open", "viewed"):
+                open_inv_total += amt
+            if status == "overdue":
+                overdue_total += amt
+
+        # Build short text block (kept compact so it doesn't dominate the AI prompt)
+        currency = ah.default_currency or "USD"
+        parts: List[str] = []
+        parts.append("AGENCY HANDY REVENUE CONTEXT (use to prioritise revenue actions):")
+        parts.append(
+            f"- MRR: {mrr} {currency} across {active_subs} active subscription(s)."
+        )
+        if followups:
+            parts.append("- Proposals to follow up (highest-value first):")
+            for f in followups[:5]:
+                parts.append(
+                    f"    * {f.get('client_name')} — {f.get('service_name')}/"
+                    f"{f.get('package_name') or '—'}: {f.get('budget')} {f.get('currency')}, "
+                    f"sent {f.get('age_days')}d ago."
+                )
+        else:
+            parts.append("- No proposals are stale; pipeline is fresh.")
+        if renewals:
+            parts.append("- Subscription renewals in next 7 days (upsell/check-in opportunity):")
+            for r in renewals[:5]:
+                parts.append(
+                    f"    * {r.get('client_name')}: renews in {r.get('days_until_renewal')}d, "
+                    f"~{r.get('monthly_value')} {r.get('currency') or currency}/mo."
+                )
+        if overdue_total > 0:
+            parts.append(f"- OVERDUE invoices total: {overdue_total} {currency} — collect today.")
+        elif open_inv_total > 0:
+            parts.append(f"- Open invoice total: {open_inv_total} {currency}.")
+        parts.append(
+            "Add a 'Revenue actions' block (or weave them into outreach/calls/client-mgmt blocks) "
+            "so today's plan converts these into closes/renewals/payments."
+        )
+        return "\n".join(parts)
+    except Exception as exc:
+        log.warning("Revenue context build failed: %s", exc)
+        return ""
+
+
 async def _generate_and_save_routine(
-    db, or_client, *, target_date: str, force: bool, extra_context: str = ""
+    db, or_client, *, target_date: str, force: bool, extra_context: str = "",
+    request: Optional[Request] = None,
 ) -> Dict[str, Any]:
     if not force:
         existing = await db.routines.find_one({"date": target_date}, {"_id": 0})
@@ -208,6 +305,10 @@ async def _generate_and_save_routine(
             return existing
     pipeline = await _build_pipeline_summary(db)
     yest = await _build_yesterday_summary(db)
+    revenue_ctx = ""
+    if request is not None:
+        revenue_ctx = await _build_revenue_context(request)
+    full_extra = "\n\n".join(filter(None, [extra_context, revenue_ctx]))
     used_ai = True
     try:
         ai_data = await generate_routine(
@@ -215,7 +316,7 @@ async def _generate_and_save_routine(
             target_date=target_date,
             pipeline_summary=pipeline,
             yesterday_summary=yest,
-            extra_context=extra_context,
+            extra_context=full_extra,
         )
         log.info("Routine generated by AI for %s", target_date)
     except Exception as e:
@@ -268,20 +369,22 @@ async def _generate_and_save_routine(
 @routine_router.post("/generate")
 async def generate_today_routine(
     req: RoutineGenerateRequest,
+    request: Request,
     db=Depends(get_db),
     or_client=Depends(get_or_client),
 ):
     target_date = req.date or _today_str()
     return serialize_doc(
         await _generate_and_save_routine(
-            db, or_client, target_date=target_date, force=req.force, extra_context=req.extra_context or ""
+            db, or_client, target_date=target_date, force=req.force,
+            extra_context=req.extra_context or "", request=request,
         )
     )
 
 
 @routine_router.get("/today")
 async def get_today(
-    db=Depends(get_db), or_client=Depends(get_or_client)
+    request: Request, db=Depends(get_db), or_client=Depends(get_or_client)
 ):
     date = _today_str()
     doc = await db.routines.find_one({"date": date}, {"_id": 0})
@@ -289,7 +392,9 @@ async def get_today(
         return serialize_doc(doc)
     # Auto-generate if missing
     return serialize_doc(
-        await _generate_and_save_routine(db, or_client, target_date=date, force=False)
+        await _generate_and_save_routine(
+            db, or_client, target_date=date, force=False, request=request
+        )
     )
 
 
@@ -916,11 +1021,13 @@ dashboard_router = APIRouter(prefix="/dashboard", tags=["dashboard"], dependenci
 
 
 @dashboard_router.get("/home")
-async def dashboard_home(db=Depends(get_db), or_client=Depends(get_or_client)) -> Dict[str, Any]:
+async def dashboard_home(request: Request, db=Depends(get_db), or_client=Depends(get_or_client)) -> Dict[str, Any]:
     today = _today_str()
     routine = await db.routines.find_one({"date": today}, {"_id": 0})
     if not routine:
-        routine = await _generate_and_save_routine(db, or_client, target_date=today, force=False)
+        routine = await _generate_and_save_routine(
+            db, or_client, target_date=today, force=False, request=request
+        )
 
     metric = await db.daily_metrics.find_one({"date": today}, {"_id": 0})
     if not metric:

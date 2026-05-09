@@ -20,6 +20,12 @@ load_dotenv(ROOT_DIR / ".env")
 
 from emailit_client import EmailitClient  # noqa: E402
 from openrouter_client import OpenRouterClient  # noqa: E402
+from agencyhandy_client import AgencyHandyClient  # noqa: E402
+from agencyhandy_routes import agencyhandy_router  # noqa: E402
+from agencyhandy_webhooks import (  # noqa: E402
+    ah_webhook_admin_router,
+    ah_webhook_router,
+)
 from integrations import (  # noqa: E402
     notification_router,
     sync_router,
@@ -64,6 +70,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize integration clients
     app.state.openrouter = OpenRouterClient()
     app.state.emailit = EmailitClient()
+    app.state.agencyhandy = AgencyHandyClient()
 
     # Seed founder + settings + authority metric
     try:
@@ -141,6 +148,9 @@ api.include_router(dashboard_router)
 api.include_router(webhook_router)
 api.include_router(notification_router)
 api.include_router(sync_router)
+api.include_router(agencyhandy_router)
+api.include_router(ah_webhook_router)
+api.include_router(ah_webhook_admin_router)
 
 app.include_router(api)
 

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Save, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import AgencyHandyWebhookPanel from "@/components/admin/AgencyHandyWebhookPanel";
 
 export default function SettingsPage() {
   const { token } = useAuth();
@@ -144,6 +145,8 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Card>
+
+      <AgencyHandyWebhookPanel />
     </div>
   );
 }

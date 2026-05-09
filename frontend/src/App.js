@@ -16,6 +16,7 @@ import CaseStudiesPage from "@/pages/admin/CaseStudiesPage";
 import TestimonialsPage from "@/pages/admin/TestimonialsPage";
 import ThoughtLeadershipPage from "@/pages/admin/ThoughtLeadershipPage";
 import AuthorityPage from "@/pages/admin/AuthorityPage";
+import RevenuePage from "@/pages/admin/RevenuePage";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
               <Route path="outreach" element={<OutreachPage />} />
               <Route path="content" element={<ContentPage />} />
               <Route path="pipeline" element={<PipelinePage />} />
+              <Route path="revenue" element={<RevenuePage />} />
               <Route path="credibility" element={<CredibilityPage />} />
               <Route path="case-studies" element={<CaseStudiesPage />} />
               <Route path="testimonials" element={<TestimonialsPage />} />

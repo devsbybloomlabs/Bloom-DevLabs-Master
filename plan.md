@@ -4,8 +4,10 @@
 - Deliver a fast, branded landing page that converts visitors into booked discovery calls and package starts (**PayPal placeholders**, swappable later).
 - Provide an internal founder dashboard for **daily AI routine** + **outreach/content generation** + **pipeline/CRM** + **analytics**.
 - Ship credibility/authority modules (case studies, testimonials, thought leadership, authority score + milestones) with **Emailit** email automation.
-- Add an integration layer that connects the system end-to-end: **TidyCal webhook → pipeline + notifications**, plus internal sync automations and cron.
-- Ensure the system is **tested end-to-end** with graceful fallbacks and clear UX for partial integration states (e.g., Emailit DNS not verified).
+- Add an integration layer that connects the system end-to-end:
+  - **TidyCal webhook → pipeline + notifications**
+  - **Agency Handy → revenue ops (MRR, proposals follow-up, invoices) + real-time webhooks + two-way sync**
+- Ensure the system is tested end-to-end with graceful fallbacks and clear UX for partial integration states (e.g., Emailit DNS not verified, Agency Handy webhook config missing).
 
 ## 2) Implementation Steps
 
@@ -100,6 +102,96 @@
 **Testing:**
 - Comprehensive Phase 2–4 test run: **Backend 100% (50/50)**, **Frontend desktop 95%**, **Frontend mobile 100%**, **no critical issues** (iteration_2.json).
 
+---
+
+### Phase 5 — Agency Handy Integration (Revenue Ops + Webhooks + Two-way Sync + AI Context) 🚧 IN PROGRESS
+**Goal:** Make Agency Handy the system-of-record for revenue operations while keeping Bloom Labs admin UX streamlined.
+
+**Key product outcomes (from stakeholder priorities):**
+- **MRR tracking is most important** (plus month-over-month delta).
+- Clear visibility into **proposals that need follow-up**.
+- Daily AI routine emphasizes **revenue-driving actions**.
+- Preserve clarity for admins/moderators/sales (no confusing duplication of Pipeline vs Revenue).
+
+#### Phase 5.1 — Foundation (Data Layer + API Client) 🚧 IN PROGRESS
+- Add `AGENCYHANDY_API_KEY` to `backend/.env`.
+- Create `agencyhandy_client.py`:
+  - HTTP wrapper using `x-api-key` header (confirmed required).
+  - Retries, timeouts, structured errors.
+  - Defensive parsing for partial/empty datasets.
+- Define Pydantic models:
+  - `AHOrder`, `AHInvoice`, `AHSubscription`, `AHProposal`, `AHClient`, `AHService`.
+- Implement read-only proxy endpoints:
+  - `GET /api/agencyhandy/orders`
+  - `GET /api/agencyhandy/invoices`
+  - `GET /api/agencyhandy/subscriptions`
+  - `GET /api/agencyhandy/proposals`
+  - `GET /api/agencyhandy/clients`
+  - `GET /api/agencyhandy/services`
+  - `GET /api/agencyhandy/summary` (MRR + KPIs)
+- MRR calculation logic:
+  - Sum active subscriptions normalized to **monthly MRR**.
+  - Track last-month MRR snapshot for delta.
+- Cache strategy:
+  - Light caching in MongoDB collections `ah_cache_*`.
+  - Refresh on demand (endpoint query param) and via webhooks (Phase 5.3).
+
+#### Phase 5.2 — Revenue Dashboard UI ✅ PLANNED
+- Add new admin page: `/admin/revenue` with tabs:
+  - Overview (MRR, proposals needing follow-up, recent orders)
+  - Subscriptions
+  - Invoices
+  - Proposals
+  - Clients
+- Add MRR widget to Dashboard Home (with delta vs last month).
+- Add “Proposals needing follow-up” component:
+  - Criteria: sent > 3 days ago, not accepted/rejected, no recent activity.
+- Sidebar nav entry: **Revenue** (keep Pipeline intact to avoid disruption).
+- UX intent:
+  - **Pipeline** = lead/prospect operations (TidyCal + manual prospects).
+  - **Revenue** = revenue system-of-record (Agency Handy).
+  - Cross-links between them (e.g., Prospect → Create Quotation).
+
+#### Phase 5.3 — Webhooks + Real-time Sync ✅ PLANNED
+- Register Agency Handy webhooks programmatically on backend startup (idempotent):
+  - Use `POST /webhooks` and `GET /webhooks` to upsert.
+- Add public receiver endpoint:
+  - `POST /api/webhooks/agencyhandy`
+- Security:
+  - Verify webhook signature (HMAC) using the rolled/registered secret.
+  - Provide admin UI readout for webhook status + last delivery.
+- Handle events (minimum set aligned to revenue ops):
+  - `ORDER.CREATED`, `ORDER.UPDATED`
+  - `INVOICE.STATUS.CHANGED`
+  - `PAYMENT.RECEIVED`, `PAYMENT.FAILED`
+  - `PROPOSAL.SENT`, `PROPOSAL.ACCEPTED`, `PROPOSAL.REJECTED`
+  - `CLIENT.ADDED`
+  - `PUBLIC_FORM.RESPONSE.CREATED`
+  - `TASK.COMPLETED`
+- Each event actions:
+  - Create Bloom Notification.
+  - Update `ah_cache_*` selectively.
+  - Trigger selective automation:
+    - `PUBLIC_FORM.RESPONSE.CREATED` → auto-create Prospect in Pipeline.
+    - `ORDER.UPDATED` → if completed → auto-trigger Emailit testimonial request (guarded + idempotent).
+
+#### Phase 5.4 — Two-way Sync + AI Routine Revenue Context ✅ PLANNED
+- Two-way sync (Pipeline → Agency Handy):
+  - Pipeline page: add **“Send Quotation”** button.
+  - Backend: `POST /api/agencyhandy/quotations` (wrap AH `POST /quotations`).
+  - Use Prospect data to create quotation draft and send.
+- Daily routine AI prompt enhancements (revenue context):
+  - Open proposals expiring / needing follow-up.
+  - Subscriptions renewing in 7 days (upsell/check-in).
+  - Overdue invoices (collection actions).
+  - Recently completed orders (testimonial requests).
+  - New form responses (lead follow-up).
+- New endpoint:
+  - `GET /api/agencyhandy/revenue-actions` (today’s prioritized revenue-driving tasks)
+- Routine generator:
+  - Update block templates to include a “Revenue Actions” mode/section.
+  - Ensure fallbacks if Agency Handy is unavailable (cached data + graceful UI warnings).
+
 ## 3) Next Actions
 **Delivery-ready. Remaining operator tasks (outside the codebase):**
 1. **Replace PayPal placeholders**
@@ -108,7 +200,11 @@
    - Verify `bybloomlabs.com` in Emailit dashboard (SPF + DKIM DNS records). If emails already send successfully, this is complete.
 3. **Configure TidyCal webhook (optional but recommended)**
    - In TidyCal, set webhook URL to: `https://bybloomlabs.com/api/webhooks/tidycal`.
-4. **Add Google Analytics later (optional)**
+4. **Agency Handy integration operator tasks (Phase 5)**
+   - Add `AGENCYHANDY_API_KEY` to production `backend/.env`.
+   - Ensure the public webhook URL is reachable: `https://bybloomlabs.com/api/webhooks/agencyhandy`.
+   - Confirm webhook secret storage/rotation procedure (roll secret when needed).
+5. **Add Google Analytics later (optional)**
    - GA is intentionally skipped for now; landing page is prepared for future integration.
 
 ## 4) Success Criteria
@@ -135,6 +231,14 @@
 - Internal sync endpoints generate AI draft posts and update checklist/status.
 - Emailit send-request endpoint responds gracefully whether domain is verified or pending.
 
+✅ **Agency Handy (Phase 5)**
+- **MRR tracking** visible in Dashboard + dedicated Revenue page, with MoM delta.
+- Proposals needing follow-up list is accurate and action-oriented.
+- Webhooks keep revenue KPIs fresh and generate notifications.
+- Two-way sync works: Prospect → Quotation in Agency Handy.
+- Daily routine includes a “Revenue Actions” section driven by live/cached Agency Handy data.
+
 ✅ **Testing**
 - Iteration 1: Phase 1 landing page **100% pass**.
 - Iteration 2: Phase 2–4 **backend 100%**, **frontend mobile 100%**, **frontend desktop 95%** (minor selector detection notes, no functional bugs).
+- Phase 5: add incremental test runs per sub-phase (5.1–5.4) with API mocking + sandbox/live smoke tests.

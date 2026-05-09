@@ -826,10 +826,261 @@ class BloomLabsAPITester:
                 200,
             )
 
+    async def test_agencyhandy(self):
+        """Test Agency Handy integration endpoints (Phase 5)."""
+        self.log("\n=== TESTING AGENCY HANDY INTEGRATION ===", "INFO")
+
+        # Test health check
+        success, response = await self.run_test(
+            "GET /agencyhandy/health",
+            "GET",
+            "/agencyhandy/health",
+            200,
+            check_fields=["connected", "configured"],
+        )
+        if success and response:
+            if response.get("connected"):
+                self.log(f"✅ Connected to Agency Handy: {response.get('company', {}).get('name')}")
+            else:
+                self.log(f"⚠️ WARNING: Not connected to Agency Handy: {response.get('error')}", "WARN")
+                return  # Skip remaining tests if not connected
+
+        # Test summary endpoint (MRR + proposals + invoices + renewals)
+        success, response = await self.run_test(
+            "GET /agencyhandy/summary",
+            "GET",
+            "/agencyhandy/summary",
+            200,
+            check_fields=["currency", "mrr", "proposals", "invoices", "renewals_7d", "orders", "freshness"],
+        )
+        if success and response:
+            mrr = response.get("mrr", {})
+            proposals = response.get("proposals", {})
+            invoices = response.get("invoices", {})
+            self.log(f"MRR: {mrr.get('total')} {response.get('currency')} (ARR: {mrr.get('arr')})")
+            self.log(f"Proposals: {proposals.get('total')} total, {proposals.get('pending')} pending, {len(proposals.get('follow_ups', []))} need follow-up")
+            self.log(f"Invoices: {invoices.get('open_count')} open ({invoices.get('open_total')} {response.get('currency')}), {invoices.get('overdue_count')} overdue")
+            self.log(f"Renewals in 7d: {len(response.get('renewals_7d', []))}")
+
+        # Test proposals list
+        success, response = await self.run_test(
+            "GET /agencyhandy/proposals",
+            "GET",
+            "/agencyhandy/proposals",
+            200,
+            check_fields=["data", "source"],
+        )
+        if success and response:
+            proposals = response.get("data", [])
+            self.log(f"Retrieved {len(proposals)} proposals")
+
+        # Test proposals with needs_followup filter
+        success, response = await self.run_test(
+            "GET /agencyhandy/proposals?needs_followup=true",
+            "GET",
+            "/agencyhandy/proposals?needs_followup=true&days_threshold=3",
+            200,
+            check_fields=["data", "counts"],
+        )
+        if success and response:
+            follow_ups = response.get("data", [])
+            counts = response.get("counts", {})
+            self.log(f"Proposals needing follow-up: {len(follow_ups)} out of {counts.get('total', 0)}")
+            if follow_ups:
+                first = follow_ups[0]
+                self.log(f"  Example: {first.get('client_name')} - {first.get('service_name')} ({first.get('age_days')} days old)")
+
+        # Test subscriptions list
+        success, response = await self.run_test(
+            "GET /agencyhandy/subscriptions",
+            "GET",
+            "/agencyhandy/subscriptions",
+            200,
+            check_fields=["data", "source"],
+        )
+        if success and response:
+            subs = response.get("data", [])
+            active = [s for s in subs if s.get("is_active")]
+            self.log(f"Retrieved {len(subs)} subscriptions ({len(active)} active)")
+
+        # Test invoices list
+        success, response = await self.run_test(
+            "GET /agencyhandy/invoices",
+            "GET",
+            "/agencyhandy/invoices",
+            200,
+            check_fields=["data", "source"],
+        )
+        if success and response:
+            invoices = response.get("data", [])
+            self.log(f"Retrieved {len(invoices)} invoices")
+
+        # Test clients list
+        success, response = await self.run_test(
+            "GET /agencyhandy/clients",
+            "GET",
+            "/agencyhandy/clients",
+            200,
+            check_fields=["data", "source"],
+        )
+        if success and response:
+            clients = response.get("data", [])
+            self.log(f"Retrieved {len(clients)} clients")
+
+        # Test services list
+        success, response = await self.run_test(
+            "GET /agencyhandy/services",
+            "GET",
+            "/agencyhandy/services",
+            200,
+            check_fields=["data", "source"],
+        )
+        if success and response:
+            services = response.get("data", [])
+            self.log(f"Retrieved {len(services)} services")
+
+        # Test orders list
+        success, response = await self.run_test(
+            "GET /agencyhandy/orders",
+            "GET",
+            "/agencyhandy/orders",
+            200,
+            check_fields=["data", "source"],
+        )
+        if success and response:
+            orders = response.get("data", [])
+            self.log(f"Retrieved {len(orders)} orders")
+
+        # Test revenue actions
+        success, response = await self.run_test(
+            "GET /agencyhandy/revenue-actions",
+            "GET",
+            "/agencyhandy/revenue-actions",
+            200,
+            check_fields=["actions", "currency", "generated_at"],
+        )
+        if success and response:
+            actions = response.get("actions", [])
+            self.log(f"Revenue actions: {len(actions)} prioritized actions")
+            if actions:
+                top = actions[0]
+                self.log(f"  Top priority: {top.get('title')} (priority {top.get('priority')})")
+
+        # Test refresh endpoint
+        success, response = await self.run_test(
+            "POST /agencyhandy/refresh",
+            "POST",
+            "/agencyhandy/refresh",
+            200,
+            check_fields=["refreshed_at", "results"],
+        )
+        if success and response:
+            results = response.get("results", {})
+            live_count = sum(1 for r in results.values() if r.get("source") == "live")
+            self.log(f"Refreshed {len(results)} resources ({live_count} from live API)")
+
+        # Test webhook status
+        success, response = await self.run_test(
+            "GET /agencyhandy/webhooks/status",
+            "GET",
+            "/agencyhandy/webhooks/status",
+            200,
+            check_fields=["target_url", "configured_target", "registered", "wanted_events", "last_events"],
+        )
+        if success and response:
+            registered = response.get("registered", [])
+            wanted = response.get("wanted_events", [])
+            last_events = response.get("last_events", [])
+            self.log(f"Webhooks: {len(registered)} registered, {len(wanted)} wanted events, {len(last_events)} recent events")
+            if registered:
+                self.test_data["webhook_id"] = registered[0].get("id")
+
+        # Test webhook register (idempotent)
+        success, response = await self.run_test(
+            "POST /agencyhandy/webhooks/register (idempotent - first call)",
+            "POST",
+            "/agencyhandy/webhooks/register",
+            200,
+            check_fields=["action", "webhook_id", "events_count"],
+        )
+        if success and response:
+            action = response.get("action")
+            webhook_id = response.get("webhook_id")
+            events_count = response.get("events_count")
+            self.log(f"Webhook {action}: {webhook_id} with {events_count} events")
+            self.test_data["webhook_id"] = webhook_id
+
+        # Test webhook register again (should update, not create)
+        success, response = await self.run_test(
+            "POST /agencyhandy/webhooks/register (idempotent - second call)",
+            "POST",
+            "/agencyhandy/webhooks/register",
+            200,
+            check_fields=["action", "webhook_id"],
+        )
+        if success and response:
+            action = response.get("action")
+            if action == "updated":
+                self.log("✅ Webhook register is idempotent (second call updated existing webhook)")
+            elif action == "created":
+                self.log("⚠️ WARNING: Webhook register created a new webhook on second call (not idempotent)", "WARN")
+
+        # Test webhook test event
+        if "webhook_id" in self.test_data:
+            success, response = await self.run_test(
+                "POST /agencyhandy/webhooks/test/ORDER.CREATED",
+                "POST",
+                "/agencyhandy/webhooks/test/ORDER.CREATED",
+                200,
+                check_fields=["ok", "webhook_id", "event"],
+            )
+            if success and response:
+                self.log(f"✅ Test event sent: {response.get('event')}")
+
+            # Wait a moment for the webhook to be received
+            await asyncio.sleep(2)
+
+            # Check webhook status again to see if test event was received
+            success, response = await self.run_test(
+                "GET /agencyhandy/webhooks/status (after test event)",
+                "GET",
+                "/agencyhandy/webhooks/status",
+                200,
+            )
+            if success and response:
+                last_events = response.get("last_events", [])
+                if last_events and any(e.get("event_name") == "ORDER.CREATED" for e in last_events):
+                    self.log("✅ Test event received and logged in last_events")
+                else:
+                    self.log("⚠️ WARNING: Test event not found in last_events", "WARN")
+
+        # Test routine generation with revenue context (force=true)
+        success, response = await self.run_test(
+            "POST /routine/generate with force=true (should include revenue context)",
+            "POST",
+            "/routine/generate",
+            200,
+            data={"force": True},
+            timeout=120.0,
+            check_fields=["date", "blocks"],
+        )
+        if success and response:
+            blocks = response.get("blocks", [])
+            # Check if any block mentions proposals, follow-up, or revenue
+            revenue_mentions = 0
+            for block in blocks:
+                text = f"{block.get('title', '')} {block.get('description', '')}".lower()
+                if any(keyword in text for keyword in ["proposal", "follow-up", "follow up", "revenue", "mrr", "invoice"]):
+                    revenue_mentions += 1
+            if revenue_mentions > 0:
+                self.log(f"✅ Routine includes revenue context ({revenue_mentions} blocks mention revenue/proposals)")
+            else:
+                self.log("⚠️ WARNING: Routine does not mention revenue context", "WARN")
+
     async def run_all_tests(self):
         """Run all backend tests in sequence."""
         self.log("=" * 80)
-        self.log("BLOOM LABS PHASE 2-4 BACKEND API TESTS")
+        self.log("BLOOM LABS PHASE 2-5 BACKEND API TESTS")
         self.log(f"Base URL: {self.base_url}")
         self.log("=" * 80)
 
@@ -853,6 +1104,7 @@ class BloomLabsAPITester:
         await self.test_webhooks()
         await self.test_notifications()
         await self.test_sync_endpoints()
+        await self.test_agencyhandy()  # Phase 5 Agency Handy integration
 
         # Print summary
         self.log("\n" + "=" * 80)

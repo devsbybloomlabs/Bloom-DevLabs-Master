@@ -21,8 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Loader2, Trash2, Edit2, TrendingUp } from "lucide-react";
+import { Plus, Loader2, Trash2, Edit2, TrendingUp, FileSignature } from "lucide-react";
 import { toast } from "sonner";
+import SendQuotationDialog from "@/components/admin/SendQuotationDialog";
 
 const STATUSES = [
   { value: "new", label: "New", color: "bg-secondary text-foreground" },
@@ -57,6 +58,7 @@ export default function PipelinePage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(BLANK);
   const [saving, setSaving] = useState(false);
+  const [quoteFor, setQuoteFor] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -220,6 +222,16 @@ export default function PipelinePage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => setQuoteFor(p)}
+                            aria-label="Send Quotation in Agency Handy"
+                            data-testid={`pipeline-row-${p.id}-quote`}
+                            title="Send quotation in Agency Handy"
+                          >
+                            <FileSignature className="h-4 w-4 text-[#3B82F6]" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => openEdit(p)}
                             aria-label="Edit"
                             data-testid={`pipeline-row-${p.id}-edit"`}
@@ -310,6 +322,13 @@ export default function PipelinePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SendQuotationDialog
+        prospect={quoteFor}
+        open={!!quoteFor}
+        onOpenChange={(o) => !o && setQuoteFor(null)}
+        onDone={load}
+      />
     </div>
   );
 }

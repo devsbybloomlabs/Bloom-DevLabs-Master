@@ -16,6 +16,7 @@ import {
   Settings as SettingsIcon,
   LogOut,
   Menu,
+  CircleDollarSign,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { BRAND } from "@/lib/brand";
@@ -28,6 +29,7 @@ const NAV = [
   { to: "/admin/outreach", label: "Outreach AI", icon: Users, group: "Daily" },
   { to: "/admin/content", label: "Content AI", icon: PenSquare, group: "Daily" },
   { to: "/admin/pipeline", label: "Pipeline", icon: TrendingUp, group: "Sales" },
+  { to: "/admin/revenue", label: "Revenue & Clients", icon: CircleDollarSign, group: "Sales" },
   { to: "/admin/credibility", label: "Credibility Hub", icon: ShieldCheck, group: "Authority" },
   { to: "/admin/case-studies", label: "Case Studies", icon: Award, group: "Authority" },
   { to: "/admin/testimonials", label: "Testimonials", icon: Mic, group: "Authority" },

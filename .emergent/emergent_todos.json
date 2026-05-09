@@ -1,42 +1,42 @@
 [
   {
-    "content": "Phase 1: Landing page complete + tested (100% pass)",
+    "content": "Phase 5.1 — Foundation (data layer + API client + summary + cache)",
     "status": "completed"
   },
   {
-    "content": "Phase 2-Pre: POC scripts for OpenRouter + Emailit (verified)",
+    "content": "Phase 5.2 — Build Revenue page UI + MRR widget on Dashboard + sidebar nav",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Get integration playbooks",
+    "content": "Phase 5.3 — Webhook receiver + token verification + audit log",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Build backend - JWT auth, MongoDB models, OpenRouter, Emailit, all admin endpoints",
+    "content": "Phase 5.3 — Programmatic webhook registration (idempotent)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Build frontend admin shell - login, sidebar, all admin pages",
+    "content": "Phase 5.3 — Event automation (notifications, prospect auto-create, testimonial requests)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Block timer + daily auto-generation cron (5am)",
+    "content": "Phase 5.3 — Webhook control panel on Settings page",
     "status": "completed"
   },
   {
-    "content": "Phase 3: Credibility Builder - case studies, testimonials w/ Emailit, thought leadership, authority score, milestones, themes, positioning checker",
+    "content": "Phase 5.4 — Pipeline 'Send Quotation' button + AH portal handoff",
     "status": "completed"
   },
   {
-    "content": "Phase 4: Integration Layer - TidyCal webhook, notifications, internal sync (case study/testimonial -> AI draft post)",
+    "content": "Phase 5.4 — Inject revenue context into AI routine prompt (verified live)",
     "status": "completed"
   },
   {
-    "content": "Phase 2-4: Test admin dashboard + integrations end-to-end (Backend 100%, Mobile 100%, Desktop 95%)",
-    "status": "completed"
-  },
-  {
-    "content": "Final delivery summary",
+    "content": "Phase 5 — End-to-end testing via testing_agent",
     "status": "in_progress"
+  },
+  {
+    "content": "Phase 5 — Update plan.md to mark Phase 5 COMPLETED",
+    "status": "pending"
   }
 ]
