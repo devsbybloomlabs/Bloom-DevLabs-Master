@@ -1,0 +1,29 @@
+{
+  "summary": "Re-test of SeoHead.jsx fix from iteration_6 + Phase 8 backend regression. ALL PASS. Backend: 26/26 pytest cases green (test_phase8.py). Frontend SeoHead hijack-in-place approach fully works: on /blog/hello-world, document.querySelector returns the post-specific values (description='Test excerpt', og:title contains 'Hello World', og:image ends with /api/og/blog/hello-world.svg, canonical='https://bybloomlabs.com/blog/hello-world'), JSON-LD parses as Article schema with correct headline/description/image. Zero duplicate <meta>/<link> tags in <head> — confirms the hijack adds data-seo-head + data-seo-orig in-place on existing static tags. /blog listing shows blog-specific description ('Deep dives on AI-native SaaS development...'). /case-studies shows case-study-specific description. Landing / restores landing-specific description. Cleanup verified: navigating /blog/hello-world → / restores og:image back to 'https://bybloomlabs.com/og-default.png' (single tag, no duplicates).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase8.py",
+    "/app/test_reports/pytest/phase8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SeoHead.jsx hijack-in-place implementation is clean: pickTag() prefers non-managed tags first so it always grabs the static tag on first mount; cleanup() correctly distinguishes hijacked vs newly-created tags via the data-seo-orig attribute presence. Works as designed.",
+    "Edge case worth noting (not blocking): if SeoHead unmounts and the same selector is then mounted again with different content before cleanup completes (e.g., rapid client-side nav), the second mount will pickTag() on the still-managed (data-seo-head) tag and NOT save a fresh data-seo-orig — but since data-seo-orig is preserved from the first hijack, the restore-to-original-on-final-unmount still works. Verified empirically by the /blog/hello-world → / cleanup test."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "100% (all 9 SeoHead assertions passed)"},
+  "test_credentials": "Admin founder@thesalvador.group/admin123, Client testclient@bybloomlabs.com/clientpass123 — both work.",
+  "seed_data_creation": "Phase 8 tests create + clean up ephemeral TEST_ lead magnets, leads, and one 'Build Auth' milestone.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "SeoHead bug from iteration_6 is FULLY FIXED. Hijack-in-place approach is correct: on first mount it grabs the static tag (no [data-seo-head]), saves its original value as data-seo-orig, then sets new content; on unmount it restores from data-seo-orig and clears the marker. No duplicate tags in DOM. Phase 8 backend tests remain 100% green (26/26). Admin/portal UI verification from iteration_6 (lead-magnet wizard, milestones admin, client portal milestones tab) is still pending visual confirmation — backend supports them all.",
+  "rca_of_the_issue": "Previous bug RCA (iteration_6): SeoHead's selector `:not([data-seo-head])` was inverted vs intent (was matching only already-managed tags). Fix verified: pickTag() now correctly searches for tags WITHOUT [data-seo-head] first (static tags from index.html), hijacks them in place, and on cleanup restores via the saved data-seo-orig attribute. All 5 critical meta tag types (description, og:title, og:image, canonical, JSON-LD) verified to expose page-specific values on /blog/hello-world and restore on navigation away."
+}

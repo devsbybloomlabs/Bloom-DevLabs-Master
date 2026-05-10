@@ -1,59 +1,106 @@
 /**
  * SeoHead — drop-in SEO meta tag injector for any public page.
  *
- * Sets document.title plus a comprehensive set of meta tags:
- *   • description, keywords, author, robots
- *   • Open Graph (og:title, og:description, og:image, og:url, og:type)
- *   • Twitter card (summary_large_image)
- *   • Canonical URL
- *   • Optional JSON-LD structured data (Article/WebPage/BreadcrumbList/Organization)
+ * IMPORTANT: This component HIJACKS any existing static meta/link tags from
+ * public/index.html (saving their original content) so that they get
+ * overridden in place — preserving DOM order so crawlers + social-card
+ * scrapers see the right values. On unmount we restore the original
+ * content / remove tags we injected.
  *
- * All tags are cleaned up on unmount so different pages don't leak meta.
+ * Sets document.title plus:
+ *   • <meta name=description|keywords|author|robots>
+ *   • Open Graph (<meta property=og:*>)
+ *   • Twitter card (<meta name=twitter:*>)
+ *   • <link rel=canonical>
+ *   • <script type=application/ld+json> JSON-LD blocks
  */
 import { useEffect } from "react";
 
-const MANAGED_ATTR = "data-seo-head";
+const MANAGED = "data-seo-head";
+const ORIG = "data-seo-orig";
 
-function setTag(selector, attrs) {
-  let el = document.head.querySelector(selector + `[${MANAGED_ATTR}]`);
-  if (!el) {
-    el = document.createElement(selector.split("[")[0]);
-    el.setAttribute(MANAGED_ATTR, "true");
-    document.head.appendChild(el);
+function pickTag(bareSelector, fallbackSelector) {
+  // Find a non-managed tag first (static from index.html), then any tag.
+  let el = document.head.querySelector(`${bareSelector}:not([${MANAGED}])`);
+  if (el) return { el, hijacked: true };
+  el = document.head.querySelector(fallbackSelector || bareSelector);
+  if (el) return { el, hijacked: false };
+  return { el: null, hijacked: false };
+}
+
+function setAttr(el, k, v) {
+  if (v == null) return;
+  if (k === "textContent") el.textContent = v;
+  else el.setAttribute(k, v);
+}
+
+function ensureTag(tagName, selectorWithoutManaged, attrs, content) {
+  let found = pickTag(selectorWithoutManaged);
+  let el = found.el;
+  const isNew = !el;
+  if (isNew) {
+    el = document.createElement(tagName);
   }
-  Object.entries(attrs).forEach(([k, v]) => {
-    if (v == null) return;
-    if (k === "innerText" || k === "textContent") {
-      el.textContent = v;
-    } else {
-      el.setAttribute(k, v);
-    }
-  });
+  // Save original content (only when first hijacking a static tag)
+  if (!isNew && !el.hasAttribute(ORIG) && !el.hasAttribute(MANAGED)) {
+    // For meta tags, content is in the "content" attribute. For link, in "href". For script, in textContent.
+    const origVal =
+      tagName === "script"
+        ? el.textContent
+        : tagName === "link"
+        ? el.getAttribute("href") || ""
+        : el.getAttribute("content") || "";
+    el.setAttribute(ORIG, origVal);
+  }
+  el.setAttribute(MANAGED, "true");
+  Object.entries(attrs).forEach(([k, v]) => setAttr(el, k, v));
+  if (content != null) {
+    if (tagName === "script") el.textContent = content;
+    else if (tagName === "link") el.setAttribute("href", content);
+    else el.setAttribute("content", content);
+  }
+  if (isNew) document.head.appendChild(el);
   return el;
 }
 
-function setMeta(name, content, attr = "name") {
-  if (!content) return;
-  const sel = `meta[${attr}="${name}"]`;
-  setTag(sel, { [attr]: name, content });
+function setMetaName(name, content) {
+  if (content == null) return;
+  ensureTag("meta", `meta[name="${name}"]`, { name }, content);
 }
-
+function setMetaProp(property, content) {
+  if (content == null) return;
+  ensureTag("meta", `meta[property="${property}"]`, { property }, content);
+}
 function setLink(rel, href) {
-  if (!href) return;
-  const sel = `link[rel="${rel}"]`;
-  setTag(sel, { rel, href });
+  if (href == null) return;
+  ensureTag("link", `link[rel="${rel}"]`, { rel }, href);
 }
-
 function setJsonLd(id, data) {
-  if (!data) return;
-  const sel = `script[type="application/ld+json"][data-id="${id}"]`;
-  setTag(sel, { type: "application/ld+json", "data-id": id, textContent: JSON.stringify(data) });
+  if (data == null) return;
+  ensureTag(
+    "script",
+    `script[type="application/ld+json"][data-id="${id}"]`,
+    { type: "application/ld+json", "data-id": id },
+    JSON.stringify(data)
+  );
 }
 
 function cleanup() {
-  document.head
-    .querySelectorAll(`[${MANAGED_ATTR}]`)
-    .forEach((el) => el.parentNode && el.parentNode.removeChild(el));
+  document.head.querySelectorAll(`[${MANAGED}]`).forEach((el) => {
+    if (el.hasAttribute(ORIG)) {
+      // Hijacked a static tag → restore its original content
+      const orig = el.getAttribute(ORIG);
+      const tag = el.tagName.toLowerCase();
+      if (tag === "script") el.textContent = orig;
+      else if (tag === "link") el.setAttribute("href", orig);
+      else el.setAttribute("content", orig);
+      el.removeAttribute(MANAGED);
+      el.removeAttribute(ORIG);
+    } else {
+      // We created it from scratch → remove it
+      el.parentNode && el.parentNode.removeChild(el);
+    }
+  });
 }
 
 export default function SeoHead({
@@ -86,30 +133,26 @@ export default function SeoHead({
 
     document.title = fullTitle;
 
-    setMeta("description", description);
-    setMeta("keywords", keywords);
-    setMeta("author", author);
-    setMeta("robots", robots);
+    setMetaName("description", description);
+    setMetaName("keywords", keywords);
+    setMetaName("author", author);
+    setMetaName("robots", robots);
 
-    // Open Graph
-    setMeta("og:type", type, "property");
-    setMeta("og:title", fullTitle, "property");
-    setMeta("og:description", description, "property");
-    setMeta("og:image", ogImage, "property");
-    setMeta("og:url", canonical, "property");
-    setMeta("og:site_name", "Bloom Labs", "property");
+    setMetaProp("og:type", type);
+    setMetaProp("og:title", fullTitle);
+    setMetaProp("og:description", description);
+    setMetaProp("og:image", ogImage);
+    setMetaProp("og:url", canonical);
+    setMetaProp("og:site_name", "Bloom Labs");
 
-    // Twitter
-    setMeta("twitter:card", "summary_large_image");
-    setMeta("twitter:title", fullTitle);
-    setMeta("twitter:description", description);
-    setMeta("twitter:image", ogImage);
-    setMeta("twitter:site", twitterHandle);
+    setMetaName("twitter:card", "summary_large_image");
+    setMetaName("twitter:title", fullTitle);
+    setMetaName("twitter:description", description);
+    setMetaName("twitter:image", ogImage);
+    setMetaName("twitter:site", twitterHandle);
 
-    // Canonical
     setLink("canonical", canonical);
 
-    // Structured data
     if (jsonLd) setJsonLd("primary", jsonLd);
     if (breadcrumbs && breadcrumbs.length > 0) {
       setJsonLd("breadcrumbs", {
