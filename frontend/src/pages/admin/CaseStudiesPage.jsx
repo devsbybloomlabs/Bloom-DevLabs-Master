@@ -220,7 +220,7 @@ export default function CaseStudiesPage() {
                     ))}
                   </ul>
                 </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-border">
+                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border">
                   <Button
                     variant="ghost"
                     size="sm"

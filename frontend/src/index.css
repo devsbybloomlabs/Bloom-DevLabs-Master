@@ -51,7 +51,15 @@ body {
         'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Prevent rogue horizontal scroll caused by long unbroken text or overflowing children */
+    overflow-x: hidden;
     /* Inter-only feature settings dropped — they don't apply to Bw Modelica */
+}
+
+/* Ensure long unbroken strings (URLs, IDs, code) wrap rather than force the page wider */
+.break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .font-display {

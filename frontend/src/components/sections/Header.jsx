@@ -46,12 +46,12 @@ export const Header = () => {
           />
         </a>
 
-        <nav className="hidden md:flex items-center gap-7" aria-label="Primary">
+        <nav className="hidden lg:flex items-center gap-7" aria-label="Primary">
           {NAV_ITEMS.map((item) => (
             <a
               key={item.id}
               href={`#${item.id}`}
-              className="text-sm text-foreground/80 hover:text-foreground transition-colors"
+              className="text-sm text-foreground/80 hover:text-foreground transition-colors whitespace-nowrap"
               data-testid={`header-nav-${item.id}-link`}
             >
               {item.label}
@@ -62,7 +62,7 @@ export const Header = () => {
         <div className="flex items-center gap-2">
           <Button
             asChild
-            className="hidden sm:inline-flex bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-10 px-5"
+            className="hidden lg:inline-flex bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-10 px-5"
             data-testid="header-book-call-button"
           >
             <a href="#book">
@@ -76,7 +76,7 @@ export const Header = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden"
+                className="lg:hidden"
                 aria-label="Open menu"
                 data-testid="mobile-menu-open-button"
               >

@@ -212,7 +212,7 @@ export default function DashboardHome() {
 
       {/* Block timer + Today's Routine */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-6 min-w-0">
           <BlockTimer blocks={routine?.blocks || []} />
 
           {/* MRR + revenue actions snapshot from Agency Handy */}
@@ -261,7 +261,7 @@ export default function DashboardHome() {
         </div>
 
         {/* Routine */}
-        <Card className="lg:col-span-2 border-border" data-testid="dashboard-routine">
+        <Card className="lg:col-span-2 border-border min-w-0 overflow-hidden" data-testid="dashboard-routine">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-display flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-[#3B82F6]" />

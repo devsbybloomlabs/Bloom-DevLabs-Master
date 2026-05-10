@@ -168,7 +168,7 @@ export default function AgencyHandyWebhookPanel() {
             onClick={register}
             disabled={registering || !status.target_url}
             variant="default"
-            className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+            className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white w-full sm:w-auto"
             data-testid="ah-webhook-register-button"
           >
             {registering ? (
@@ -179,10 +179,10 @@ export default function AgencyHandyWebhookPanel() {
             {isRegistered ? "Re-sync events" : "Register webhook"}
           </Button>
           {isRegistered && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
               <Select value={testEvent} onValueChange={setTestEvent}>
                 <SelectTrigger
-                  className="w-56 h-9"
+                  className="w-full sm:w-56 h-9"
                   data-testid="ah-webhook-test-event-select"
                 >
                   <SelectValue />
@@ -200,6 +200,7 @@ export default function AgencyHandyWebhookPanel() {
                 disabled={testing}
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 data-testid="ah-webhook-test-button"
               >
                 {testing ? (

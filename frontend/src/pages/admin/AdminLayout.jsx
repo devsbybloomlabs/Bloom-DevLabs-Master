@@ -164,7 +164,7 @@ export default function AdminLayout() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 overflow-x-hidden">
           {/* Top user bar */}
           <div className="hidden lg:flex items-center justify-end gap-3 h-14 px-6 border-b border-border bg-background">
             <NotificationsBell />

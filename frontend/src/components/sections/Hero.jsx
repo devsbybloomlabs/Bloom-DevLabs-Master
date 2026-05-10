@@ -24,7 +24,7 @@ export const Hero = () => {
               className="font-display mt-5 text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight leading-[1.04] text-foreground"
             >
               Enterprise Web Apps in{" "}
-              <span className="text-[#1E3A8A]">2&ndash;4 Weeks</span>
+              <span className="text-[#1E3A8A] whitespace-nowrap">2&ndash;4 Weeks</span>
               <br className="hidden sm:block" /> (Not 6 Months)
             </h1>
             <p className="mt-5 text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed">
