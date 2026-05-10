@@ -383,7 +383,7 @@ function Phase1Form({ data, setArrayItem, setField }) {
           value={data.color_preferences || ""}
           onChange={(e) => setField("color_preferences", e.target.value)}
           placeholder='e.g. "deep navy + warm cream + 1 accent"'
-          data-testid="onboarding-color-prefs"
+          data-testid="onboarding-color-preferences"
           className="mt-1.5"
         />
       </div>

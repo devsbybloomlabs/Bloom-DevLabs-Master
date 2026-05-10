@@ -2,130 +2,115 @@
 
 ## Original Problem Statement
 Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
-- High-converting B2B SaaS landing page
-- Founder admin dashboard (AI routine, CRM, content, credibility hub, revenue ops)
-- Integrations: OpenRouter (AI), Emailit (transactional email), AgencyHandy (CRM/revenue), TidyCal (booking)
-- PayPal full payment processing (one-time + subscriptions) — Feb 2026
-- Client Portal (self-service) — Feb 2026
-- Hidden admin login — Feb 2026
+- High-converting B2B SaaS landing page with public Case Studies + Blog
+- Founder admin dashboard (AI routine, CRM, content, credibility hub, revenue ops, blog, onboarding)
+- Integrations: OpenRouter (AI), Emailit (transactional email), AgencyHandy (CRM/revenue), TidyCal (booking), **PayPal** (one-time + subscriptions), **Nifty PM** (task automation)
+- Client Portal with self-service onboarding wizard
+- Hidden admin gate (5x footer logo click → `/admin/login`)
 
 ## User Personas
-- **Founder** (Ryan Salvador) — sole admin user. Operates daily AI routine, pipeline, content, revenue.
-- **Prospect** — discovery-call lead from TidyCal/manual/AgencyHandy form responses.
-- **Client** — paid customer with portal access (orders, invoices, subscriptions, proposals, profile).
+- **Founder** (Ryan Salvador) — sole admin. Runs daily routine, pipeline, content, blog, onboardings, revenue.
+- **Prospect** — discovery-call lead from TidyCal/AgencyHandy/landing forms.
+- **Client** — paid customer with portal access (orders, invoices, subscriptions, proposals, profile, onboarding).
+- **Team** (Designer/PM/Developer) — receive Nifty task notifications + assignments triggered by onboarding submissions.
 
 ## Core Requirements (static)
-1. SEO-optimized public landing with OG cards, sitemap, robots, JSON-LD.
-2. Bw Modelica self-hosted typography across the entire app.
-3. Mobile-responsive: zero horizontal overflow at 375px.
-4. JWT auth with strict role separation (`founder` vs `client`).
-5. All integrations resilient (graceful 5xx, audit trails, retry-safe webhooks).
-6. MongoDB with `_id` exclusion on every response.
+1. SEO-optimized public landing with OG cards, sitemap, robots, JSON-LD, custom Bw Modelica typography, mobile-responsive.
+2. JWT auth with strict role separation (`founder` vs `client` — verified by tests).
+3. All integrations resilient (graceful 5xx, audit trails, retry-safe webhooks, best-effort with admin fallback notifications).
+4. MongoDB with `_id` exclusion on every response.
+5. All UI elements have `data-testid` for automated testing.
 
 ## Tech Stack
 - Frontend: React 19 (CRA + craco), Tailwind, shadcn/ui, react-router-dom 7, sonner, @paypal/react-paypal-js
 - Backend: FastAPI, Motor (async MongoDB), httpx, bcrypt, PyJWT, APScheduler
 - DB: MongoDB
-- Integrations: OpenRouter, Emailit, AgencyHandy, TidyCal, **PayPal REST v2**
+- Integrations: OpenRouter, Emailit, AgencyHandy, TidyCal, **PayPal REST v2**, **Nifty PM**
 
-## Implementation Log
+## Implementation Phases
 
-### ✅ Phase 1 — Core POC (completed prior session)
-External dependency proven: OpenRouter routine generation, Emailit send, webhook ingestion.
+### ✅ Phase 1-5 (prior sessions)
+Core POC → V1 MVP → Credibility Builder → Integration Layer → AgencyHandy.
 
-### ✅ Phase 2 — V1 MVP (completed prior session)
-Landing page (10 sections) + Admin dashboard core (JWT, daily routine, outreach, content, pipeline, analytics, settings) + APScheduler 5am cron.
+### ✅ Phase 6 — PayPal + Client Portal (Feb 2026)
+- PayPal full payment (one-time + subscriptions) with Smart Buttons
+- Client auth (register/login/forgot-pw/reset-pw) + role separation hardening
+- Client Portal (Orders/Subscriptions/Invoices/Proposals/Profile)
+- Hidden admin gate (5x footer logo click)
 
-### ✅ Phase 3 — Credibility Builder (completed prior session)
-Case studies, testimonials, thought leadership, authority score, positioning checker, content themes.
+### ✅ Phase 7 — Blog + Onboarding + Nifty + PayPal Plans (Feb 2026)
+**New backend modules:**
+- `/app/backend/nifty_client.py` — Nifty PM async REST client (graceful fallback when token missing)
+- `/app/backend/onboarding_routes.py` — 3-phase onboarding (public-by-token, client-auth, admin)
+- `/app/backend/blog_routes.py` — public listing/detail + admin CRUD + AI-assisted drafts (OpenRouter)
+- `/app/backend/public_routes.py` — `/api/public/case-studies` (filter public:true)
 
-### ✅ Phase 4 — Integration Layer (completed prior session)
-TidyCal webhook → prospect/notifications, internal AI sync rules, OpenRouter fallback model.
+**New frontend pages:**
+- `/blog`, `/blog/:slug` — public blog with markdown renderer + OG/SEO meta
+- `/case-studies` — public marketing page
+- `/portal/onboarding` — 3-step wizard (Design → Function → Company) with token + client-auth resume
+- `/admin/blog` — admin CRUD + AI draft dialog
+- `/admin/onboarding` — manage onboardings, regenerate resume links, replay failed Nifty automation
+- `/admin/paypal-plans` — create recurring subscription plans
 
-### ✅ Phase 5 — AgencyHandy Integration (completed prior session)
-MRR widget, /admin/revenue page, webhook receiver, real-time sync, revenue-context AI routine.
+**Wiring:**
+- PayPal capture → auto-create client → auto-trigger onboarding (idempotent)
+- Onboarding phase submission → Nifty task creation (best-effort) + admin notification + AH project context
+- Public case-study filtered endpoint with no auth
+- Admin nav: added Blog, Onboarding, PayPal Plans
+- Header: added Blog nav link
+- Client Portal: added onboarding banner with Resume/Start button
+- Footer 5x admin gate still works
 
-### ✅ Phase 6 — PayPal + Client Portal (completed Feb 2026)
-**Backend additions:**
-- `/app/backend/paypal_client.py` — async REST v2 client (OAuth, Orders, Catalog Products, Plans, Subscriptions, Webhook verify via official endpoint)
-- `/app/backend/paypal_routes.py` — public checkout endpoints + admin-auth-protected admin endpoints
-- `/app/backend/paypal_webhooks.py` — `POST /api/webhooks/paypal` (no auth, signature-verified, persisted to `paypal_webhook_events`)
-- `/app/backend/client_routes.py` — client auth (register/login/forgot-pw/reset-pw), client portal (`/clients/me/*`), admin client management (`/admin/clients`)
-- `/app/backend/auth.py` — **hard role separation**: `get_current_user` now rejects role=`client` tokens
-- `/app/backend/.env` — `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` (sandbox), `PAYPAL_ENV=sandbox`
+**Test results (iteration_5):**
+- Backend: 20/20 new pytest cases pass; combined with Phase 6: 47/47 total
+- Frontend: 100% flows verified end-to-end (testing agent)
+- One PayPal API URL typo found + fixed by testing agent (`/v1/catalog/products` → `/v1/catalogs/products`)
 
-**Frontend additions:**
-- `/app/frontend/src/lib/clientAuth.js` — `ClientAuthProvider`, `RequireClient`, separate localStorage key from admin
-- `/app/frontend/src/components/payment/PayPalCheckoutButton.jsx` — reusable Smart Buttons (order & subscription)
-- `/app/frontend/src/components/sections/Pricing.jsx` — checkout dialog with email/name capture → Smart Buttons
-- `/app/frontend/src/components/sections/Header.jsx` — Client Login button (top right + mobile menu)
-- `/app/frontend/src/components/sections/Footer.jsx` — 5x rapid click on footer logo within 3s → `/admin/login` (hidden admin gate)
-- `/app/frontend/src/pages/client/{ClientLogin,ClientRegister,ClientPortal,SetPassword,ForgotPassword,CheckoutSuccess}.jsx`
-- `/app/frontend/src/App.js` — registered all client routes (`/login`, `/register`, `/portal`, `/forgot-password`, `/set-password`, `/reset-password`, `/checkout/success`)
-
-**Testing:**
-- 27/27 backend pytest cases pass (`/app/backend/tests/test_paypal_clients.py`)
-- All 9 frontend flows verified (header button, registration → portal, 5 portal tabs, profile save+persist, logout, footer admin gate, mobile menu client login, forgot password, pricing checkout dialog with PayPal Smart Buttons)
-
-**Known user-config issue (not a code bug):**
-- PayPal sandbox `CLIENT_ID` and `CLIENT_SECRET` in `.env` are intentionally the same string (user pasted Client ID twice). PayPal OAuth returns `invalid_client` until user pastes real secret. Backend handles gracefully with 502 + clear error message.
-
-## Backlog / Future Tasks
+## Backlog
 
 ### P1
-- Replace duplicated `PAYPAL_CLIENT_SECRET` in `.env` with real PayPal sandbox secret. Once done, full end-to-end PayPal checkout works.
-- Build **subscription plans** for Server Management / App Maintenance / 3-Tier Support — UI to create plans in `/admin/revenue` → POST `/api/paypal/admin/plans`.
-- Register PayPal webhook URL in production: `POST /api/paypal/admin/webhooks/register` (sets `PAYPAL_WEBHOOK_TARGET_URL` from env).
-- Emailit DNS verification for `bybloomlabs.com` (SPF/DKIM) so client setup emails actually send.
+- Generate `NIFTY_ACCESS_TOKEN` via https://developers.niftypm.com app registration so onboarding tasks auto-create in Nifty. Update `NIFTY_ACCESS_TOKEN` + `NIFTY_PROJECT_ID` in backend `.env`.
+- Emailit DNS verification for `bybloomlabs.com` (SPF/DKIM) so transactional emails actually deliver.
 
 ### P2
-- Public `/case-studies` marketing page pulling `?public=true` from `/api/case-studies`.
 - Google Analytics tracking.
-- HMAC signature verification on AgencyHandy webhooks (if plan supports it).
-- AgencyHandy server-side filter for `list_orders(client_email=…)` instead of client-side filtering.
-- Admin `/admin/clients` UI page listing/managing client accounts with resend-setup button.
+- HMAC signature verification on AgencyHandy webhooks (if plan supports).
+- AgencyHandy server-side `list_orders(client_email=…)` filter.
+- Admin `/admin/clients` UI page.
+- Public blog RSS feed at `/blog/rss.xml`.
+- Auto-generated OG cards per blog post (use existing headless Chromium tooling).
 
 ### P3
-- More 3rd-party integrations (per user note: "we will be integrating a lot of apps next"). Likely candidates from prior conversations: Stripe (backup payment), Calendly (alt to TidyCal), Slack notifications, Google Calendar sync.
+- More integrations the user mentioned ("a lot of apps next"): likely Stripe (backup payment), Google Calendar sync, Slack notifications.
+- Onboarding analytics dashboard (completion funnel, time-per-phase).
+- AI agent that auto-generates kickoff brief from Phase 3 responses.
 
-## API Endpoints (new in Phase 6)
+## API Endpoints (cumulative)
 
 ### Public (no auth)
-- `GET /api/paypal/config`
-- `POST /api/paypal/orders` (create one-time)
-- `POST /api/paypal/orders/{id}/capture`
-- `POST /api/paypal/subscriptions` (create from plan_key)
-- `GET /api/paypal/subscriptions/{id}`
-- `POST /api/webhooks/paypal`
-- `POST /api/clients/register`
-- `POST /api/clients/login`
-- `POST /api/clients/forgot-password`
-- `POST /api/clients/reset-password`
+- `GET /api/paypal/config`, `POST /api/paypal/orders`, `POST /api/paypal/orders/{id}/capture`, `POST /api/paypal/subscriptions`, `GET /api/paypal/subscriptions/{id}`
+- `POST /api/webhooks/paypal`, `POST /api/webhooks/agencyhandy`, `POST /api/webhooks/tidycal`
+- `POST /api/clients/{register,login,forgot-password,reset-password}`
+- `GET /api/blog`, `GET /api/blog/{slug}`
+- `GET /api/public/case-studies`, `GET /api/public/case-studies/{id}`
+- `GET /api/onboarding/by-token/{token}`, `POST /api/onboarding/by-token/{token}/{save,submit}`
 
-### Client-auth required
-- `GET /api/clients/me`
-- `PATCH /api/clients/me`
-- `GET /api/clients/me/orders`
-- `GET /api/clients/me/subscriptions`
-- `GET /api/clients/me/invoices`
-- `GET /api/clients/me/proposals`
+### Client-auth
+- `GET/PATCH /api/clients/me`
+- `GET /api/clients/me/{orders,subscriptions,invoices,proposals,onboarding}`
+- `POST /api/clients/me/onboarding/{save,submit}`
 
-### Admin-auth required (role=founder)
-- `GET /api/paypal/admin/health`
-- `GET /api/paypal/admin/plans`
-- `POST /api/paypal/admin/plans` (create subscription plan)
-- `GET /api/paypal/admin/transactions`
-- `GET /api/paypal/admin/subscriptions`
-- `POST /api/paypal/admin/webhooks/register`
-- `GET /api/paypal/admin/webhooks`
-- `GET /api/admin/clients`
-- `POST /api/admin/clients/{email}/resend-setup`
+### Admin-auth (role=founder)
+- All `/api/admin/*` routes (case-studies, testimonials, etc.)
+- `GET/POST/PATCH/DELETE /api/admin/blog`, `POST /api/admin/blog/ai/draft`
+- `GET/POST/DELETE /api/admin/onboarding`, `POST /api/admin/onboarding/start`, `POST /api/admin/onboarding/{id}/regenerate-link`, `POST /api/admin/onboarding/{id}/replay/{phase}`
+- `GET /api/admin/clients`, `POST /api/admin/clients/{email}/resend-setup`
+- `GET /api/paypal/admin/{health,plans,transactions,subscriptions,webhooks}`, `POST /api/paypal/admin/plans`, `POST /api/paypal/admin/webhooks/register`
 
-## MongoDB Collections (new in Phase 6)
-- `clients` — { id, email, name, company, phone, password_hash, needs_password_setup, source, source_ids, status, last_login_at, created_at, updated_at }
-- `client_reset_tokens` — { token, email, purpose, expires_at, used, created_at }
-- `paypal_transactions` — { id, kind, status, tier, amount, currency, customer_email, customer_name, description, metadata, raw, raw_capture, captured_at, created_at, updated_at }
-- `paypal_subscriptions` — { id, plan_id, plan_key, status, customer_email, customer_name, metadata, raw, activated_at, created_at, updated_at }
-- `paypal_plans` — { plan_id, plan_key, product_id, name, description, price, currency, interval_unit, interval_count, status, created_at }
-- `paypal_products` — { product_id, name, description, created_at }
-- `paypal_webhook_events` — { event_id, event_type, resource_type, summary, received_at, verified, raw }
+## MongoDB Collections (cumulative)
+- `users`, `daily_routines`, `prospects`, `case_studies`, `testimonials`, `notifications`, `thought_leadership`, `authority_score`
+- `clients`, `client_reset_tokens`
+- `paypal_transactions`, `paypal_subscriptions`, `paypal_plans`, `paypal_products`, `paypal_webhook_events`
+- `blog_posts`
+- `onboardings`
