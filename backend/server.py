@@ -26,6 +26,14 @@ from agencyhandy_webhooks import (  # noqa: E402
     ah_webhook_admin_router,
     ah_webhook_router,
 )
+from paypal_client import PayPalClient  # noqa: E402
+from paypal_routes import paypal_admin_router, paypal_router  # noqa: E402
+from paypal_webhooks import paypal_webhook_router  # noqa: E402
+from client_routes import (  # noqa: E402
+    client_admin_router,
+    client_auth_router,
+    client_portal_router,
+)
 from integrations import (  # noqa: E402
     notification_router,
     sync_router,
@@ -71,6 +79,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.openrouter = OpenRouterClient()
     app.state.emailit = EmailitClient()
     app.state.agencyhandy = AgencyHandyClient()
+    app.state.paypal = PayPalClient()
 
     # Seed founder + settings + authority metric
     try:
@@ -151,6 +160,12 @@ api.include_router(sync_router)
 api.include_router(agencyhandy_router)
 api.include_router(ah_webhook_router)
 api.include_router(ah_webhook_admin_router)
+api.include_router(paypal_router)
+api.include_router(paypal_admin_router)
+api.include_router(paypal_webhook_router)
+api.include_router(client_auth_router)
+api.include_router(client_portal_router)
+api.include_router(client_admin_router)
 
 app.include_router(api)
 

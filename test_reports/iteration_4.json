@@ -1,0 +1,59 @@
+{
+  "summary": "Phase 6 testing for PayPal integration + Client Portal. Ran 27 backend pytest cases (26 pass, 1 fail — critical security: client JWT can access admin endpoints because get_current_user does not enforce role). Frontend: header client-login button, /register → /portal, all 5 portal tabs, profile save+persist, logout, footer 5x-click admin gate, mobile menu client-login button, /forgot-password, and Express pricing checkout dialog (PayPal Smart Buttons iframe loads) — ALL PASS.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/admin/clients (and other admin routes guarded by get_current_user)",
+        "issue": "Role separation broken: a JWT issued for role=\"client\" is accepted by get_current_user (auth.py L50-60). It does NOT check payload.role. Therefore a client token can call /api/admin/clients, /api/paypal/admin/*, /api/notifications, /api/admin/* etc. Test pytest test_client_token_cannot_access_admin_clients FAILED with 200 (expected 401/403). The reciprocal direction (admin token hitting /api/clients/me) IS correctly rejected (403 'Client access required') because get_current_client checks role.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "/api/paypal/admin/health",
+        "issue": "Returns ok=false (expected) because PAYPAL_CLIENT_SECRET == PAYPAL_CLIENT_ID in /app/backend/.env. This is the documented user-config issue — backend handles it gracefully. No fix needed in code, but user must paste real PayPal sandbox secret."
+      },
+      {
+        "endpoint": "/api/paypal/orders",
+        "issue": "Express tier order creation returns 502 'invalid_client' due to same root cause (bad PayPal credentials). Graceful — no crash. Will succeed once real secret is set."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Pricing checkout dialog",
+        "issues": ["Radix Dialog console warning: 'Missing `Description` or `aria-describedby={undefined}` for {DialogContent}' — accessibility nit, add DialogDescription to CheckoutDialog in Pricing.jsx"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_paypal_clients.py",
+    "/app/test_reports/pytest/paypal_clients.xml"
+  ],
+  "action_items": [
+    "HIGH/CRITICAL — Fix /app/backend/auth.py get_current_user to reject role=='client' tokens (or accept only role in {'founder','admin'}). Otherwise a logged-in client can read /api/admin/clients (including all client emails) and call other admin endpoints. Suggested fix: `if payload.get('role') == 'client': raise HTTPException(403, 'Admin access required')` inside get_current_user, OR add a separate require_admin dependency.",
+    "LOW — Add DialogDescription/aria-describedby to the Pricing CheckoutDialog to silence Radix a11y warning.",
+    "USER CONFIG — Replace duplicated PAYPAL_CLIENT_SECRET in /app/backend/.env with the real sandbox secret to unblock live PayPal OAuth (already documented)."
+  ],
+  "critical_code_review_comments": [
+    "auth.py L50-60: get_current_user does not verify role; defaults missing role to 'founder' which silently elevates any token without a role claim. Combined with role='client' JWT being accepted, this is a privilege-escalation vector.",
+    "client_routes.py L420-446: my_orders/my_subscriptions calls request.app.state.agencyhandy.list_orders() with no client-scoping at AH side — it pulls ALL company orders then filters locally by email. OK for now but won't scale; consider AH server-side filter param.",
+    "paypal_routes.py L182-197: auto_provision_client_from_payment is wrapped in try/except Exception — silently swallows DB failure. Suggest at least adding a notification on failure so founder is alerted."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_paypal_clients.py (new)"
+  ],
+  "success_rate": {
+    "backend": "96% (26/27)",
+    "frontend": "100% (9/9 flows)"
+  },
+  "test_credentials": "Admin founder@thesalvador.group/admin123, Client testclient@bybloomlabs.com/clientpass123 — both work.",
+  "seed_data_creation": "Tests create ephemeral client accounts (e2e-reg-*, e2e-pwflow-*, e2e-ui-* @bybloomlabs.com). Persist in MongoDB clients collection; safe but cleanup not implemented.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The 1 backend failure is a genuine security bug (role enforcement). All other PayPal + Client Portal endpoints work. Frontend selectors confirmed: pricing-plan-{key}-get-started-button, pricing-checkout-{key}-{name|email}-input, portal-profile-{name|company|phone}-input, portal-profile-save-button, portal-logout-button, footer-logo-admin-gate (5x click within 3s with 200ms gap navigates to /admin/login). PayPal Smart Buttons iframe loads even though OAuth fails because /api/paypal/config returns configured=true. Do NOT attempt full PayPal checkout — Client ID == Secret in .env.",
+  "rca_of_the_issue": "Token role separation bug RCA: /app/backend/auth.py defines get_current_user which decodes JWT and returns email/name/role but does not validate role. /api/admin/* routes use Depends(get_current_user) which therefore accepts ANY valid signed JWT — including client tokens issued via /api/clients/login (role='client'). Reproduction: 1) POST /api/clients/login as testclient → get access_token. 2) GET /api/admin/clients with Bearer <token> → 200 OK returning entire clients list. Mitigation: enforce role whitelist in get_current_user, e.g. raise 403 if payload.role not in {'founder','admin'}."
+}

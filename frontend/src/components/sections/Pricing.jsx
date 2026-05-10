@@ -1,8 +1,18 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Check, Sparkles, ArrowRight } from "lucide-react";
-import { PAYPAL_LINKS } from "@/lib/brand";
-import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
+import { PayPalCheckoutButton } from "@/components/payment/PayPalCheckoutButton";
 
 const PLANS = [
   {
@@ -19,7 +29,7 @@ const PLANS = [
       "Launch + 7-day post-launch support",
     ],
     badge: null,
-    payTier: "express",
+    tier: "express",
   },
   {
     key: "custom",
@@ -36,7 +46,7 @@ const PLANS = [
       "Launch + 14-day post-launch support",
     ],
     badge: "POPULAR",
-    payTier: "custom",
+    tier: "custom",
   },
   {
     key: "enterprise",
@@ -54,26 +64,123 @@ const PLANS = [
       "Launch + 30-day priority support",
     ],
     badge: null,
-    payTier: "enterprise",
+    tier: "enterprise",
   },
 ];
 
-const handlePayClick = (e, plan) => {
-  // PayPal placeholder behaviour: open link if real, else show toast and route to booking.
-  const link = PAYPAL_LINKS[plan.payTier];
-  if (!link || link === "#") {
-    e.preventDefault();
-    toast("Redirecting to booking…", {
-      description: `Lock in ${plan.name} on a 15-min discovery call.`,
-    });
-    setTimeout(() => {
-      const el = document.getElementById("book");
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 250);
-  }
-};
+function CheckoutDialog({ plan, open, onOpenChange }) {
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ email: "", name: "" });
+  const [showButtons, setShowButtons] = useState(false);
+
+  const canStart =
+    form.email.trim().length > 3 && form.email.includes("@") && form.name.trim().length > 1;
+
+  if (!plan) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="sm:max-w-md max-h-[90vh] overflow-y-auto"
+        data-testid={`pricing-checkout-dialog-${plan.key}`}
+      >
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">
+            Get started — {plan.name}
+          </DialogTitle>
+          <DialogDescription>
+            Pay <span className="font-medium text-foreground tabular-nums">
+              ${plan.price.toLocaleString()}
+            </span>{" "}
+            securely via PayPal. We&apos;ll create your client portal
+            automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!showButtons ? (
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label htmlFor={`co-name-${plan.key}`} className="text-sm">
+                Full name
+              </Label>
+              <Input
+                id={`co-name-${plan.key}`}
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Jane Doe"
+                required
+                data-testid={`pricing-checkout-${plan.key}-name-input`}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor={`co-email-${plan.key}`} className="text-sm">
+                Email
+              </Label>
+              <Input
+                id={`co-email-${plan.key}`}
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="you@company.com"
+                required
+                data-testid={`pricing-checkout-${plan.key}-email-input`}
+                className="mt-1.5"
+              />
+            </div>
+            <Button
+              className="w-full bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-11"
+              disabled={!canStart}
+              onClick={() => setShowButtons(true)}
+              data-testid={`pricing-checkout-${plan.key}-continue-button`}
+            >
+              Continue to PayPal
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+            <p className="text-[11px] text-muted-foreground text-center">
+              Secure checkout · 30-day money-back guarantee
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4 mt-2">
+            <div className="rounded-lg border border-border bg-[var(--warm-50)] px-3 py-3 text-sm">
+              <p className="font-medium">{form.name}</p>
+              <p className="text-muted-foreground text-xs">{form.email}</p>
+            </div>
+            <PayPalCheckoutButton
+              mode="order"
+              tier={plan.tier}
+              customerEmail={form.email}
+              customerName={form.name}
+              onSuccess={(result) => {
+                onOpenChange(false);
+                navigate(`/checkout/success?type=${result.type}`);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowButtons(false)}
+              className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`pricing-checkout-${plan.key}-back-button`}
+            >
+              ← back
+            </button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Pricing = () => {
+  const [activePlan, setActivePlan] = useState(null);
+  const [open, setOpen] = useState(false);
+
+  const startCheckout = (plan) => {
+    setActivePlan(plan);
+    setOpen(true);
+  };
+
   return (
     <section
       id="pricing"
@@ -89,9 +196,9 @@ export const Pricing = () => {
             Three packages. Zero surprises.
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Fixed scope. Fixed price. Pay 50% upfront, 50% at launch. PayPal
-            checkout when you&rsquo;re ready &mdash; or book a discovery call
-            if you want a custom quote first.
+            Fixed scope. Fixed price. Pay securely via PayPal — checkout
+            processed right here on the site. Or book a discovery call if you
+            want a custom quote first.
           </p>
         </div>
 
@@ -118,24 +225,16 @@ export const Pricing = () => {
                   </Badge>
                 )}
                 <div className="flex items-baseline justify-between">
-                  <div className="font-display text-lg font-semibold">
-                    {plan.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground tabular-nums">
-                    {plan.timeline}
-                  </div>
+                  <div className="font-display text-lg font-semibold">{plan.name}</div>
+                  <div className="text-xs text-muted-foreground tabular-nums">{plan.timeline}</div>
                 </div>
                 <div className="mt-4 flex items-end gap-1.5">
                   <span className="font-display text-4xl font-semibold tabular-nums tracking-tight">
                     ${plan.price.toLocaleString()}
                   </span>
-                  <span className="text-sm text-muted-foreground pb-1">
-                    one-time
-                  </span>
+                  <span className="text-sm text-muted-foreground pb-1">one-time</span>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {plan.description}
-                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
 
                 <ul className="mt-5 space-y-3 flex-1">
                   {plan.bullets.map((b, i) => (
@@ -159,26 +258,16 @@ export const Pricing = () => {
 
                 <div className="mt-7 space-y-2">
                   <Button
-                    asChild
-                    onClick={(e) => handlePayClick(e, plan)}
+                    onClick={() => startCheckout(plan)}
                     className={`w-full h-11 ${
                       popular
                         ? "bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
                         : "bg-foreground hover:bg-foreground/90 text-background"
                     }`}
                     data-testid={`pricing-plan-${plan.key}-get-started-button`}
-                    data-paypal-tier={plan.payTier}
                   >
-                    <a
-                      href={PAYPAL_LINKS[plan.payTier]}
-                      target={
-                        PAYPAL_LINKS[plan.payTier] === "#" ? "_self" : "_blank"
-                      }
-                      rel="noopener noreferrer"
-                    >
-                      Get Started
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </a>
+                    Get Started
+                    <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                   <a
                     href="#book"
@@ -195,9 +284,14 @@ export const Pricing = () => {
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
           All packages include a money-back guarantee on milestone 1. Need
-          something custom? <a href="#book" className="underline underline-offset-4 hover:text-foreground">Talk to us.</a>
+          something custom?{" "}
+          <a href="#book" className="underline underline-offset-4 hover:text-foreground">
+            Talk to us.
+          </a>
         </p>
       </div>
+
+      <CheckoutDialog plan={activePlan} open={open} onOpenChange={setOpen} />
     </section>
   );
 };

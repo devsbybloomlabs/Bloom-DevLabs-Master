@@ -41,6 +41,10 @@ class EmailitClient:
         self.from_name = from_name or os.environ.get("EMAILIT_FROM_NAME", "Bloom Labs")
 
     @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
+
+    @property
     def headers(self) -> Dict[str, str]:
         return {
             "Authorization": f"Bearer {self.api_key}",

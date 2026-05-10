@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
-import { Menu, Calendar } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+  SheetHeader,
+} from "@/components/ui/sheet";
+import { Menu, Calendar, LogIn, User } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { useClientAuth } from "@/lib/clientAuth";
 
 const NAV_ITEMS = [
   { id: "problem", label: "Problem" },
@@ -16,6 +24,8 @@ const NAV_ITEMS = [
 export const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const { token, client } = useClientAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -24,17 +34,21 @@ export const Header = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const clientLoggedIn = !!token;
+
   return (
     <header
       data-testid="header"
       className={`sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-shadow ${
-        scrolled ? "shadow-[0_1px_0_rgba(15,23,42,0.06)] border-b border-border" : "border-b border-transparent"
+        scrolled
+          ? "shadow-[0_1px_0_rgba(15,23,42,0.06)] border-b border-border"
+          : "border-b border-transparent"
       }`}
     >
-      <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         <a
           href="#top"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 flex-shrink-0"
           data-testid="header-logo-link"
           aria-label="Bloom Labs home"
         >
@@ -60,6 +74,31 @@ export const Header = () => {
         </nav>
 
         <div className="flex items-center gap-2">
+          {clientLoggedIn ? (
+            <Button
+              asChild
+              variant="outline"
+              className="hidden lg:inline-flex h-10 px-4 border-[#1E3A8A]/30 text-[#1E3A8A] hover:bg-[#1E3A8A]/5"
+              data-testid="header-portal-button"
+            >
+              <Link to="/portal">
+                <User className="h-4 w-4 mr-2" />
+                {(client?.name || "My").split(" ")[0]} → Portal
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              asChild
+              variant="outline"
+              className="hidden lg:inline-flex h-10 px-4 border-[#1E3A8A]/30 text-[#1E3A8A] hover:bg-[#1E3A8A]/5"
+              data-testid="header-client-login-button"
+            >
+              <Link to="/login">
+                <LogIn className="h-4 w-4 mr-2" />
+                Client Login
+              </Link>
+            </Button>
+          )}
           <Button
             asChild
             className="hidden lg:inline-flex bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-10 px-5"
@@ -105,9 +144,36 @@ export const Header = () => {
                     {item.label}
                   </a>
                 ))}
+                {clientLoggedIn ? (
+                  <Button
+                    variant="outline"
+                    className="mt-4 h-12 border-[#1E3A8A]/30 text-[#1E3A8A]"
+                    onClick={() => {
+                      setOpen(false);
+                      navigate("/portal");
+                    }}
+                    data-testid="mobile-portal-button"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    My Portal
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="mt-4 h-12 border-[#1E3A8A]/30 text-[#1E3A8A]"
+                    onClick={() => {
+                      setOpen(false);
+                      navigate("/login");
+                    }}
+                    data-testid="mobile-client-login-button"
+                  >
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Client Login
+                  </Button>
+                )}
                 <Button
                   asChild
-                  className="mt-4 bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-12"
+                  className="mt-2 bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-12"
                   onClick={() => setOpen(false)}
                   data-testid="mobile-book-call-button"
                 >

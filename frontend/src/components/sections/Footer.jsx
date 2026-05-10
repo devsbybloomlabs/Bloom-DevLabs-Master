@@ -1,4 +1,14 @@
-import { Mail, Phone, Linkedin, Twitter, Instagram, Facebook, Youtube } from "lucide-react";
+import { useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Mail,
+  Phone,
+  Linkedin,
+  Twitter,
+  Instagram,
+  Facebook,
+  Youtube,
+} from "lucide-react";
 import { BRAND } from "@/lib/brand";
 
 const SOCIALS = [
@@ -19,21 +29,54 @@ const LINKS = [
   { label: "Book a Call", href: "#book" },
 ];
 
+// 5x click within 3s on the footer logo → /admin/login (hidden admin gate)
+const ADMIN_GATE_CLICKS = 5;
+const ADMIN_GATE_WINDOW_MS = 3000;
+
 export const Footer = () => {
   const year = new Date().getFullYear();
+  const navigate = useNavigate();
+  const clicksRef = useRef([]);
+
+  const onLogoClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const now = Date.now();
+    const recent = [...clicksRef.current, now].filter(
+      (t) => now - t <= ADMIN_GATE_WINDOW_MS
+    );
+    clicksRef.current = recent;
+    if (recent.length >= ADMIN_GATE_CLICKS) {
+      clicksRef.current = [];
+      // Hard navigate so any state weirdness is bypassed.
+      navigate("/admin/login");
+      window.setTimeout(() => {
+        if (window.location.pathname !== "/admin/login") {
+          window.location.assign("/admin/login");
+        }
+      }, 80);
+    }
+  };
+
   return (
-    <footer
-      data-testid="footer"
-      className="bg-[var(--navy-950)] text-white"
-    >
+    <footer data-testid="footer" className="bg-[var(--navy-950)] text-white">
       <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
         <div className="grid gap-10 lg:grid-cols-12">
           <div className="lg:col-span-5">
-            <img
-              src={BRAND.logos.fullLight}
-              alt="Bloom Labs"
-              className="h-9 w-auto"
-            />
+            <button
+              type="button"
+              onClick={onLogoClick}
+              aria-label="Bloom Labs"
+              className="cursor-default focus:outline-none"
+              data-testid="footer-logo-admin-gate"
+            >
+              <img
+                src={BRAND.logos.fullLight}
+                alt="Bloom Labs"
+                className="h-9 w-auto select-none"
+                draggable="false"
+              />
+            </button>
             <p className="mt-4 text-sm text-white/70 leading-relaxed max-w-md">
               {BRAND.tagline} &nbsp;Bloom Labs builds enterprise-grade custom
               web apps in 2&ndash;4 weeks at ~40% lower cost than traditional
@@ -66,7 +109,7 @@ export const Footer = () => {
                   <a
                     href={l.href}
                     className="text-sm text-white/80 hover:text-white transition-colors"
-                    data-testid={`footer-link-${l.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    data-testid={`footer-link-${l.label.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     {l.label}
                   </a>
