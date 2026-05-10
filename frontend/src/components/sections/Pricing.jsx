@@ -83,6 +83,7 @@ function CheckoutDialog({ plan, open, onOpenChange }) {
       <DialogContent
         className="sm:max-w-md max-h-[90vh] overflow-y-auto"
         data-testid={`pricing-checkout-dialog-${plan.key}`}
+        aria-describedby={`pricing-checkout-desc-${plan.key}`}
       >
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
@@ -96,6 +97,9 @@ function CheckoutDialog({ plan, open, onOpenChange }) {
             automatically.
           </DialogDescription>
         </DialogHeader>
+        <p id={`pricing-checkout-desc-${plan.key}`} className="sr-only">
+          Secure PayPal checkout for {plan.name} — ${plan.price.toLocaleString()}.
+        </p>
 
         {!showButtons ? (
           <div className="space-y-4 mt-2">

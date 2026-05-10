@@ -53,8 +53,12 @@ async def get_current_user(
     if not creds or not creds.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     payload = decode_token(creds.credentials)
+    role = payload.get("role", "founder")
+    # Hard role separation: client tokens MUST NOT reach admin routes.
+    if role not in ("founder", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return {
         "email": payload.get("sub"),
         "name": payload.get("name"),
-        "role": payload.get("role", "founder"),
+        "role": role,
     }
