@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, Inbox } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import SeoHead from "@/components/SeoHead";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -14,7 +15,6 @@ export default function PublicCaseStudies() {
   const [items, setItems] = useState(null);
 
   useEffect(() => {
-    document.title = "Case Studies — Bloom Labs";
     axios
       .get(`${API}/public/case-studies`)
       .then((r) => setItems(r.data || []))
@@ -23,6 +23,17 @@ export default function PublicCaseStudies() {
 
   return (
     <main className="bg-background text-foreground" data-testid="public-case-studies-page">
+      <SeoHead
+        title="Case Studies — real apps, real results"
+        description="See how Bloom Labs ships enterprise-grade custom web apps in 2–4 weeks at ~40% lower cost. Real client wins, metrics, and quotes."
+        keywords="case studies, custom web app development, AI-native agency, SaaS launch, bloom labs"
+        url="https://bybloomlabs.com/case-studies"
+        type="website"
+        breadcrumbs={[
+          { name: "Home", url: "https://bybloomlabs.com" },
+          { name: "Case Studies", url: "https://bybloomlabs.com/case-studies" },
+        ]}
+      />
       <Header />
       <section className="bg-[var(--warm-50)] border-b border-border">
         <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 py-16 sm:py-24">

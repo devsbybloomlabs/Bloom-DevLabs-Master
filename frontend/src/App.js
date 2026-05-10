@@ -20,6 +20,8 @@ import RevenuePage from "@/pages/admin/RevenuePage";
 import BlogPage from "@/pages/admin/BlogPage";
 import OnboardingAdmin from "@/pages/admin/OnboardingAdmin";
 import PayPalPlansPage from "@/pages/admin/PayPalPlansPage";
+import LeadMagnetsAdmin from "@/pages/admin/LeadMagnetsAdmin";
+import MilestonesAdmin from "@/pages/admin/MilestonesAdmin";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
 import { ClientAuthProvider, RequireClient } from "@/lib/clientAuth";
 import ClientLogin from "@/pages/client/ClientLogin";
@@ -32,6 +34,7 @@ import OnboardingWizard from "@/pages/client/OnboardingWizard";
 import PublicCaseStudies from "@/pages/PublicCaseStudies";
 import PublicBlog from "@/pages/PublicBlog";
 import PublicBlogPost from "@/pages/PublicBlogPost";
+import AnalyticsTracker from "@/components/Analytics";
 
 function App() {
   return (
@@ -39,6 +42,7 @@ function App() {
       <BrowserRouter>
         <ClientAuthProvider>
           <AuthProvider>
+            <AnalyticsTracker />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/case-studies" element={<PublicCaseStudies />} />
@@ -89,6 +93,8 @@ function App() {
                 <Route path="blog" element={<BlogPage />} />
                 <Route path="onboarding" element={<OnboardingAdmin />} />
                 <Route path="paypal-plans" element={<PayPalPlansPage />} />
+                <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
+                <Route path="milestones" element={<MilestonesAdmin />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

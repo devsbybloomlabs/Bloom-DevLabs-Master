@@ -5,6 +5,7 @@ import { Header } from "@/components/sections/Header";
 import { Footer } from "@/components/sections/Footer";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowRight, BookOpen } from "lucide-react";
+import SeoHead from "@/components/SeoHead";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -12,7 +13,6 @@ export default function PublicBlog() {
   const [items, setItems] = useState(null);
 
   useEffect(() => {
-    document.title = "Blog — Bloom Labs";
     axios
       .get(`${API}/blog`)
       .then((r) => setItems(r.data || []))
@@ -21,6 +21,17 @@ export default function PublicBlog() {
 
   return (
     <main className="bg-background text-foreground" data-testid="public-blog-page">
+      <SeoHead
+        title="Blog — field notes from shipping AI-native systems"
+        description="Deep dives on AI-native SaaS development, agency operations, and the playbook we use to ship enterprise web apps in 2–4 weeks."
+        keywords="AI development blog, SaaS engineering, agency operations, fast software delivery, bloom labs"
+        url="https://bybloomlabs.com/blog"
+        type="website"
+        breadcrumbs={[
+          { name: "Home", url: "https://bybloomlabs.com" },
+          { name: "Blog", url: "https://bybloomlabs.com/blog" },
+        ]}
+      />
       <Header />
       <section className="bg-[var(--warm-50)] border-b border-border">
         <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 py-16 sm:py-24">

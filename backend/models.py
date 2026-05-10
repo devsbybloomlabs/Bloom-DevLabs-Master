@@ -602,3 +602,130 @@ class OnboardingSubmission(BaseModel):
     ah_project_id: Optional[str] = None
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
+
+
+# ---------- Lead Magnets / Email Capture ----------
+class EmailSequenceStep(BaseModel):
+    """One step inside a drip email sequence."""
+    day_offset: int = 0  # 0 = immediately, 3 = +3 days, etc.
+    subject: str = ""
+    body_markdown: str = ""
+
+
+class LeadMagnet(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_id)
+    slug: str
+    title: str  # e.g. "The Founder's AI-Native Build Playbook"
+    description: str = ""
+    asset_url: Optional[str] = None  # link to PDF/Notion/etc.
+    cta_text: str = "Get the playbook"
+    placement: str = "all"  # all | blog | blog_slug:<slug> | homepage
+    placement_target: Optional[str] = None  # if placement=blog_slug, the slug
+    sequence_steps: List[EmailSequenceStep] = Field(default_factory=list)
+    active: bool = True
+    leads_count: int = 0
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class LeadMagnetCreate(BaseModel):
+    slug: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=200)
+    description: str = ""
+    asset_url: Optional[str] = None
+    cta_text: str = "Get the playbook"
+    placement: str = "all"
+    placement_target: Optional[str] = None
+    sequence_steps: List[EmailSequenceStep] = Field(default_factory=list)
+    active: bool = True
+
+
+class LeadMagnetUpdate(BaseModel):
+    slug: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    asset_url: Optional[str] = None
+    cta_text: Optional[str] = None
+    placement: Optional[str] = None
+    placement_target: Optional[str] = None
+    sequence_steps: Optional[List[EmailSequenceStep]] = None
+    active: Optional[bool] = None
+
+
+class Lead(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_id)
+    email: EmailStr
+    name: Optional[str] = None
+    magnet_id: str
+    magnet_slug: str
+    source_url: Optional[str] = None  # which blog post / page they came from
+    utm: Dict[str, str] = Field(default_factory=dict)
+    next_step_idx: int = 0  # which sequence_step is next to send
+    next_send_at: Optional[datetime] = None  # when to send next step
+    completed_sequence: bool = False
+    unsubscribed: bool = False
+    unsubscribed_at: Optional[datetime] = None
+    sent_log: List[Dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class LeadOptInRequest(BaseModel):
+    email: EmailStr
+    name: Optional[str] = None
+    magnet_slug: str
+    source_url: Optional[str] = None
+    utm: Optional[Dict[str, str]] = None
+
+
+# ---------- Milestones (Nifty → Client Portal sync) ----------
+class MilestoneNote(BaseModel):
+    author: str = ""
+    text: str = ""
+    created_at: datetime = Field(default_factory=_now)
+
+
+class Milestone(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_id)
+    client_email: EmailStr
+    project_name: str = ""
+    title: str
+    status: str = "pending"  # pending | in_progress | complete | blocked
+    description: str = ""
+    is_final_deliverable: bool = False
+    notify_client_on_complete: bool = False
+    nifty_task_id: Optional[str] = None
+    due_date: Optional[datetime] = None
+    completion_date: Optional[datetime] = None
+    blocked_reason: Optional[str] = None
+    blocked_eta: Optional[datetime] = None
+    notes: List[MilestoneNote] = Field(default_factory=list)
+    last_updated: datetime = Field(default_factory=_now)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class MilestoneCreate(BaseModel):
+    client_email: EmailStr
+    project_name: str = ""
+    title: str
+    description: str = ""
+    is_final_deliverable: bool = False
+    notify_client_on_complete: bool = False
+    nifty_task_id: Optional[str] = None
+    due_date: Optional[datetime] = None
+    status: str = "pending"
+
+
+class MilestoneUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None
+    description: Optional[str] = None
+    is_final_deliverable: Optional[bool] = None
+    notify_client_on_complete: Optional[bool] = None
+    nifty_task_id: Optional[str] = None
+    due_date: Optional[datetime] = None
+    completion_date: Optional[datetime] = None
+    blocked_reason: Optional[str] = None
+    blocked_eta: Optional[datetime] = None

@@ -19,6 +19,12 @@ import {
   Loader2,
   ClipboardList,
   ArrowRight,
+  Target,
+  CheckCircle2,
+  PauseCircle,
+  PlayCircle,
+  Circle,
+  PartyPopper,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 
@@ -255,6 +261,94 @@ function ProposalsList({ data, loading }) {
   );
 }
 
+const MILESTONE_STATUS_META = {
+  pending: { label: "Pending", icon: Circle, cls: "bg-zinc-100 text-zinc-700" },
+  in_progress: { label: "In Progress", icon: PlayCircle, cls: "bg-amber-100 text-amber-800" },
+  complete: { label: "Complete", icon: CheckCircle2, cls: "bg-green-100 text-green-800" },
+  blocked: { label: "On Hold", icon: PauseCircle, cls: "bg-red-100 text-red-800" },
+};
+
+function MilestonesList({ data, loading }) {
+  if (loading) return <Skeleton className="h-32 w-full" />;
+  const items = data || [];
+  if (!items.length) {
+    return (
+      <EmptyState
+        icon={Target}
+        title="No milestones yet"
+        message="Your project milestones will appear here as your build progresses."
+      />
+    );
+  }
+  return (
+    <div className="space-y-3" data-testid="portal-milestones-list">
+      {items.map((m) => {
+        const meta = MILESTONE_STATUS_META[m.status] || MILESTONE_STATUS_META.pending;
+        const StatusIcon = meta.icon;
+        const isFinalComplete = m.is_final_deliverable && m.status === "complete";
+        return (
+          <Card
+            key={m.id}
+            className={`border-border ${isFinalComplete ? "ring-2 ring-[#3B82F6]/40 shadow-[var(--shadow-md)]" : ""}`}
+            data-testid={`portal-milestone-card-${m.id}`}
+          >
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${meta.cls}`}>
+                      <StatusIcon className="h-3 w-3" />
+                      {meta.label}
+                    </span>
+                    {isFinalComplete && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#1E3A8A] text-white px-2.5 py-1 text-[11px] font-medium">
+                        <PartyPopper className="h-3 w-3" />
+                        Delivered
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 font-display text-base font-medium">{m.title}</p>
+                  {m.description && (
+                    <p className="mt-1 text-sm text-muted-foreground">{m.description}</p>
+                  )}
+                  {m.blocked_reason && (
+                    <p className="mt-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded px-3 py-1.5">
+                      On hold: {m.blocked_reason}
+                    </p>
+                  )}
+                  {m.notes && m.notes.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {m.notes.slice(-3).map((n, i) => (
+                        <div key={i} className="text-xs bg-secondary rounded-md px-2.5 py-1.5">
+                          <span className="font-medium">{n.author || "Team"}:</span>{" "}
+                          <span className="text-muted-foreground">{n.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="text-right text-xs text-muted-foreground">
+                  {m.completion_date ? (
+                    <>
+                      <p>Completed</p>
+                      <p>{new Date(m.completion_date).toLocaleDateString()}</p>
+                    </>
+                  ) : m.due_date ? (
+                    <>
+                      <p>Due</p>
+                      <p>{new Date(m.due_date).toLocaleDateString()}</p>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProfilePanel({ client, refreshClient, token }) {
   const [form, setForm] = useState({
     name: client?.name || "",
@@ -343,6 +437,7 @@ export default function ClientPortal() {
   const [invoices, setInvoices] = useState(null);
   const [proposals, setProposals] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
+  const [milestones, setMilestones] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -354,18 +449,20 @@ export default function ClientPortal() {
     setLoading(true);
     const api = clientApi(token);
     try {
-      const [o, s, i, p, ob] = await Promise.allSettled([
+      const [o, s, i, p, ob, ms] = await Promise.allSettled([
         api.get("/clients/me/orders"),
         api.get("/clients/me/subscriptions"),
         api.get("/clients/me/invoices"),
         api.get("/clients/me/proposals"),
         api.get("/clients/me/onboarding"),
+        api.get("/clients/me/milestones"),
       ]);
       setOrders(o.status === "fulfilled" ? o.value.data : null);
       setSubs(s.status === "fulfilled" ? s.value.data : null);
       setInvoices(i.status === "fulfilled" ? i.value.data : null);
       setProposals(p.status === "fulfilled" ? p.value.data : null);
       setOnboarding(ob.status === "fulfilled" ? ob.value.data : null);
+      setMilestones(ms.status === "fulfilled" ? ms.value.data : null);
     } finally {
       setLoading(false);
     }
@@ -449,8 +546,11 @@ export default function ClientPortal() {
           </Card>
         )}
 
-        <Tabs defaultValue="orders" className="w-full">
+        <Tabs defaultValue="milestones" className="w-full">
           <TabsList className="flex w-full overflow-x-auto no-scrollbar gap-1 bg-background border border-border p-1 h-auto">
+            <TabsTrigger value="milestones" data-testid="portal-tab-milestones" className="flex-shrink-0">
+              <Target className="h-4 w-4 mr-1.5" /> Milestones
+            </TabsTrigger>
             <TabsTrigger value="orders" data-testid="portal-tab-orders" className="flex-shrink-0">
               <CreditCard className="h-4 w-4 mr-1.5" /> Orders
             </TabsTrigger>
@@ -467,6 +567,9 @@ export default function ClientPortal() {
               <UserIcon className="h-4 w-4 mr-1.5" /> Profile
             </TabsTrigger>
           </TabsList>
+          <TabsContent value="milestones" className="mt-6">
+            <MilestonesList data={milestones} loading={loading} />
+          </TabsContent>
           <TabsContent value="orders" className="mt-6">
             <OrdersList data={orders} loading={loading} />
           </TabsContent>

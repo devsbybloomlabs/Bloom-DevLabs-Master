@@ -1,0 +1,41 @@
+{
+  "summary": "Phase 8 e2e — 26/26 backend pytest PASS (lead magnets CRUD + public opt-in + drip tick + unsubscribe + role separation; blog RSS feed; OG SVG card 200/404; milestones admin CRUD; client portal milestones; Nifty webhook match/no-match/complete/Client-Notes append; sync history). Frontend: lead-magnet-form on /blog/hello-world renders, accepts email, submits to /api/leads/subscribe and shows lead-magnet-success state — PASS. CRITICAL FINDING: SeoHead component injects duplicate meta tags (with data-seo-head attr) but does NOT update/remove the static meta tags shipped in public/index.html, so document.querySelector('meta[name=\"description\"]') and og:title/og:image/canonical return the LANDING PAGE defaults — meaning crawlers + social cards on /blog/:slug, /blog, /case-studies will see Bloom Labs landing meta, not the page-specific content. Only the JSON-LD <script> works (no static counterpart in index.html, so the new one is found). Admin /admin/lead-magnets + /admin/milestones UI could not be exercised due to a Playwright login-submit issue (page stayed at /admin/login); main agent should manually verify the wizard + sidebar nav.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SeoHead", "issue": "Injects new <meta data-seo-head> tags but the static <meta name=description>, <meta property=og:title>, <meta property=og:image>, <link rel=canonical> from public/index.html are NOT removed/updated. document.querySelector returns the static (landing) value first. og:image stays 'https://bybloomlabs.com/og-default.png' instead of '/api/og/blog/hello-world.svg'. canonical stays 'https://bybloomlabs.com/' instead of '/blog/hello-world'. og:title stays landing title.", "selector": "meta[name=description], meta[property=og:title], meta[property=og:image], link[rel=canonical]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase8.py",
+    "/app/test_reports/pytest/phase8.xml"
+  ],
+  "action_items": [
+    "HIGH — Fix SeoHead.jsx: in setTag(), first look up an EXISTING non-managed tag matching the bare selector (without [data-seo-head]) and update IT in place (after saving its original value/attrs), OR delete static defaults from public/index.html on mount and restore them on unmount. Simplest patch: change setTag() to find the existing tag with `document.head.querySelector(selector)` and ADD the data-seo-head attribute + set new content; cleanup() then restores the original content saved in a closure. This will make /blog/:slug, /blog, /case-studies all expose post-specific og:title/og:image/canonical/description.",
+    "VERIFY MANUALLY — /admin/lead-magnets wizard (3 steps: Basics → Drip → Review), Copy embed button, and /admin/milestones (New milestone + status edit + Sync history tab) + sidebar nav 'Lead Magnets' & 'Milestones'. Backend endpoints are fully verified working — only UI wiring needs eyeball.",
+    "VERIFY MANUALLY — Client portal: Milestones tab is the default first tab (data-testid='portal-tab-milestones'), and milestones with is_final_deliverable=true + status='complete' show 'Delivered' badge + ring border on portal-milestone-card-{id}."
+  ],
+  "critical_code_review_comments": [
+    "SeoHead.jsx L17-33: setTag's selector includes `[${MANAGED_ATTR}]` which only matches tags already injected by SeoHead. Static index.html meta tags never get queried, so they remain unchanged and take precedence in DOM order. Either (a) update the existing static tag in place and remove from cleanup, or (b) strip duplicates after injection.",
+    "leads_routes.py L141 drip_tick signature: (db, app) — matches caller in server.py. Good.",
+    "milestone_routes.py L60 _normalize_status: defaults unknown status to 'pending' which silently masks Nifty's new states. Consider logging a warning when an unknown status is seen.",
+    "blog_extras_routes.py: RSS feed includes published_at fallback chain — robust. OG SVG _wrap_text truncates words >max_chars onto a single line which can overflow; acceptable for current title lengths.",
+    "Lead magnet public/active list correctly hides sequence_steps via Mongo projection — good privacy practice.",
+    "Nifty webhook is unauthenticated by design (Nifty signs externally). PAYPAL_ACCEPT_UNVERIFIED=true pattern not replicated here — fine since matcher requires existing milestone and outcomes are logged."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase8.py (new — 26 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "1 confirmed working flow (LeadMagnetForm e2e). 1 HIGH bug confirmed (SeoHead). Admin/portal UI not visually verified — login automation glitch (sticky input post-submit), backend supports all the flows."},
+  "test_credentials": "Admin founder@thesalvador.group/admin123, Client testclient@bybloomlabs.com/clientpass123 — both work.",
+  "seed_data_creation": "Tests create ephemeral TEST_ lead magnets (auto-deleted), ephemeral leads (lead-e2e-*, lead-test-*, lead-unsub-*, frontend-e2e@bybloomlabs.com), 1 milestone 'Build Auth' for testclient@bybloomlabs.com (auto-deleted). Existing magnet 'founder-playbook' was found and exercised for the e2e idempotency test.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend Phase 8 is rock solid — re-running test_phase8.py should keep being green. The ONE bug to fix is SeoHead's failure to override pre-existing static <meta> tags from public/index.html. After the fix, re-verify on /blog/hello-world: querySelector('meta[property=og:image]').content should equal `${REACT_APP_BACKEND_URL}/api/og/blog/hello-world.svg` and canonical should be `https://bybloomlabs.com/blog/hello-world`. JSON-LD already works. For the admin wizard / milestones admin / client portal milestones tab — backend is 100% ready, just visual UI verification needed. data-testid='lead-magnet-form' + 'lead-magnet-success' both confirmed present and functional on the public blog post.",
+  "rca_of_the_issue": "SeoHead RCA: setTag() builds selector `meta[name='description'][data-seo-head]`. On first mount, this query returns null (no such tag exists), so SeoHead creates a NEW <meta> with data-seo-head=true. The original <meta name='description'> from index.html still sits earlier in <head>. Standard DOM query `document.querySelector('meta[name=description]')` returns the FIRST match — the static one. Same for og:title, og:image, canonical. Google/Twitter/Facebook crawlers reading <head> top-to-bottom also see the static one first. Mitigation: SeoHead must either (1) hijack the existing static tag (set content, mark with data-seo-head, remember original for cleanup), or (2) remove the static defaults from index.html and let SeoHead own everything. Approach (1) is safer because it preserves SEO baseline if SeoHead fails to mount."
+}

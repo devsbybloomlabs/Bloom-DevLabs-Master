@@ -37,6 +37,19 @@ from onboarding_routes import (  # noqa: E402
     onboarding_client_router,
     onboarding_public_router,
 )
+from leads_routes import (  # noqa: E402
+    drip_tick,
+    leads_admin_router,
+    leads_public_router,
+)
+from milestone_routes import (  # noqa: E402
+    milestone_admin_router,
+    milestone_client_router,
+    nifty_comment_poll,
+    nifty_timeline_refresh,
+    nifty_webhook_router,
+)
+from blog_extras_routes import blog_extras_router  # noqa: E402
 from client_routes import (  # noqa: E402
     client_admin_router,
     client_auth_router,
@@ -115,6 +128,38 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             log.exception("Auto-routine cron failed: %s", exc)
 
     scheduler.add_job(auto_generate_routine, CronTrigger(hour=5, minute=0))
+
+    async def drip_cron() -> None:
+        try:
+            res = await drip_tick(db, app)
+            if res.get("sent", 0) > 0 or res.get("failed", 0) > 0:
+                log.info("Drip tick: %s", res)
+        except Exception as exc:
+            log.exception("Drip cron failed: %s", exc)
+
+    async def nifty_comment_cron() -> None:
+        try:
+            res = await nifty_comment_poll(app)
+            if res.get("polled", 0) > 0:
+                log.info("Nifty comment poll: %s", res)
+        except Exception as exc:
+            log.exception("Nifty comment cron failed: %s", exc)
+
+    async def nifty_timeline_cron() -> None:
+        try:
+            res = await nifty_timeline_refresh(app)
+            if res.get("refreshed", 0) > 0:
+                log.info("Nifty timeline refresh: %s", res)
+        except Exception as exc:
+            log.exception("Nifty timeline cron failed: %s", exc)
+
+    # Hourly drip ticks
+    scheduler.add_job(drip_cron, CronTrigger(minute=15))
+    # Every 5 min Nifty comment poll
+    scheduler.add_job(nifty_comment_cron, CronTrigger(minute="*/5"))
+    # Daily 8am Nifty timeline refresh
+    scheduler.add_job(nifty_timeline_cron, CronTrigger(hour=8, minute=0))
+
     scheduler.start()
     app.state.scheduler = scheduler
     log.info("Bloom Labs API ready at /api")
@@ -176,11 +221,17 @@ api.include_router(client_auth_router)
 api.include_router(client_portal_router)
 api.include_router(client_admin_router)
 api.include_router(public_router)
+api.include_router(blog_extras_router)
 api.include_router(blog_public_router)
 api.include_router(blog_admin_router)
 api.include_router(onboarding_public_router)
 api.include_router(onboarding_client_router)
 api.include_router(onboarding_admin_router)
+api.include_router(leads_public_router)
+api.include_router(leads_admin_router)
+api.include_router(nifty_webhook_router)
+api.include_router(milestone_client_router)
+api.include_router(milestone_admin_router)
 
 app.include_router(api)
 

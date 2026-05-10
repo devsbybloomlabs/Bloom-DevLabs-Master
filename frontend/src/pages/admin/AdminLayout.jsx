@@ -20,6 +20,8 @@ import {
   Newspaper,
   ClipboardList,
   Repeat,
+  Sparkles,
+  Target,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { BRAND } from "@/lib/brand";
@@ -35,6 +37,8 @@ const NAV = [
   { to: "/admin/revenue", label: "Revenue & Clients", icon: CircleDollarSign, group: "Sales" },
   { to: "/admin/paypal-plans", label: "PayPal Plans", icon: Repeat, group: "Sales" },
   { to: "/admin/onboarding", label: "Onboarding", icon: ClipboardList, group: "Sales" },
+  { to: "/admin/milestones", label: "Milestones", icon: Target, group: "Sales" },
+  { to: "/admin/lead-magnets", label: "Lead Magnets", icon: Sparkles, group: "Authority" },
   { to: "/admin/credibility", label: "Credibility Hub", icon: ShieldCheck, group: "Authority" },
   { to: "/admin/case-studies", label: "Case Studies", icon: Award, group: "Authority" },
   { to: "/admin/testimonials", label: "Testimonials", icon: Mic, group: "Authority" },

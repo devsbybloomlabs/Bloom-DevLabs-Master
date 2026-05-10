@@ -6,6 +6,8 @@ import { Footer } from "@/components/sections/Footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import SeoHead from "@/components/SeoHead";
+import LeadMagnetForm from "@/components/LeadMagnetForm";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -68,27 +70,60 @@ export default function PublicBlogPost() {
       .get(`${API}/blog/${slug}`)
       .then((r) => {
         setPost(r.data);
-        document.title = (r.data.seo_title || r.data.title) + " — Bloom Labs";
-        // basic SEO
-        const setMeta = (name, content) => {
-          if (!content) return;
-          let tag = document.querySelector(`meta[name="${name}"]`);
-          if (!tag) {
-            tag = document.createElement("meta");
-            tag.setAttribute("name", name);
-            document.head.appendChild(tag);
-          }
-          tag.setAttribute("content", content);
-        };
-        setMeta("description", r.data.seo_description || r.data.excerpt);
       })
       .catch((err) => {
         setError(err?.response?.status === 404 ? "Post not found" : "Failed to load");
       });
   }, [slug]);
 
+  const canonicalUrl = `https://bybloomlabs.com/blog/${slug}`;
+  const ogImage = post
+    ? `${process.env.REACT_APP_BACKEND_URL}/api/og/blog/${slug}.svg`
+    : undefined;
+
+  const articleJsonLd = post && {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.seo_description || post.excerpt,
+    image: ogImage,
+    author: {
+      "@type": "Person",
+      name: post.author_name || "Bloom Labs",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Bloom Labs",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://bybloomlabs.com/og-default.png",
+      },
+    },
+    datePublished: post.published_at,
+    dateModified: post.updated_at || post.published_at,
+    mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
+    keywords: (post.tags || []).join(", "),
+  };
+
   return (
     <main className="bg-background text-foreground" data-testid="public-blog-post-page">
+      {post && (
+        <SeoHead
+          title={post.seo_title || post.title}
+          description={post.seo_description || post.excerpt}
+          keywords={(post.tags || []).join(", ")}
+          image={ogImage}
+          url={canonicalUrl}
+          type="article"
+          author={post.author_name}
+          jsonLd={articleJsonLd}
+          breadcrumbs={[
+            { name: "Home", url: "https://bybloomlabs.com" },
+            { name: "Blog", url: "https://bybloomlabs.com/blog" },
+            { name: post.title, url: canonicalUrl },
+          ]}
+        />
+      )}
       <Header />
       <article className="mx-auto max-w-[760px] px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <Button
@@ -165,6 +200,11 @@ export default function PublicBlogPost() {
               data-testid="blog-post-body"
               dangerouslySetInnerHTML={{ __html: renderMarkdown(post.body) }}
             />
+
+            {/* Lead magnet opt-in — auto-fetches active magnet */}
+            <div className="mt-14">
+              <LeadMagnetForm sourceUrl={canonicalUrl} />
+            </div>
           </>
         )}
       </article>
