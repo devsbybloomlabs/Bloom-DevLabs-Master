@@ -2,111 +2,103 @@
 
 ## Original Problem Statement
 Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
-- High-converting B2B SaaS landing page with public Case Studies + Blog
-- Founder admin dashboard (AI routine, CRM, content, credibility hub, revenue ops, blog, onboarding)
-- Integrations: OpenRouter (AI), Emailit (transactional email), AgencyHandy (CRM/revenue), TidyCal (booking), **PayPal** (one-time + subscriptions), **Nifty PM** (task automation)
-- Client Portal with self-service onboarding wizard
+- High-converting B2B SaaS landing page with public Case Studies + Blog + per-page SEO + dynamic OG cards + RSS
+- Founder admin dashboard (AI routine, CRM, content, credibility hub, revenue ops, blog, onboarding, **lead magnets**, **milestones**)
+- Integrations: OpenRouter (AI), Emailit (transactional email, DNS now verified), AgencyHandy, TidyCal, **PayPal** (one-time + subscriptions), **Nifty PM** (task automation + milestone sync)
+- Client Portal with self-service onboarding wizard + **milestone tracking**
 - Hidden admin gate (5x footer logo click → `/admin/login`)
+- **Lead generation funnel**: inline opt-in forms on blog posts → email drip via Emailit → admin dashboard for managing magnets + leads
+- **Google Analytics 4** (gated on `REACT_APP_GA_MEASUREMENT_ID` env var)
 
 ## User Personas
-- **Founder** (Ryan Salvador) — sole admin. Runs daily routine, pipeline, content, blog, onboardings, revenue.
-- **Prospect** — discovery-call lead from TidyCal/AgencyHandy/landing forms.
-- **Client** — paid customer with portal access (orders, invoices, subscriptions, proposals, profile, onboarding).
-- **Team** (Designer/PM/Developer) — receive Nifty task notifications + assignments triggered by onboarding submissions.
-
-## Core Requirements (static)
-1. SEO-optimized public landing with OG cards, sitemap, robots, JSON-LD, custom Bw Modelica typography, mobile-responsive.
-2. JWT auth with strict role separation (`founder` vs `client` — verified by tests).
-3. All integrations resilient (graceful 5xx, audit trails, retry-safe webhooks, best-effort with admin fallback notifications).
-4. MongoDB with `_id` exclusion on every response.
-5. All UI elements have `data-testid` for automated testing.
+- **Founder** (Ryan Salvador) — sole admin
+- **Prospect** — discovery-call lead from TidyCal/AgencyHandy/landing/blog magnet opt-in
+- **Client** — paid customer (orders, invoices, subscriptions, proposals, profile, onboarding, milestones)
+- **Team** (Designer/PM/Developer) — Nifty task assignees, get notifications on onboarding submissions, drive milestone updates back to client portal
 
 ## Tech Stack
 - Frontend: React 19 (CRA + craco), Tailwind, shadcn/ui, react-router-dom 7, sonner, @paypal/react-paypal-js
-- Backend: FastAPI, Motor (async MongoDB), httpx, bcrypt, PyJWT, APScheduler
+- Backend: FastAPI, Motor, httpx, bcrypt, PyJWT, APScheduler
 - DB: MongoDB
-- Integrations: OpenRouter, Emailit, AgencyHandy, TidyCal, **PayPal REST v2**, **Nifty PM**
+- Integrations: OpenRouter · Emailit · AgencyHandy · TidyCal · **PayPal REST v2** · **Nifty PM** · **GA4**
 
 ## Implementation Phases
 
 ### ✅ Phase 1-5 (prior sessions)
-Core POC → V1 MVP → Credibility Builder → Integration Layer → AgencyHandy.
+POC → V1 MVP → Credibility Builder → Integration Layer → AgencyHandy.
 
 ### ✅ Phase 6 — PayPal + Client Portal (Feb 2026)
-- PayPal full payment (one-time + subscriptions) with Smart Buttons
-- Client auth (register/login/forgot-pw/reset-pw) + role separation hardening
-- Client Portal (Orders/Subscriptions/Invoices/Proposals/Profile)
-- Hidden admin gate (5x footer logo click)
+PayPal Smart Buttons (one-time + subscriptions), Client auth (JWT, role separation), Portal (Orders/Subs/Invoices/Proposals/Profile), Hidden admin gate.
 
 ### ✅ Phase 7 — Blog + Onboarding + Nifty + PayPal Plans (Feb 2026)
+Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboarding wizard (auto-triggered post-payment, resume-by-token, admin management), Nifty PM REST client + task auto-creation on phase submit with graceful fallback, PayPal subscription plans admin.
+
+### ✅ Phase 8 — Lead Magnets + SEO + GA4 + RSS + OG + Milestones Sync (Feb 2026)
 **New backend modules:**
-- `/app/backend/nifty_client.py` — Nifty PM async REST client (graceful fallback when token missing)
-- `/app/backend/onboarding_routes.py` — 3-phase onboarding (public-by-token, client-auth, admin)
-- `/app/backend/blog_routes.py` — public listing/detail + admin CRUD + AI-assisted drafts (OpenRouter)
-- `/app/backend/public_routes.py` — `/api/public/case-studies` (filter public:true)
+- `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
+- `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
+- `/app/backend/blog_extras_routes.py` — `/api/blog/rss.xml` (RSS 2.0) + `/api/og/blog/{slug}.svg` (dynamic SVG OG card generator)
+
+**New frontend components:**
+- `/app/frontend/src/components/SeoHead.jsx` — drop-in SEO injector with **hijack-in-place** strategy (overrides static index.html tags, restores on unmount)
+- `/app/frontend/src/components/Analytics.jsx` — GA4 loader + page-view tracker + `trackEvent()` helper
+- `/app/frontend/src/components/LeadMagnetForm.jsx` — embeddable opt-in form (auto-fetches active magnet)
 
 **New frontend pages:**
-- `/blog`, `/blog/:slug` — public blog with markdown renderer + OG/SEO meta
-- `/case-studies` — public marketing page
-- `/portal/onboarding` — 3-step wizard (Design → Function → Company) with token + client-auth resume
-- `/admin/blog` — admin CRUD + AI draft dialog
-- `/admin/onboarding` — manage onboardings, regenerate resume links, replay failed Nifty automation
-- `/admin/paypal-plans` — create recurring subscription plans
+- `/admin/lead-magnets` — 3-step wizard (Basics → Drip emails → Review)
+- `/admin/milestones` — CRUD + sync-history tabs
 
 **Wiring:**
-- PayPal capture → auto-create client → auto-trigger onboarding (idempotent)
-- Onboarding phase submission → Nifty task creation (best-effort) + admin notification + AH project context
-- Public case-study filtered endpoint with no auth
-- Admin nav: added Blog, Onboarding, PayPal Plans
-- Header: added Blog nav link
-- Client Portal: added onboarding banner with Resume/Start button
-- Footer 5x admin gate still works
+- LeadMagnetForm auto-embedded at bottom of every blog post (PublicBlogPost.jsx)
+- SeoHead applied to Landing + Blog listing + Blog post (Article JSON-LD + breadcrumbs + dynamic OG SVG) + Case Studies (BreadcrumbList JSON-LD)
+- AnalyticsTracker mounted inside BrowserRouter for auto-page-view tracking
+- Client Portal: new **Milestones tab (default first tab)** with status pills + celebration ring for final deliverables
+- Admin nav: added Lead Magnets + Milestones items
+- Sitemap.xml updated with /blog + /case-studies
 
-**Test results (iteration_5):**
-- Backend: 20/20 new pytest cases pass; combined with Phase 6: 47/47 total
-- Frontend: 100% flows verified end-to-end (testing agent)
-- One PayPal API URL typo found + fixed by testing agent (`/v1/catalog/products` → `/v1/catalogs/products`)
+**Test results:**
+- iteration_6: 26/26 backend pytest pass (lead magnets + RSS + OG SVG + milestones + Nifty webhook). 1 critical SEO bug found.
+- iteration_7: SEO bug fixed (hijack-in-place SeoHead). 26/26 backend pytest still pass. 9/9 SEO frontend assertions pass.
 
 ## Backlog
 
 ### P1
-- Generate `NIFTY_ACCESS_TOKEN` via https://developers.niftypm.com app registration so onboarding tasks auto-create in Nifty. Update `NIFTY_ACCESS_TOKEN` + `NIFTY_PROJECT_ID` in backend `.env`.
-- Emailit DNS verification for `bybloomlabs.com` (SPF/DKIM) so transactional emails actually deliver.
+- Generate Nifty access token at https://developers.niftypm.com → paste into `/app/backend/.env`. Once set, Phase 7 onboarding tasks auto-create AND Phase 8 milestone status syncs run live.
+- Set `REACT_APP_GA_MEASUREMENT_ID` in `/app/frontend/.env` with the user's GA4 measurement ID (G-XXXXXXXXXX) → analytics enables itself.
 
 ### P2
-- Google Analytics tracking.
-- HMAC signature verification on AgencyHandy webhooks (if plan supports).
+- HMAC signature verification on AgencyHandy webhooks.
 - AgencyHandy server-side `list_orders(client_email=…)` filter.
 - Admin `/admin/clients` UI page.
-- Public blog RSS feed at `/blog/rss.xml`.
-- Auto-generated OG cards per blog post (use existing headless Chromium tooling).
+- Migrate dynamic OG SVG to also render to PNG (some social-card scrapers don't render SVG; current SVG works for OpenGraph but Twitter Cards prefer PNG).
 
 ### P3
-- More integrations the user mentioned ("a lot of apps next"): likely Stripe (backup payment), Google Calendar sync, Slack notifications.
-- Onboarding analytics dashboard (completion funnel, time-per-phase).
-- AI agent that auto-generates kickoff brief from Phase 3 responses.
+- Lead scoring + segmentation in Lead Magnets admin (e.g., filter by source_url, magnet_slug).
+- A/B testing for lead magnet copy.
+- Automated Nifty project creation on Phase 3 onboarding submit (currently logs to admin notifications).
+- Stripe as backup payment processor.
+- Google Calendar sync.
+- Slack notifications.
 
-## API Endpoints (cumulative)
+## API Endpoints (cumulative reference)
 
 ### Public (no auth)
-- `GET /api/paypal/config`, `POST /api/paypal/orders`, `POST /api/paypal/orders/{id}/capture`, `POST /api/paypal/subscriptions`, `GET /api/paypal/subscriptions/{id}`
-- `POST /api/webhooks/paypal`, `POST /api/webhooks/agencyhandy`, `POST /api/webhooks/tidycal`
-- `POST /api/clients/{register,login,forgot-password,reset-password}`
-- `GET /api/blog`, `GET /api/blog/{slug}`
-- `GET /api/public/case-studies`, `GET /api/public/case-studies/{id}`
-- `GET /api/onboarding/by-token/{token}`, `POST /api/onboarding/by-token/{token}/{save,submit}`
+- PayPal: `GET /api/paypal/config`, `POST /api/paypal/orders`, `POST /api/paypal/orders/{id}/capture`, `POST /api/paypal/subscriptions`, `GET /api/paypal/subscriptions/{id}`
+- Webhooks: `POST /api/webhooks/{paypal,agencyhandy,tidycal,nifty}`
+- Client auth: `POST /api/clients/{register,login,forgot-password,reset-password}`
+- Blog: `GET /api/blog`, `GET /api/blog/{slug}`, `GET /api/blog/rss.xml`, `GET /api/og/blog/{slug}.svg`
+- Case studies: `GET /api/public/case-studies`
+- Onboarding (by token): `GET /api/onboarding/by-token/{token}`, `POST .../save`, `POST .../submit`
+- Lead magnets: `GET /api/leads/magnet/{slug}`, `GET /api/leads/active`, `POST /api/leads/subscribe`, `GET /api/leads/unsubscribe`
 
 ### Client-auth
 - `GET/PATCH /api/clients/me`
-- `GET /api/clients/me/{orders,subscriptions,invoices,proposals,onboarding}`
+- `GET /api/clients/me/{orders,subscriptions,invoices,proposals,onboarding,milestones}`
 - `POST /api/clients/me/onboarding/{save,submit}`
 
-### Admin-auth (role=founder)
-- All `/api/admin/*` routes (case-studies, testimonials, etc.)
-- `GET/POST/PATCH/DELETE /api/admin/blog`, `POST /api/admin/blog/ai/draft`
-- `GET/POST/DELETE /api/admin/onboarding`, `POST /api/admin/onboarding/start`, `POST /api/admin/onboarding/{id}/regenerate-link`, `POST /api/admin/onboarding/{id}/replay/{phase}`
-- `GET /api/admin/clients`, `POST /api/admin/clients/{email}/resend-setup`
-- `GET /api/paypal/admin/{health,plans,transactions,subscriptions,webhooks}`, `POST /api/paypal/admin/plans`, `POST /api/paypal/admin/webhooks/register`
+### Admin-auth
+- All `/api/admin/*` routes: case-studies, testimonials, blog (incl. `/admin/blog/ai/draft`), onboarding, clients, lead-magnets, leads (+ drip-tick), milestones (+ sync-history)
+- PayPal admin: `/api/paypal/admin/{health,plans,transactions,subscriptions,webhooks}`
 
 ## MongoDB Collections (cumulative)
 - `users`, `daily_routines`, `prospects`, `case_studies`, `testimonials`, `notifications`, `thought_leadership`, `authority_score`
@@ -114,3 +106,5 @@ Core POC → V1 MVP → Credibility Builder → Integration Layer → AgencyHand
 - `paypal_transactions`, `paypal_subscriptions`, `paypal_plans`, `paypal_products`, `paypal_webhook_events`
 - `blog_posts`
 - `onboardings`
+- `lead_magnets`, `leads`
+- `milestones`, `milestone_sync_history`
