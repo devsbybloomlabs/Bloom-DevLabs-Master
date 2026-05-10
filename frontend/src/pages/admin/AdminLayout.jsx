@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
@@ -105,6 +105,21 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // SEO: ensure admin pages are not indexed (belt-and-suspenders alongside robots.txt)
+  useEffect(() => {
+    const meta = document.createElement("meta");
+    meta.name = "robots";
+    meta.content = "noindex, nofollow, noarchive, nosnippet";
+    meta.setAttribute("data-admin-noindex", "true");
+    document.head.appendChild(meta);
+    const prevTitle = document.title;
+    document.title = "Bloom Labs Admin";
+    return () => {
+      document.head.removeChild(meta);
+      document.title = prevTitle;
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();

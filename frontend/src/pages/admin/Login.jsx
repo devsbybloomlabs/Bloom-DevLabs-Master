@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,21 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // SEO: noindex admin login page
+  useEffect(() => {
+    const meta = document.createElement("meta");
+    meta.name = "robots";
+    meta.content = "noindex, nofollow, noarchive, nosnippet";
+    meta.setAttribute("data-admin-noindex", "true");
+    document.head.appendChild(meta);
+    const prevTitle = document.title;
+    document.title = "Sign in — Bloom Labs Admin";
+    return () => {
+      document.head.removeChild(meta);
+      document.title = prevTitle;
+    };
+  }, []);
 
   const onSubmit = async (e) => {
     e.preventDefault();
