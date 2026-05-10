@@ -17,6 +17,8 @@ import {
   ExternalLink,
   Inbox,
   Loader2,
+  ClipboardList,
+  ArrowRight,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 
@@ -340,6 +342,7 @@ export default function ClientPortal() {
   const [subs, setSubs] = useState(null);
   const [invoices, setInvoices] = useState(null);
   const [proposals, setProposals] = useState(null);
+  const [onboarding, setOnboarding] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -351,16 +354,18 @@ export default function ClientPortal() {
     setLoading(true);
     const api = clientApi(token);
     try {
-      const [o, s, i, p] = await Promise.allSettled([
+      const [o, s, i, p, ob] = await Promise.allSettled([
         api.get("/clients/me/orders"),
         api.get("/clients/me/subscriptions"),
         api.get("/clients/me/invoices"),
         api.get("/clients/me/proposals"),
+        api.get("/clients/me/onboarding"),
       ]);
       setOrders(o.status === "fulfilled" ? o.value.data : null);
       setSubs(s.status === "fulfilled" ? s.value.data : null);
       setInvoices(i.status === "fulfilled" ? i.value.data : null);
       setProposals(p.status === "fulfilled" ? p.value.data : null);
+      setOnboarding(ob.status === "fulfilled" ? ob.value.data : null);
     } finally {
       setLoading(false);
     }
@@ -411,6 +416,38 @@ export default function ClientPortal() {
             Your projects, invoices, and subscriptions in one place.
           </p>
         </div>
+
+        {onboarding && !onboarding.completed && (
+          <Card
+            className="mb-6 border-[#1E3A8A]/30 bg-gradient-to-br from-[#1E3A8A]/5 to-[#3B82F6]/5"
+            data-testid="portal-onboarding-banner"
+          >
+            <CardContent className="p-4 sm:p-5 flex flex-wrap items-center gap-4 justify-between">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="h-10 w-10 rounded-full bg-[#1E3A8A] text-white flex items-center justify-center flex-shrink-0">
+                  <ClipboardList className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-display font-medium">
+                    Finish your onboarding ({onboarding.current_phase || 1}/3)
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Tell us about your design taste, function references, and
+                    success metrics so we can ship the right thing.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => navigate("/portal/onboarding")}
+                className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+                data-testid="portal-onboarding-resume-button"
+              >
+                {onboarding.current_phase > 1 ? "Resume" : "Start"}
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="orders" className="w-full">
           <TabsList className="flex w-full overflow-x-auto no-scrollbar gap-1 bg-background border border-border p-1 h-auto">

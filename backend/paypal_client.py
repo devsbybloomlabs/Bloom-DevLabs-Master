@@ -207,11 +207,11 @@ class PayPalClient:
         }
         if description:
             body["description"] = description[:256]
-        return await self._request("POST", "/v1/catalog/products", json=body)
+        return await self._request("POST", "/v1/catalogs/products", json=body)
 
     async def list_products(self, page_size: int = 20) -> Dict[str, Any]:
         return await self._request(
-            "GET", "/v1/catalog/products", params={"page_size": page_size}
+            "GET", "/v1/catalogs/products", params={"page_size": page_size}
         )
 
     # ------------------------------------------------------------------

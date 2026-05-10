@@ -191,8 +191,19 @@ async def capture_order(
                 source="paypal_order",
                 source_id=order_id,
             )
+            # Also kick off onboarding flow
+            from onboarding_routes import ensure_onboarding_for_payment
+
+            await ensure_onboarding_for_payment(
+                db,
+                request,
+                email=payer_email,
+                name=payer_name or payer_email.split("@")[0],
+                source="paypal_order",
+                source_id=order_id,
+            )
         except Exception as exc:
-            log.exception("Auto-provision client failed: %s", exc)
+            log.exception("Auto-provision client/onboarding failed: %s", exc)
 
     return {"id": order_id, "status": status_str, "payer_email": payer_email}
 

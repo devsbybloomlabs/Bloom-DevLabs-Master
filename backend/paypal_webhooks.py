@@ -143,8 +143,17 @@ async def _process_paypal_event(
         # Auto-provision client
         if payer_email and "@" in payer_email:
             from client_routes import auto_provision_client_from_payment
+            from onboarding_routes import ensure_onboarding_for_payment
 
             await auto_provision_client_from_payment(
+                db,
+                request,
+                email=payer_email,
+                name=payer_email.split("@")[0],
+                source="paypal_webhook",
+                source_id=order_id or event.get("id") or "",
+            )
+            await ensure_onboarding_for_payment(
                 db,
                 request,
                 email=payer_email,

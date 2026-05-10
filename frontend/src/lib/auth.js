@@ -107,3 +107,9 @@ export function authClient(token) {
   });
   return inst;
 }
+
+// Convenience hook: returns an axios instance pre-bound to the admin token.
+export function useAdminApi() {
+  const { token } = useAuth();
+  return authClient(token);
+}

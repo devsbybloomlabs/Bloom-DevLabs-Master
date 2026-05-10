@@ -29,6 +29,14 @@ from agencyhandy_webhooks import (  # noqa: E402
 from paypal_client import PayPalClient  # noqa: E402
 from paypal_routes import paypal_admin_router, paypal_router  # noqa: E402
 from paypal_webhooks import paypal_webhook_router  # noqa: E402
+from nifty_client import NiftyClient  # noqa: E402
+from blog_routes import blog_admin_router, blog_public_router  # noqa: E402
+from public_routes import public_router  # noqa: E402
+from onboarding_routes import (  # noqa: E402
+    onboarding_admin_router,
+    onboarding_client_router,
+    onboarding_public_router,
+)
 from client_routes import (  # noqa: E402
     client_admin_router,
     client_auth_router,
@@ -80,6 +88,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.emailit = EmailitClient()
     app.state.agencyhandy = AgencyHandyClient()
     app.state.paypal = PayPalClient()
+    app.state.nifty = NiftyClient()
 
     # Seed founder + settings + authority metric
     try:
@@ -166,6 +175,12 @@ api.include_router(paypal_webhook_router)
 api.include_router(client_auth_router)
 api.include_router(client_portal_router)
 api.include_router(client_admin_router)
+api.include_router(public_router)
+api.include_router(blog_public_router)
+api.include_router(blog_admin_router)
+api.include_router(onboarding_public_router)
+api.include_router(onboarding_client_router)
+api.include_router(onboarding_admin_router)
 
 app.include_router(api)
 

@@ -479,3 +479,126 @@ class NotificationItem(BaseModel):
     read: bool = False
     link: Optional[str] = None
     created_at: datetime = Field(default_factory=_now)
+
+
+# ---------- Blog Posts ----------
+class BlogPost(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_id)
+    slug: str
+    title: str
+    excerpt: Optional[str] = None
+    body: str = ""  # markdown
+    featured_image: Optional[str] = None
+    og_image: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    author_name: str = "Bloom Labs"
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    published: bool = False
+    published_at: Optional[datetime] = None
+    views: int = 0
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class BlogPostCreate(BaseModel):
+    slug: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=200)
+    excerpt: Optional[str] = None
+    body: str = ""
+    featured_image: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    author_name: str = "Bloom Labs"
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    published: bool = False
+
+
+class BlogPostUpdate(BaseModel):
+    slug: Optional[str] = None
+    title: Optional[str] = None
+    excerpt: Optional[str] = None
+    body: Optional[str] = None
+    featured_image: Optional[str] = None
+    og_image: Optional[str] = None
+    tags: Optional[List[str]] = None
+    author_name: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    published: Optional[bool] = None
+
+
+class BlogDraftPromptRequest(BaseModel):
+    topic: str = Field(min_length=2, max_length=200)
+    angle: Optional[str] = None
+    target_length: str = "medium"  # short | medium | long
+    audience: Optional[str] = "SaaS founders, agency operators"
+
+
+# ---------- Onboarding ----------
+class OnboardingDesignLink(BaseModel):
+    url: str = ""
+    why: str = ""
+
+
+class OnboardingFunctionLink(BaseModel):
+    url: str = ""
+    why: str = ""
+
+
+class OnboardingSuccessScenario(BaseModel):
+    description: str = ""
+    metric: str = ""
+
+
+class OnboardingPhase1(BaseModel):
+    """Design Language"""
+    design_links: List[OnboardingDesignLink] = Field(default_factory=lambda: [
+        OnboardingDesignLink(), OnboardingDesignLink(), OnboardingDesignLink()
+    ])
+    color_preferences: str = ""
+    mood_keywords: str = ""
+
+
+class OnboardingPhase2(BaseModel):
+    """Function Language"""
+    function_links: List[OnboardingFunctionLink] = Field(default_factory=lambda: [
+        OnboardingFunctionLink(), OnboardingFunctionLink(), OnboardingFunctionLink()
+    ])
+    additional_specs: str = ""
+
+
+class OnboardingPhase3(BaseModel):
+    """Company Background & Kickoff"""
+    project_name: str = ""
+    company_story: str = ""
+    goals: str = ""
+    success_scenarios: List[OnboardingSuccessScenario] = Field(default_factory=lambda: [
+        OnboardingSuccessScenario(), OnboardingSuccessScenario(), OnboardingSuccessScenario()
+    ])
+    timeline_expectation: str = ""
+    budget: str = ""
+
+
+class OnboardingSubmission(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_id)
+    client_email: EmailStr
+    client_name: str = ""
+    client_id: Optional[str] = None
+    resume_token: str = ""
+    phase1: OnboardingPhase1 = Field(default_factory=OnboardingPhase1)
+    phase1_submitted_at: Optional[datetime] = None
+    phase2: OnboardingPhase2 = Field(default_factory=OnboardingPhase2)
+    phase2_submitted_at: Optional[datetime] = None
+    phase3: OnboardingPhase3 = Field(default_factory=OnboardingPhase3)
+    phase3_submitted_at: Optional[datetime] = None
+    current_phase: int = 1
+    completed: bool = False
+    # Nifty task ids created per phase (audit)
+    nifty_task_ids: Dict[str, List[str]] = Field(default_factory=dict)
+    nifty_errors: List[Dict[str, Any]] = Field(default_factory=list)
+    ah_project_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)

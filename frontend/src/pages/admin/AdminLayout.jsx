@@ -17,6 +17,9 @@ import {
   LogOut,
   Menu,
   CircleDollarSign,
+  Newspaper,
+  ClipboardList,
+  Repeat,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { BRAND } from "@/lib/brand";
@@ -30,10 +33,13 @@ const NAV = [
   { to: "/admin/content", label: "Content AI", icon: PenSquare, group: "Daily" },
   { to: "/admin/pipeline", label: "Pipeline", icon: TrendingUp, group: "Sales" },
   { to: "/admin/revenue", label: "Revenue & Clients", icon: CircleDollarSign, group: "Sales" },
+  { to: "/admin/paypal-plans", label: "PayPal Plans", icon: Repeat, group: "Sales" },
+  { to: "/admin/onboarding", label: "Onboarding", icon: ClipboardList, group: "Sales" },
   { to: "/admin/credibility", label: "Credibility Hub", icon: ShieldCheck, group: "Authority" },
   { to: "/admin/case-studies", label: "Case Studies", icon: Award, group: "Authority" },
   { to: "/admin/testimonials", label: "Testimonials", icon: Mic, group: "Authority" },
   { to: "/admin/thought-leadership", label: "Thought Leadership", icon: BookOpen, group: "Authority" },
+  { to: "/admin/blog", label: "Blog", icon: Newspaper, group: "Authority" },
   { to: "/admin/authority", label: "Authority Score", icon: ShieldCheck, group: "Authority" },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3, group: "Insights" },
   { to: "/admin/settings", label: "Settings", icon: SettingsIcon, group: "Insights" },

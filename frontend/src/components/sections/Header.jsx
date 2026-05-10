@@ -13,12 +13,13 @@ import { BRAND } from "@/lib/brand";
 import { useClientAuth } from "@/lib/clientAuth";
 
 const NAV_ITEMS = [
-  { id: "problem", label: "Problem" },
-  { id: "solution", label: "Solution" },
-  { id: "pricing", label: "Pricing" },
-  { id: "case-studies", label: "Case Studies" },
-  { id: "how-we-work", label: "How We Work" },
-  { id: "faq", label: "FAQ" },
+  { id: "problem", label: "Problem", type: "anchor" },
+  { id: "solution", label: "Solution", type: "anchor" },
+  { id: "pricing", label: "Pricing", type: "anchor" },
+  { id: "case-studies", label: "Case Studies", type: "anchor" },
+  { id: "blog", label: "Blog", type: "route", to: "/blog" },
+  { id: "how-we-work", label: "How We Work", type: "anchor" },
+  { id: "faq", label: "FAQ", type: "anchor" },
 ];
 
 export const Header = () => {
@@ -61,16 +62,27 @@ export const Header = () => {
         </a>
 
         <nav className="hidden lg:flex items-center gap-7" aria-label="Primary">
-          {NAV_ITEMS.map((item) => (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              className="text-sm text-foreground/80 hover:text-foreground transition-colors whitespace-nowrap"
-              data-testid={`header-nav-${item.id}-link`}
-            >
-              {item.label}
-            </a>
-          ))}
+          {NAV_ITEMS.map((item) =>
+            item.type === "route" ? (
+              <Link
+                key={item.id}
+                to={item.to}
+                className="text-sm text-foreground/80 hover:text-foreground transition-colors whitespace-nowrap"
+                data-testid={`header-nav-${item.id}-link`}
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <a
+                key={item.id}
+                href={`/#${item.id}`}
+                className="text-sm text-foreground/80 hover:text-foreground transition-colors whitespace-nowrap"
+                data-testid={`header-nav-${item.id}-link`}
+              >
+                {item.label}
+              </a>
+            )
+          )}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -133,17 +145,29 @@ export const Header = () => {
                 </SheetTitle>
               </SheetHeader>
               <div className="mt-6 flex flex-col gap-1">
-                {NAV_ITEMS.map((item) => (
-                  <a
-                    key={item.id}
-                    href={`#${item.id}`}
-                    onClick={() => setOpen(false)}
-                    className="px-3 py-3 rounded-lg text-base hover:bg-secondary transition-colors"
-                    data-testid={`mobile-nav-${item.id}-link`}
-                  >
-                    {item.label}
-                  </a>
-                ))}
+                {NAV_ITEMS.map((item) =>
+                  item.type === "route" ? (
+                    <Link
+                      key={item.id}
+                      to={item.to}
+                      onClick={() => setOpen(false)}
+                      className="px-3 py-3 rounded-lg text-base hover:bg-secondary transition-colors"
+                      data-testid={`mobile-nav-${item.id}-link`}
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <a
+                      key={item.id}
+                      href={`/#${item.id}`}
+                      onClick={() => setOpen(false)}
+                      className="px-3 py-3 rounded-lg text-base hover:bg-secondary transition-colors"
+                      data-testid={`mobile-nav-${item.id}-link`}
+                    >
+                      {item.label}
+                    </a>
+                  )
+                )}
                 {clientLoggedIn ? (
                   <Button
                     variant="outline"

@@ -17,6 +17,9 @@ import TestimonialsPage from "@/pages/admin/TestimonialsPage";
 import ThoughtLeadershipPage from "@/pages/admin/ThoughtLeadershipPage";
 import AuthorityPage from "@/pages/admin/AuthorityPage";
 import RevenuePage from "@/pages/admin/RevenuePage";
+import BlogPage from "@/pages/admin/BlogPage";
+import OnboardingAdmin from "@/pages/admin/OnboardingAdmin";
+import PayPalPlansPage from "@/pages/admin/PayPalPlansPage";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
 import { ClientAuthProvider, RequireClient } from "@/lib/clientAuth";
 import ClientLogin from "@/pages/client/ClientLogin";
@@ -25,6 +28,10 @@ import ClientPortal from "@/pages/client/ClientPortal";
 import SetPassword from "@/pages/client/SetPassword";
 import ForgotPassword from "@/pages/client/ForgotPassword";
 import CheckoutSuccess from "@/pages/client/CheckoutSuccess";
+import OnboardingWizard from "@/pages/client/OnboardingWizard";
+import PublicCaseStudies from "@/pages/PublicCaseStudies";
+import PublicBlog from "@/pages/PublicBlog";
+import PublicBlogPost from "@/pages/PublicBlogPost";
 
 function App() {
   return (
@@ -34,6 +41,9 @@ function App() {
           <AuthProvider>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/case-studies" element={<PublicCaseStudies />} />
+              <Route path="/blog" element={<PublicBlog />} />
+              <Route path="/blog/:slug" element={<PublicBlogPost />} />
 
               {/* Client (public-facing) auth + portal */}
               <Route path="/login" element={<ClientLogin />} />
@@ -43,6 +53,8 @@ function App() {
               <Route path="/reset-password" element={<SetPassword mode="reset" />} />
               <Route path="/checkout/success" element={<CheckoutSuccess />} />
               <Route path="/checkout/cancel" element={<Navigate to="/" replace />} />
+              {/* Public onboarding by token (no auth required) */}
+              <Route path="/portal/onboarding" element={<OnboardingWizard />} />
               <Route
                 path="/portal"
                 element={
@@ -74,6 +86,9 @@ function App() {
                 <Route path="testimonials" element={<TestimonialsPage />} />
                 <Route path="thought-leadership" element={<ThoughtLeadershipPage />} />
                 <Route path="authority" element={<AuthorityPage />} />
+                <Route path="blog" element={<BlogPage />} />
+                <Route path="onboarding" element={<OnboardingAdmin />} />
+                <Route path="paypal-plans" element={<PayPalPlansPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
