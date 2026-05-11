@@ -38,6 +38,7 @@ import OnboardingWizard from "@/pages/client/OnboardingWizard";
 import PublicCaseStudies from "@/pages/PublicCaseStudies";
 import PublicBlog from "@/pages/PublicBlog";
 import PublicBlogPost from "@/pages/PublicBlogPost";
+import PublicSandboxTour from "@/pages/PublicSandboxTour";
 import AnalyticsTracker from "@/components/Analytics";
 import AuthCallback from "@/pages/AuthCallback";
 
@@ -53,6 +54,7 @@ function App() {
               <Route path="/case-studies" element={<PublicCaseStudies />} />
               <Route path="/blog" element={<PublicBlog />} />
               <Route path="/blog/:slug" element={<PublicBlogPost />} />
+              <Route path="/tour" element={<PublicSandboxTour />} />
 
               {/* Client (public-facing) auth + portal */}
               <Route path="/login" element={<ClientLogin />} />

@@ -1,0 +1,37 @@
+{
+  "summary": "Phase 14 — Public Sandbox Tour at /tour + Slack live. 7/7 Phase 14 backend tests pass + 34/34 regression tests pass (Phase 11+12+13) = 41/41 total. Frontend verification of /tour confirms full data-testid coverage (tour-page, hero badge/start/cta, header CTA, all 6 step sections, sticky preview panel + 6 preview kinds, final book/pricing CTAs). Scrollytelling preview-swap verified by scrolling into step sections and observing the preview testid change (e.g., scrolling into tour-step-slack swaps preview to tour-preview-slack). Header 'See it live' nav link present on homepage and navigates to /tour correctly. Public snapshot endpoint returns 200 with no auth, auto-seeds after wipe, returns >=4 escalations and 2 milestones, strips hashed_password/raw_data, every client_email ends in @bloomlabs.demo. Slack /test endpoint returns ok+green pill. Sitemap includes /tour with priority 0.95.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase14.py",
+    "/app/backend/tests/test_phase11.py",
+    "/app/backend/tests/test_phase12.py",
+    "/app/backend/tests/test_phase13.py",
+    "/app/test_reports/pytest/phase14.xml",
+    "/app/test_reports/pytest/phase11_12_13_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "public_tour_routes.py — Clean separation: _ensure_seeded triggers demo_routes._seed only when count<4 (idempotent + safe). _public_safe strips hashed_password/raw_data and serializes to JSON-safe via serialize_doc. {_id:0} projection at query time is the right belt-and-suspenders pattern (cannot leak ObjectId).",
+    "PublicSandboxTour.jsx — IntersectionObserver rootMargin '-40% 0px -55% 0px' is a sensible narrow band that crisply switches active step as the user scrolls. Sticky preview panel uses `lg:sticky lg:top-24 lg:self-start lg:h-[calc(100vh-7rem)]` correctly anchoring on desktop. GA4 events `tour_step_view` (per observer intersection) and `tour_cta_click` (header/hero/footer) are wired with the right `typeof window.gtag === 'function'` guard.",
+    "Page is fully public — no auth context dependency, no admin token leakage. SeoHead included with canonical https://bybloomlabs.com/tour. Sitemap entry added.",
+    "Header.jsx NAV_ITEMS array now contains { id: 'tour', label: 'See it live', type: 'route', to: '/tour' } — clicking on homepage navigates to /tour via react-router (verified in Playwright run).",
+    "Minor observation (not a bug): The IntersectionObserver behavior depends on viewport height — at a 4000px test viewport the 40-45% visibility band lands in the middle step section at scroll=0, so the 'initial' active step in a tall viewport is not step 0. In a realistic user viewport (~900-1080px) at scroll=0 the band is over the hero region and active stays at 0 (onboarding). Acceptable production behavior; no fix needed.",
+    "Slack live wiring verified — admin/integrations/slack/test endpoint returned 200 with green pill in the integrations health response."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (41/41 — 7 Phase14 + 34 regression)", "frontend": "100% (all data-testids verified, preview-swap verified, header-nav-tour-link routes correctly)"},
+  "test_credentials": "Admin: founder@thesalvador.group / admin123 (used for Phase 14 auto-seed test + regression auth). /tour itself requires no auth.",
+  "seed_data_creation": "Phase 14 test_public_tour_auto_seeds_when_empty wipes demo set via DELETE /api/admin/demo/seed, then re-hits /api/public/tour/snapshot and verifies the dataset re-seeds itself (>=4 escalations, >=2 milestones). Cleanup happens via Phase 13's test_zzz_cleanup_demo.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 14 fully green. /tour is PUBLIC — never include Authorization headers when testing the snapshot endpoint or page. ThriveDesk continues in scope-limited mode (mock_log fallback for writes) which is intended. Slack webhook is LIVE — calling /api/admin/integrations/slack/test will post a real message to the user's #urgent-support channel; be mindful with rate. Demo dataset is auto-seeded on first tour snapshot hit if absent. For Playwright tests on /tour, use a normal viewport height (e.g., 900-1080px) if you need to assert the initial preview is onboarding — with a tall (4000px) viewport the IntersectionObserver's 40-45% band can land mid-page and pre-activate a later step. Scroll-trigger verification works reliably by calling scroll_into_view_if_needed() on the target tour-step-* element and waiting ~1.2s.",
+  "rca_of_the_issue": "N/A — no failures observed."
+}

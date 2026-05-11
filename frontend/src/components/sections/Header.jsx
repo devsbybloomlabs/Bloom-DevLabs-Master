@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { id: "solution", label: "Solution", type: "anchor" },
   { id: "pricing", label: "Pricing", type: "anchor" },
   { id: "case-studies", label: "Case Studies", type: "anchor" },
+  { id: "tour", label: "See it live", type: "route", to: "/tour" },
   { id: "blog", label: "Blog", type: "route", to: "/blog" },
   { id: "how-we-work", label: "How We Work", type: "anchor" },
   { id: "faq", label: "FAQ", type: "anchor" },
