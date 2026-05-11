@@ -1,0 +1,45 @@
+{
+  "summary": "Phase 10 backend (Friction-Reducer + Nifty cache/sync/prefs + provider grid + pagination + DB-prefs resolve) tested: 18/18 pytest PASS. GA4 frontend verified (gtag function + gtag.js with G-KTSD1H6KMX loaded). Critical frontend regression found: after saving manual Nifty token, the page enters a 403 polling loop that floods toasts and tears down the providers grid + hides the Sync + preferences UI.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/integrations/paypal/test", "issue": "Intermittent flake — live PayPal OAuth occasionally returns RemoteDisconnected. 1/2 runs failed; retry passed. Add httpx retry or accept 502 in CI."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "IntegrationsAdmin", "issue": "After manual-token save with a fake token (ping_ok=false), the nifty-sync-button + nifty-default-project-select + nifty-designer-select + nifty-pm-select + nifty-developer-select + nifty-save-prefs-button are NOT rendered (count=0). The spec requires Sync + preferences visible once 'connected' regardless of ping_ok. Currently the JSX appears to gate this section on ping_ok or cache presence.", "selector": "[data-testid='nifty-sync-button']", "priority": "HIGH"},
+      {"component": "ProvidersGrid", "issue": "Providers grid collapses to 'Loading…' permanently after token save; multiple 'Could not load integrations' toasts pile up (9+ notification badge). Root cause: continuous 403 polling loop visible in console (hundreds of 'Failed to load resource: 403' messages) which keeps resetting the loading state.", "selector": "[data-testid='providers-grid']", "priority": "CRITICAL"},
+      {"component": "IntegrationsAdmin polling", "issue": "Unidentified endpoint is polled rapidly and returns 403 — likely a status-refresh hook with stale auth header or wrong path. Investigate useEffect interval in IntegrationsAdmin.jsx; also stale 'proj-test' was leftover in default project preference between sessions (cleanup PUT with empty string did NOT clear preference because backend merges only non-null values).", "selector": "n/a", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Preferences cleanup", "issue": "PUT /nifty/preferences with empty-string default_project_id does NOT reset it (merge logic keeps last value because empty-string is falsy but still 'not None'). Provide explicit DELETE or treat empty-string as clear.", "affected_selectors": ["nifty-default-project-select"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase10_integrations.py",
+    "/app/test_reports/pytest/phase10.xml"
+  ],
+  "action_items": [
+    "Fix IntegrationsAdmin.jsx: render Sync button + preferences section whenever status.connected is true (not gated on ping_ok / cache).",
+    "Diagnose the 403 polling cascade triggered after manual-token save — check setInterval / useEffect deps in IntegrationsAdmin.jsx and any AnalyticsTracker/notifications hook.",
+    "Backend nifty_set_preferences: treat empty string default_project_id as clear (currently `if v is not None` keeps '').",
+    "Add httpx-level retry or jitter to /paypal/test to mask transient RemoteDisconnected from live OAuth."
+  ],
+  "critical_code_review_comments": [
+    "nifty_set_preferences merge keeps empty string — cannot clear default_project_id once set.",
+    "Sync + preferences UI invisible when ping fails — defeats the stated UX flow (admin can't recover without successful ping).",
+    "Unbounded toast queue (Sonner default keeps stacking) magnifies the 403-loop bug visually; add toast dedup or rate-limit."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase10_integrations.py (new — 18 tests)"
+  ],
+  "success_rate": {"backend": "100% (18/18 in best run; 17/18 with paypal flake)", "frontend": "60% — GA4 + base render + manual token save work; Sync/prefs UI + provider grid stability broken after token save"},
+  "test_credentials": "Admin founder@thesalvador.group / admin123; Client testclient@bybloomlabs.com / clientpass123.",
+  "seed_data_creation": "Test created TEST_phase10 onboarding (auto-deleted in test). NiftyPreferences may retain leftover values (designer/pm/dev cleared, default_project_id sticky bug — admin should re-set explicitly).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend Phase 10 endpoints fully verified via pytest. The main outstanding issue is frontend: (1) Sync/preferences section is hidden whenever ping fails, contradicting the spec's 'Once connected (manual token): Sync now visible' requirement; (2) a 403 polling cascade triggers after manual token save and breaks the providers grid. Re-run /admin/integrations end-to-end after E1 fixes these two items.",
+  "rca of the issue": "1) IntegrationsAdmin.jsx gates Sync/prefs on (status.ping_ok || cache) instead of status.connected. 2) Polling effect runs status check on a tight interval; when auth token is briefly invalid (e.g. due to header re-injection race) the providers endpoint 403s and the catch clause sets loading=true + shows toast → 100+ identical toasts. Reproduction: login as admin → /admin/integrations → Paste token → save 'test_token_99' → observe top-right toast flood and provider cards disappear."
+}

@@ -64,7 +64,8 @@ def _business_days_from_now(days: int) -> datetime:
 
 
 def _safe_get_assignees() -> Dict[str, List[str]]:
-    """Read team assignee emails from env (comma-separated)."""
+    """Read team assignee emails from env (comma-separated). DB-stored
+    preferences (set via /admin/integrations) override env values when present."""
 
     def parse(env_key: str) -> List[str]:
         raw = os.environ.get(env_key, "")
@@ -74,6 +75,18 @@ def _safe_get_assignees() -> Dict[str, List[str]]:
         "designer": parse("NIFTY_DESIGNER_ASSIGNEES"),
         "pm": parse("NIFTY_PM_ASSIGNEES"),
         "developer": parse("NIFTY_DEVELOPER_ASSIGNEES"),
+    }
+
+
+async def _resolve_assignees(db: AsyncIOMotorDatabase) -> Dict[str, List[str]]:
+    """Final assignee resolution: DB preferences first, env fallback."""
+    from app_settings import get_setting
+    env_defaults = _safe_get_assignees()
+    prefs = await get_setting(db, "nifty.preferences") or {}
+    return {
+        "designer": prefs.get("designer_assignees") or env_defaults["designer"],
+        "pm": prefs.get("pm_assignees") or env_defaults["pm"],
+        "developer": prefs.get("developer_assignees") or env_defaults["developer"],
     }
 
 
@@ -224,7 +237,7 @@ async def _process_phase1(
     request: Request,
     onboarding: Dict[str, Any],
 ) -> Dict[str, Any]:
-    teams = _safe_get_assignees()
+    teams = await _resolve_assignees(db)
     p1 = onboarding.get("phase1", {})
     links = p1.get("design_links") or []
     desc_lines = ["[Design Links]"]
@@ -256,7 +269,7 @@ async def _process_phase2(
     request: Request,
     onboarding: Dict[str, Any],
 ) -> Dict[str, Any]:
-    teams = _safe_get_assignees()
+    teams = await _resolve_assignees(db)
     p2 = onboarding.get("phase2", {})
     links = p2.get("function_links") or []
     desc_lines = ["[Function References]"]

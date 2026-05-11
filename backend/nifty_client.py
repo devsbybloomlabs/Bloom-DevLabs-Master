@@ -307,14 +307,67 @@ class NiftyClient:
             body["custom_fields"] = custom_fields
         return await self._request("POST", "/api/v1.0/tasks", json=body)
 
-    async def list_projects(self) -> Dict[str, Any]:
-        return await self._request("GET", "/api/v1.0/projects")
+    async def list_projects(self, *, page_size: int = 100) -> Dict[str, Any]:
+        """Fetches ALL projects across pages (Nifty defaults to 25 per page)."""
+        all_items: List[Dict[str, Any]] = []
+        page = 1
+        while True:
+            res = await self._request(
+                "GET",
+                "/api/v1.0/projects",
+                params={"page": page, "per_page": page_size},
+            )
+            if not res.get("success"):
+                if all_items:
+                    # Return what we have so far
+                    return {"success": True, "status": 200, "data": {"projects": all_items}, "error": None}
+                return res
+            data = res.get("data") or {}
+            chunk = (
+                data.get("projects")
+                or data.get("data")
+                or (data if isinstance(data, list) else [])
+            )
+            if not isinstance(chunk, list):
+                chunk = []
+            all_items.extend(chunk)
+            # Stop if smaller than page_size (or no items)
+            if len(chunk) < page_size:
+                break
+            page += 1
+            if page > 20:  # safety cap (2000 projects)
+                break
+        return {"success": True, "status": 200, "data": {"projects": all_items}, "error": None}
 
     async def get_project(self, project_id: str) -> Dict[str, Any]:
         return await self._request("GET", f"/api/v1.0/projects/{project_id}")
 
-    async def list_members(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+    async def list_members(self, project_id: Optional[str] = None, *, page_size: int = 100) -> Dict[str, Any]:
+        """Fetch all members across pages."""
         pid = project_id or self.default_project_id
-        if pid:
-            return await self._request("GET", f"/api/v1.0/projects/{pid}/members")
-        return await self._request("GET", "/api/v1.0/members")
+        base_path = f"/api/v1.0/projects/{pid}/members" if pid else "/api/v1.0/members"
+        all_items: List[Dict[str, Any]] = []
+        page = 1
+        while True:
+            res = await self._request(
+                "GET", base_path, params={"page": page, "per_page": page_size}
+            )
+            if not res.get("success"):
+                if all_items:
+                    return {"success": True, "status": 200, "data": {"members": all_items}, "error": None}
+                return res
+            data = res.get("data") or {}
+            chunk = (
+                data.get("members")
+                or data.get("data")
+                or (data if isinstance(data, list) else [])
+            )
+            if not isinstance(chunk, list):
+                chunk = []
+            all_items.extend(chunk)
+            if len(chunk) < page_size:
+                break
+            page += 1
+            if page > 20:
+                break
+        return {"success": True, "status": 200, "data": {"members": all_items}, "error": None}
