@@ -418,7 +418,7 @@ function UploadDialog({ open, onClose, milestones, onUploaded }) {
               value={form.milestone_id || "__none__"}
               onValueChange={onSelectMilestone}
             >
-              <SelectTrigger className="mt-1.5" data-testid="upload-milestone-select">
+              <SelectTrigger className="mt-1.5" data-testid="admin-approvals-upload-milestone-select">
                 <SelectValue placeholder={milestones.length === 0 ? "No milestones yet" : "Select a milestone..."} />
               </SelectTrigger>
               <SelectContent>
@@ -436,9 +436,10 @@ function UploadDialog({ open, onClose, milestones, onUploaded }) {
             <FormField label="Client email" required>
               <Input
                 type="email"
+                required
                 value={form.client_email}
                 onChange={(e) => setForm({ ...form, client_email: e.target.value })}
-                data-testid="upload-client-email-input"
+                data-testid="admin-approvals-upload-client-email-input"
               />
             </FormField>
             <FormField label="Designer email (optional)">
@@ -446,34 +447,37 @@ function UploadDialog({ open, onClose, milestones, onUploaded }) {
                 type="email"
                 value={form.designer_email}
                 onChange={(e) => setForm({ ...form, designer_email: e.target.value })}
-                data-testid="upload-designer-email-input"
+                data-testid="admin-approvals-upload-designer-email-input"
               />
             </FormField>
           </div>
 
           <FormField label="Project name" required>
             <Input
+              required
               value={form.project_name}
               onChange={(e) => setForm({ ...form, project_name: e.target.value })}
-              data-testid="upload-project-name-input"
+              data-testid="admin-approvals-upload-project-name-input"
             />
           </FormField>
 
           <FormField label="Asset name (e.g. Landing v2)" required>
             <Input
+              required
               value={form.asset_name}
               onChange={(e) => setForm({ ...form, asset_name: e.target.value })}
-              data-testid="upload-asset-name-input"
+              data-testid="admin-approvals-upload-asset-name-input"
             />
           </FormField>
 
           <FormField label="Design URL (Figma / Drive / etc.)" required>
             <Input
               type="url"
+              required
               placeholder="https://figma.com/..."
               value={form.design_url}
               onChange={(e) => setForm({ ...form, design_url: e.target.value })}
-              data-testid="upload-design-url-input"
+              data-testid="admin-approvals-upload-design-url-input"
             />
           </FormField>
 
@@ -482,7 +486,7 @@ function UploadDialog({ open, onClose, milestones, onUploaded }) {
               placeholder="task ObjectId — auto-filled when a milestone is selected"
               value={form.nifty_task_id}
               onChange={(e) => setForm({ ...form, nifty_task_id: e.target.value })}
-              data-testid="upload-nifty-task-input"
+              data-testid="admin-approvals-upload-nifty-task-input"
             />
           </FormField>
         </div>
@@ -494,7 +498,7 @@ function UploadDialog({ open, onClose, milestones, onUploaded }) {
             onClick={onSubmit}
             disabled={busy}
             className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
-            data-testid="upload-submit-button"
+            data-testid="admin-approvals-upload-submit-button"
           >
             {busy ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />

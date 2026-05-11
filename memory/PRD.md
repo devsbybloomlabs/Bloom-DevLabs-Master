@@ -77,6 +77,33 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - iteration_8 18/18 pytest (Phase 9 OAuth)
 - iteration_9 18/18 pytest (Phase 10 friction-reducer) + 3 frontend bugs caught
 - iteration_10 21/21 pytest (18 phase10 + 3 regression) + 100% frontend re-verification. All 3 bugs fixed.
+
+### ✅ Phase 11 — P2 Backlog + Approval Studio Loop + Health Strip (Feb 2026)
+
+**P2 backlog (all 4 items DONE):**
+- **C1 — AgencyHandy HMAC verification**: New `AGENCYHANDY_WEBHOOK_HMAC_SECRET` env var. When set, every incoming AH webhook MUST carry `x-ah-sig` matching `hmac_sha256(secret, raw_body)`. Falls back to existing token check when not set (zero-config-break).
+- **C2 — `/admin/clients` admin page**: New `ClientsAdmin.jsx` with table view (name, status, source, last login, joined), search filter, copy-email, mailto link, and one-click "Resend setup" / "Reset link" that auto-copies the URL to clipboard.
+- **C3 — OG SVG → PNG conversion**: New `/api/og/blog/{slug}.png` endpoint using `cairosvg`. Same layout as SVG, renders at 1200×630, served with `Cache-Control: public, max-age=3600`. `PublicBlogPost.jsx` switched its `og:image` to the PNG variant (Twitter Cards prefer raster).
+- **C4 — AgencyHandy server-side `client_email` filter**: New `AgencyHandyClient.list_orders_for_client_email()` resolves a client by email via the members API, then filters orders by `clientId` server-side. `client_routes.my_orders` calls it first, falls back to pull-all + local filter when company_id missing.
+
+**B — Integrations Health Strip on Dashboard home:**
+- New `/api/admin/integrations/health` endpoint aggregates status for all 6 providers (OpenRouter, Emailit, AgencyHandy, PayPal, Nifty, Approval Studio) into a unified `{provider, status, last_ping}` envelope.
+- New `_record_ping(db, provider, ok, detail)` helper persists test-ping results to `app_settings.integration_pings`. Wired into every per-provider `/test` endpoint + Nifty status route.
+- New `IntegrationsHealthStrip.jsx` component on the admin Dashboard home — renders coloured pills (green = configured + last ping ok, yellow = never tested / configured-but-failing, red = not configured) with relative-time hover tooltip and click-through to `/admin/integrations`.
+
+**Part 3 — Approval Studio ↔ Nifty Design Review Loop (NEW):**
+- **`approval_studio_client.py`** (new): Mockable REST client for `approval.studio`. Live mode activates when `APPROVAL_STUDIO_USERNAME/PASSWORD` (or `APPROVAL_STUDIO_TOKEN`) is set; otherwise runs MOCK mode and logs every call to in-memory `mock_log` for inspection. Surface: `create_project`, `upload_asset`, `list_comments`, `get_project`.
+- **`approval_studio_routes.py`** (new):
+  - `POST /admin/approvals/upload` — Designer pushes a Figma URL → creates/reuses an Approval Studio project, uploads asset (bumps version on re-upload of same client+project+asset), posts a Nifty comment with the review link, sets task status to "In Review", updates linked milestone → `in_progress`.
+  - `POST /webhooks/approval-studio` — Public, optional HMAC via `APPROVAL_STUDIO_WEBHOOK_SECRET`. Handles `ANNOTATION_ADDED` (relays comment to Nifty as `[Feedback from <author>] <text>` + status='revision'), `TASK_APPROVED` (closes Nifty task, marks milestone complete, emails client via Emailit), `TASK_REJECTED` (Nifty comment + status='revision').
+  - `POST /admin/approvals/{id}/resolve` — Manual fallback when the webhook never arrives.
+  - `GET /admin/approvals/mock-log` — Surfaces what the mocked Approval Studio "would have sent" upstream.
+- **Hourly cron** (`designer_reminder_cron`): Emails the assigned designer when an approval has been in `revision` state > 48h with no new upload. 24h cooldown on re-sends. Wired into `server.py` lifespan.
+- **`ApprovalsAdmin.jsx`** (new admin page at `/admin/approvals`): Upload dialog (auto-fills client/project/asset from a selected milestone), approval list grouped by status pills (in_review / revision / approved / rejected), per-row "Mark approved" manual resolve button, "View mock log" dialog showing the activity log entries.
+
+**Test results:**
+- iteration_11 12/12 backend pytest (`/app/backend/tests/test_phase11.py`) — OG PNG, AH HMAC, health endpoint, Approval Studio upload + webhooks + manual resolve + mock log.
+- iteration_11 — 100% frontend verification: dashboard health pills (6) render and turn green after `/test` fires, sidebar nav has Clients + Design Approvals, ClientsAdmin renders + search + resend works, ApprovalsAdmin upload flow + mock-log dialog work, client portal login unchanged (5 tabs intact).
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
@@ -106,14 +133,14 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 ## Backlog
 
 ### P1
-- Generate Nifty access token at https://developers.niftypm.com → paste into `/app/backend/.env`. Once set, Phase 7 onboarding tasks auto-create AND Phase 8 milestone status syncs run live.
-- Set `REACT_APP_GA_MEASUREMENT_ID` in `/app/frontend/.env` with the user's GA4 measurement ID (G-XXXXXXXXXX) → analytics enables itself.
+- Generate Nifty access token at https://developers.niftypm.com → paste into `/app/backend/.env`. Once set, Phase 7 onboarding tasks auto-create AND Phase 8 milestone status syncs run live, AND Phase 11 design approvals auto-comment on the linked Nifty task.
+- Wire real Approval Studio credentials (`APPROVAL_STUDIO_USERNAME` + `APPROVAL_STUDIO_PASSWORD`) in `/app/backend/.env` to flip from mock → live mode. No code change required.
 
 ### P2
-- HMAC signature verification on AgencyHandy webhooks.
-- AgencyHandy server-side `list_orders(client_email=…)` filter.
-- Admin `/admin/clients` UI page.
-- Migrate dynamic OG SVG to also render to PNG (some social-card scrapers don't render SVG; current SVG works for OpenGraph but Twitter Cards prefer PNG).
+- ~~HMAC signature verification on AgencyHandy webhooks.~~ ✅ Done (Phase 11) — set `AGENCYHANDY_WEBHOOK_HMAC_SECRET` in `.env` to enforce.
+- ~~AgencyHandy server-side `list_orders(client_email=…)` filter.~~ ✅ Done (Phase 11).
+- ~~Admin `/admin/clients` UI page.~~ ✅ Done (Phase 11).
+- ~~Migrate dynamic OG SVG to also render to PNG.~~ ✅ Done (Phase 11) — `.png` route via cairosvg, used by Twitter Cards.
 
 ### P3
 - Lead scoring + segmentation in Lead Magnets admin (e.g., filter by source_url, magnet_slug).
@@ -121,7 +148,8 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - Automated Nifty project creation on Phase 3 onboarding submit (currently logs to admin notifications).
 - Stripe as backup payment processor.
 - Google Calendar sync.
-- Slack notifications.
+- Slack notifications (deferred from Phase 11 Approval Studio loop).
+- Approval Studio: real-time annotation preview inside `/admin/approvals` (currently shows mock log only).
 
 ## API Endpoints (cumulative reference)
 
