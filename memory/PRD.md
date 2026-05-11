@@ -51,28 +51,32 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 ### ✅ Phase 9 — Nifty OAuth Integration (Feb 2026)
 **Backend:**
 - `nifty_client.py` rewritten to support OAuth2 authorization-code flow with token storage in MongoDB `integrations` collection and **auto-refresh on 401** (one-shot retry). Falls back to static `NIFTY_ACCESS_TOKEN` env var if present.
-- `integrations_admin_routes.py` (new) — `/api/admin/integrations/nifty/*` endpoints:
-  - `GET /status` — connection state + ping
-  - `GET /authorize-url` — generate Nifty authorize URL with CSRF state
-  - `POST /exchange` — code → tokens (persists in MongoDB)
-  - `POST /manual-token` — testing escape hatch
-  - `POST /disconnect` — wipe stored tokens
-  - `GET /projects`, `GET /members` — read-only Nifty data
+- `integrations_admin_routes.py` (new) — `/api/admin/integrations/nifty/*` endpoints
 - Milestone cron jobs now use async `nifty.is_connected()` instead of static check.
 
 **Frontend:**
-- `/auth/callback` — generic OAuth callback page (handles Nifty + future providers). Parses `?code/state/error`, posts to backend exchange, shows success/error/needs-login states.
-- `/admin/integrations` — new admin page with NiftyCard showing status, Connect button, Paste-token fallback, Disconnect, plus live project/member listings once connected.
-- Admin nav: added "Integrations" item.
+- `/auth/callback` — generic OAuth callback page (handles Nifty + future providers).
+- `/admin/integrations` — admin page with NiftyCard.
 
-**Test results (iteration_8):**
-- 18/18 backend pytest pass (auth gating, status, authorize-url, exchange, manual-token, disconnect)
-- 8/8 frontend flows pass
+### ✅ Phase 10 — Friction-Reducer Dashboard + Nifty UX + GA4 (Feb 2026)
+**Frictionless integration dashboard at `/admin/integrations`:**
+- **Nifty rebuild:**
+  - `NiftyClient.list_projects()` + `list_members()` now PAGINATED (`per_page=100`, up to 20 pages) — fixes the "only 25 projects" issue.
+  - New `app_settings` MongoDB collection stores Nifty projects+members CACHE so admin pages don't re-hit Nifty on every load.
+  - "Sync now" button refreshes cache on demand.
+  - Default project + Designer/PM/Developer assignees are now **dropdowns** (driven by cached members). Saved preferences stored in DB and used by `onboarding_routes._resolve_assignees(db)` (DB-first, env-fallback).
+  - Empty-string + empty-list explicitly clears the preference (regression-tested).
+- **Provider cards:** OpenRouter / Emailit / AgencyHandy / PayPal each have a card showing masked key + "Test connection" button that runs a live ping (`chat`, `send_email`, `list_orders`, `_get_access_token`).
+- **Bug fix:** `useAdminApi()` now memoizes the axios instance with `useMemo([token])` — fixes infinite useEffect re-trigger loop that was creating a 403-toast cascade.
 
-**User config:**
-- `NIFTY_CLIENT_ID=YWSnuABjapgejTQFGXse9Xc3LKiQjFqH`
-- `NIFTY_CLIENT_SECRET=` (set in `/app/backend/.env`)
-- `NIFTY_REDIRECT_URI=https://bybloomlabs.com/auth/callback`
+**Google Analytics 4:**
+- `REACT_APP_GA_MEASUREMENT_ID=G-KTSD1H6KMX` set in `/app/frontend/.env`. AnalyticsTracker auto-loads `gtag.js` and fires `page_view` on route change.
+- Lead opt-ins fire custom `lead_subscribe` event.
+
+**Test results:**
+- iteration_8 18/18 pytest (Phase 9 OAuth)
+- iteration_9 18/18 pytest (Phase 10 friction-reducer) + 3 frontend bugs caught
+- iteration_10 21/21 pytest (18 phase10 + 3 regression) + 100% frontend re-verification. All 3 bugs fixed.
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
