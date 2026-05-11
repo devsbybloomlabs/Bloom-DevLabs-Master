@@ -488,6 +488,154 @@ async def admin_resolve_escalation(
     }
 
 
+@support_admin_router.get("/{escalation_id}/timeline")
+async def admin_escalation_timeline(
+    escalation_id: str,
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    td: ThriveDeskClient = Depends(get_td),
+) -> Dict[str, Any]:
+    """Build a chronological event timeline for a single escalation.
+
+    Surfaces every touch point in the loop:
+      • ThriveDesk webhook event (`created` / `tags.updated`)
+      • Classification result + Nifty task creation outcome
+      • Slack notification result (with fallback to admin notification)
+      • Manual replies posted from `/admin/support-triage/{id}/resolve`
+      • Final status transition
+      • Any related admin notifications
+
+    Combines data from `support_escalations`, `thrivedesk_webhook_events`,
+    and `notifications` collections.
+    """
+    esc = await db.support_escalations.find_one({"id": escalation_id}, {"_id": 0})
+    if not esc:
+        raise HTTPException(404, "Escalation not found")
+
+    events: List[Dict[str, Any]] = []
+
+    # Initial creation event
+    events.append({
+        "kind": "escalation_created",
+        "title": f"Ticket classified as {esc['escalation_type'].upper()}",
+        "body": (
+            f"Subject: {esc['subject']}\n"
+            f"Client: {esc.get('client_name')} ({esc.get('client_email') or 'no email'})\n"
+            f"Tags: {', '.join(esc.get('tags') or []) or '—'}"
+        ),
+        "at": esc.get("created_at"),
+        "icon": "alert",
+        "actor": "ThriveDesk",
+    })
+
+    # Nifty task creation result
+    if esc.get("nifty_task_id"):
+        events.append({
+            "kind": "nifty_task_created",
+            "title": "Nifty PM task created",
+            "body": f"Task ID: {esc['nifty_task_id']}\nAuto-assigned to PM/Support lead.",
+            "at": esc.get("created_at"),
+            "icon": "check",
+            "actor": "Nifty PM",
+        })
+    elif esc.get("nifty_error"):
+        events.append({
+            "kind": "nifty_task_failed",
+            "title": "Nifty task creation FAILED",
+            "body": (
+                f"Reason: {esc['nifty_error']}\n"
+                "Admin notification queued so you can create the task manually."
+            ),
+            "at": esc.get("created_at"),
+            "icon": "error",
+            "actor": "Nifty PM",
+        })
+    else:
+        events.append({
+            "kind": "nifty_task_skipped",
+            "title": "Nifty PM not connected — task creation skipped",
+            "body": "Connect Nifty in /admin/integrations to auto-create tasks.",
+            "at": esc.get("created_at"),
+            "icon": "info",
+            "actor": "Nifty PM",
+        })
+
+    # Slack alerts — only for urgent escalations
+    if esc.get("escalation_type") == "urgent":
+        slack_notifications = await db.notifications.find(
+            {
+                "kind": "support_escalation",
+                "title": {"$regex": esc["subject"][:30], "$options": "i"},
+            },
+            {"_id": 0},
+        ).to_list(5)
+        if slack_notifications:
+            events.append({
+                "kind": "slack_fallback",
+                "title": "Slack not configured — admin notification queued",
+                "body": "Connect Slack in /admin/integrations → Credentials to enable instant alerts.",
+                "at": esc.get("created_at"),
+                "icon": "info",
+                "actor": "Slack",
+            })
+
+    # Related ThriveDesk webhook events (looking up by ticket id)
+    td_events = (
+        await db.thrivedesk_webhook_events.find(
+            {"payload.data.ticketId": _coerce_ticket_id(esc["ticket_id"])},
+            {"_id": 0},
+        )
+        .sort("received_at", 1)
+        .to_list(50)
+    )
+    for ev in td_events:
+        events.append({
+            "kind": f"thrivedesk_{ev.get('event_type', 'event')}",
+            "title": f"ThriveDesk webhook: {ev.get('event_type')}",
+            "body": f"Verified: {ev.get('sig_verified')}",
+            "at": ev.get("received_at"),
+            "icon": "webhook",
+            "actor": "ThriveDesk",
+        })
+
+    # Resolution
+    if esc.get("resolved_at"):
+        events.append({
+            "kind": "resolution",
+            "title": f"Marked {esc['status'].upper()}",
+            "body": esc.get("resolution_summary") or "Issue resolved.",
+            "at": esc.get("resolved_at"),
+            "icon": "check_circle",
+            "actor": "Admin",
+        })
+
+    # Sort chronologically (events without `at` go last)
+    events.sort(key=lambda e: e.get("at") or "9999")
+
+    # Annotate with ThriveDesk live thread when the API key is configured
+    await td._resolve_creds()
+    live_thread = None
+    if td.is_configured:
+        thread_res = await td.get_conversation(esc["ticket_id"])
+        if thread_res.get("success") and not thread_res.get("scope_limited"):
+            live_thread = thread_res.get("data")
+
+    return {
+        "escalation": serialize_doc(esc),
+        "events": events,
+        "live_thread": live_thread,
+        "td_mode": td.mode,
+    }
+
+
+def _coerce_ticket_id(tid: Any) -> Any:
+    """Webhook payloads sometimes carry numeric ticket IDs; our store keeps strings."""
+    try:
+        return int(tid)
+    except (ValueError, TypeError):
+        return tid
+
+
 class SimulateTicketRequest(BaseModel):
     subject: str = "Sandbox test — please make headline bigger"
     body: Optional[str] = "This is a synthetic test ticket created from the admin UI."

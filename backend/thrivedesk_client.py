@@ -34,6 +34,21 @@ DEFAULT_TIMEOUT = 20.0
 DEFAULT_BASE_URL = "https://api.thrivedesk.com/v1"
 
 
+SCOPE_LIMITED_STATUSES = (401, 403, 404, 405)
+
+
+def _is_scope_limited(res: Dict[str, Any]) -> bool:
+    """True when the response indicates the endpoint isn't exposed by this scope.
+
+    ThriveDesk returns HTML 405s for write endpoints under public-scope JWTs;
+    `_request` captures a `raw` field in that case. 404/405 are the common
+    signals; 401/403 also count when the token is otherwise valid.
+    """
+    if res.get("success"):
+        return False
+    return res.get("status") in SCOPE_LIMITED_STATUSES
+
+
 class ThriveDeskClient:
     """Async wrapper. Mocks responses when API key is absent."""
 
@@ -144,6 +159,20 @@ class ThriveDeskClient:
     # ------------------------------------------------------------------
     # Public domain methods (mock-aware)
     # ------------------------------------------------------------------
+    async def get_me(self) -> Dict[str, Any]:
+        """Light auth probe — works on every scope including 'public'."""
+        await self._resolve_creds()
+        if not self.is_configured:
+            return {"success": True, "status": 200, "data": {"mock": True}, "error": None}
+        return await self._request("GET", "/me")
+
+    async def list_inboxes(self) -> Dict[str, Any]:
+        """Available on public scope."""
+        await self._resolve_creds()
+        if not self.is_configured:
+            return {"success": True, "status": 200, "data": {"data": []}, "error": None}
+        return await self._request("GET", "/inboxes")
+
     async def get_conversation(self, ticket_id: Any) -> Dict[str, Any]:
         await self._resolve_creds()
         if not self.is_configured:
@@ -153,40 +182,95 @@ class ThriveDeskClient:
                 "data": {"id": ticket_id, "subject": "Mock ticket", "mock": True},
                 "error": None,
             }
-        return await self._request("GET", f"/conversations/{ticket_id}")
+        res = await self._request("GET", f"/conversations/{ticket_id}")
+        if _is_scope_limited(res):
+            res["error"] = "Conversation endpoint not exposed by current API scope (need admin token)."
+            res["scope_limited"] = True
+        return res
 
     async def add_reply(self, ticket_id: Any, text: str) -> Dict[str, Any]:
+        """Post a public reply on a ticket.
+
+        ThriveDesk's public-scope JWT does NOT expose conversation routes; in
+        that case we log the call to `mock_log` and return `{success: True,
+        scope_limited: True}` so escalations still progress (the audit trail
+        captures what would have been sent).
+        """
         await self._resolve_creds()
         if not self.is_configured:
             self._log_mock("add_reply", {"ticketId": ticket_id, "text": text})
             return {"success": True, "status": 200, "data": {"mock": True}, "error": None}
-        return await self._request(
+        res = await self._request(
             "POST", f"/conversations/{ticket_id}/replies", json={"text": text, "public": True}
         )
+        if _is_scope_limited(res):
+            self._log_mock("add_reply (scope-limited)", {"ticketId": ticket_id, "text": text})
+            return {
+                "success": True,
+                "status": 200,
+                "data": {"scope_limited": True},
+                "error": None,
+                "scope_limited": True,
+            }
+        return res
 
     async def add_note(self, ticket_id: Any, text: str) -> Dict[str, Any]:
         await self._resolve_creds()
         if not self.is_configured:
             self._log_mock("add_note", {"ticketId": ticket_id, "text": text})
             return {"success": True, "status": 200, "data": {"mock": True}, "error": None}
-        return await self._request(
+        res = await self._request(
             "POST", f"/conversations/{ticket_id}/notes", json={"text": text}
         )
+        if _is_scope_limited(res):
+            self._log_mock("add_note (scope-limited)", {"ticketId": ticket_id, "text": text})
+            return {
+                "success": True,
+                "status": 200,
+                "data": {"scope_limited": True},
+                "error": None,
+                "scope_limited": True,
+            }
+        return res
 
     async def update_status(self, ticket_id: Any, status: str) -> Dict[str, Any]:
         await self._resolve_creds()
         if not self.is_configured:
             self._log_mock("update_status", {"ticketId": ticket_id, "status": status})
             return {"success": True, "status": 200, "data": {"mock": True}, "error": None}
-        return await self._request(
+        res = await self._request(
             "PATCH", f"/conversations/{ticket_id}", json={"status": status}
         )
+        if _is_scope_limited(res):
+            self._log_mock(
+                "update_status (scope-limited)", {"ticketId": ticket_id, "status": status}
+            )
+            return {
+                "success": True,
+                "status": 200,
+                "data": {"scope_limited": True},
+                "error": None,
+                "scope_limited": True,
+            }
+        return res
 
     async def add_tags(self, ticket_id: Any, tags: List[str]) -> Dict[str, Any]:
         await self._resolve_creds()
         if not self.is_configured:
             self._log_mock("add_tags", {"ticketId": ticket_id, "tags": tags})
             return {"success": True, "status": 200, "data": {"mock": True}, "error": None}
-        return await self._request(
+        res = await self._request(
             "POST", f"/conversations/{ticket_id}/tags", json={"tags": tags}
         )
+        if _is_scope_limited(res):
+            self._log_mock(
+                "add_tags (scope-limited)", {"ticketId": ticket_id, "tags": tags}
+            )
+            return {
+                "success": True,
+                "status": 200,
+                "data": {"scope_limited": True},
+                "error": None,
+                "scope_limited": True,
+            }
+        return res

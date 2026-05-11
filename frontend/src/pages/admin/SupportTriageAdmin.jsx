@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import EscalationTimelineDialog from "@/components/admin/EscalationTimelineDialog";
 import {
   LifeBuoy,
   RefreshCw,
@@ -44,6 +45,7 @@ import {
   History,
   FlaskConical,
   Send,
+  Clock,
 } from "lucide-react";
 
 const TYPE_META = {
@@ -77,6 +79,7 @@ export default function SupportTriageAdmin() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [resolveTarget, setResolveTarget] = useState(null);
+  const [timelineTarget, setTimelineTarget] = useState(null);
   const [simulateOpen, setSimulateOpen] = useState(false);
   const [mockLogOpen, setMockLogOpen] = useState(false);
   const [mockLog, setMockLog] = useState({ mode: "mock", entries: [] });
@@ -289,14 +292,36 @@ export default function SupportTriageAdmin() {
                         </div>
                       </div>
                       {it.status === "open" && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setTimelineTarget(it.id)}
+                            data-testid={`support-timeline-${it.id}`}
+                          >
+                            <Clock className="h-3.5 w-3.5 mr-1.5" />
+                            Timeline
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setResolveTarget(it)}
+                            data-testid={`support-resolve-${it.id}`}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                            Resolve
+                          </Button>
+                        </div>
+                      )}
+                      {it.status !== "open" && (
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => setResolveTarget(it)}
-                          data-testid={`support-resolve-${it.id}`}
+                          variant="ghost"
+                          onClick={() => setTimelineTarget(it.id)}
+                          data-testid={`support-timeline-${it.id}`}
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                          Resolve
+                          <Clock className="h-3.5 w-3.5 mr-1.5" />
+                          Timeline
                         </Button>
                       )}
                     </div>
@@ -324,6 +349,12 @@ export default function SupportTriageAdmin() {
           setSimulateOpen(false);
           load();
         }}
+      />
+
+      <EscalationTimelineDialog
+        escalationId={timelineTarget}
+        open={!!timelineTarget}
+        onClose={() => setTimelineTarget(null)}
       />
 
       <Dialog open={mockLogOpen} onOpenChange={setMockLogOpen}>

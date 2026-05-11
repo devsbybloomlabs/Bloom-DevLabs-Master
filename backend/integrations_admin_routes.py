@@ -466,19 +466,33 @@ async def test_paypal(
 async def test_thrivedesk(
     request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Verify ThriveDesk auth by doing a no-op GET. In mock mode returns ok=true."""
+    """Verify ThriveDesk auth via `/v1/me` (works on every scope, incl. public)."""
     td = request.app.state.thrivedesk
     await td._resolve_creds()
     if not td.is_configured:
         await _record_ping(db, "thrivedesk", ok=False, detail="not configured (mock mode)")
         return {"ok": False, "mode": "mock", "reason": "not configured"}
-    # Light probe — ThriveDesk doesn't have a dedicated /me endpoint; use GET /conversations
-    res = await td._request("GET", "/conversations", params={"limit": 1})
+    res = await td.get_me()
     ok = bool(res.get("success"))
-    await _record_ping(
-        db, "thrivedesk", ok=ok, detail=None if ok else str(res.get("error"))[:80]
-    )
-    return {"ok": ok, "mode": "live", "status": res.get("status")}
+    detail = None
+    company_name = None
+    if ok:
+        company = ((res.get("data") or {}).get("company") or {})
+        company_name = company.get("company")
+    else:
+        detail = str(res.get("error"))[:80]
+    await _record_ping(db, "thrivedesk", ok=ok, detail=detail)
+    return {
+        "ok": ok,
+        "mode": "live",
+        "status": res.get("status"),
+        "company": company_name,
+        "note": (
+            "Auth verified. Note: `public` scope JWT exposes /me + /inboxes + /contacts "
+            "only — conversation REST endpoints fall back to mock_log."
+            if ok else None
+        ),
+    }
 
 
 @integrations_admin_router.post("/slack/test")

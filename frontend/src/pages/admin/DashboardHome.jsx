@@ -24,6 +24,7 @@ import { Link } from "react-router-dom";
 import BlockTimer from "@/components/admin/BlockTimer";
 import MRRWidget from "@/components/admin/MRRWidget";
 import IntegrationsHealthStrip from "@/components/admin/IntegrationsHealthStrip";
+import DemoModeCard from "@/components/admin/DemoModeCard";
 
 const BLOCK_BG = {
   OUTREACH: "bg-[#3B82F6]/10 text-[#1E3A8A] border-[#3B82F6]/30",
@@ -213,6 +214,9 @@ export default function DashboardHome() {
 
       {/* Integrations health strip */}
       <IntegrationsHealthStrip />
+
+      {/* Demo mode card — 1-click sandbox for Loom recordings */}
+      <DemoModeCard />
 
       {/* Block timer + Today's Routine */}
       <div className="grid gap-6 lg:grid-cols-3">

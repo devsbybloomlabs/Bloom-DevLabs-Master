@@ -60,6 +60,7 @@ from thrivedesk_routes import (  # noqa: E402
     support_admin_router,
     thrivedesk_webhook_router,
 )
+from demo_routes import demo_router  # noqa: E402
 from blog_extras_routes import blog_extras_router  # noqa: E402
 from integrations_admin_routes import integrations_admin_router  # noqa: E402
 from client_routes import (  # noqa: E402
@@ -264,6 +265,7 @@ api.include_router(approvals_admin_router)
 api.include_router(approvals_webhook_router)
 api.include_router(support_admin_router)
 api.include_router(thrivedesk_webhook_router)
+api.include_router(demo_router)
 
 app.include_router(api)
 
