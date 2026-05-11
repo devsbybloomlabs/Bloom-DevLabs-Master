@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,8 @@ import {
   AlertCircle,
   Loader2,
   ExternalLink,
+  XCircle,
+  Pencil,
 } from "lucide-react";
 
 function fmtMoney(amount, currency = "USD") {
@@ -131,6 +135,10 @@ export default function PayPalOrdersPage() {
   const [busyId, setBusyId] = useState(null);
   const [query, setQuery] = useState("");
   const [linkDialog, setLinkDialog] = useState(null);
+  const [reissueDialog, setReissueDialog] = useState(null); // {tx}
+  const [reissueAmount, setReissueAmount] = useState("");
+  const [cancelDialog, setCancelDialog] = useState(null); // {tx}
+  const [cancelReason, setCancelReason] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -169,10 +177,14 @@ export default function PayPalOrdersPage() {
     };
   }, [rows]);
 
-  const markReadyForLaunch = async (orderId) => {
+  const markReadyForLaunch = async (orderId, amountOverride) => {
     setBusyId(orderId);
     try {
-      const r = await api.post(`/paypal/admin/transactions/${orderId}/mark-ready-for-launch`);
+      const body = amountOverride ? { amount_override: amountOverride } : {};
+      const r = await api.post(
+        `/paypal/admin/transactions/${orderId}/mark-ready-for-launch`,
+        body
+      );
       const data = r.data || {};
       setLinkDialog({
         orderId,
@@ -184,11 +196,32 @@ export default function PayPalOrdersPage() {
       if (data.already_initiated) {
         toast.info("Balance was already billed — showing existing link");
       } else {
-        toast.success("Launch balance order created — link emailed to client");
+        toast.success(
+          amountOverride
+            ? `Re-issued for ${amountOverride} — link emailed to client`
+            : "Launch balance order created — link emailed to client"
+        );
       }
       load();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Could not bill remaining balance");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const cancelInstallment2 = async (orderId, reason) => {
+    setBusyId(orderId);
+    try {
+      await api.post(`/paypal/admin/transactions/${orderId}/cancel-installment-2`, {
+        reason: reason || "Cancelled by admin",
+      });
+      toast.success("Launch balance cancelled — admin can re-issue or leave it.");
+      setCancelDialog(null);
+      setCancelReason("");
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not cancel installment 2");
     } finally {
       setBusyId(null);
     }
@@ -355,25 +388,60 @@ export default function PayPalOrdersPage() {
                             ? "Launch balance already invoiced — awaiting client payment."
                             : "Project ready to launch? Bill the remaining 50% now."}
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => markReadyForLaunch(tx.id)}
-                          disabled={busyId === tx.id}
-                          className={
-                            alreadyBilled
-                              ? "bg-secondary text-foreground hover:bg-secondary/80"
-                              : "bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
-                          }
-                          variant={alreadyBilled ? "outline" : "default"}
-                          data-testid={`paypal-order-launch-${tx.id}`}
-                        >
-                          {busyId === tx.id ? (
-                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                          ) : (
-                            <Rocket className="h-3.5 w-3.5 mr-1.5" />
+                        <div className="flex flex-wrap gap-2">
+                          {alreadyBilled && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setReissueAmount(tx.charge_later || "");
+                                  setReissueDialog({ tx });
+                                }}
+                                disabled={busyId === tx.id}
+                                data-testid={`paypal-order-reissue-${tx.id}`}
+                                title="Cancel & re-issue with a different amount"
+                              >
+                                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                Re-issue
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setCancelReason("");
+                                  setCancelDialog({ tx });
+                                }}
+                                disabled={busyId === tx.id}
+                                className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-900"
+                                data-testid={`paypal-order-cancel-${tx.id}`}
+                                title="Cancel the uncaptured launch balance"
+                              >
+                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                Cancel
+                              </Button>
+                            </>
                           )}
-                          {alreadyBilled ? "View launch link" : "Mark Ready for Launch"}
-                        </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => markReadyForLaunch(tx.id)}
+                            disabled={busyId === tx.id}
+                            className={
+                              alreadyBilled
+                                ? "bg-secondary text-foreground hover:bg-secondary/80"
+                                : "bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+                            }
+                            variant={alreadyBilled ? "outline" : "default"}
+                            data-testid={`paypal-order-launch-${tx.id}`}
+                          >
+                            {busyId === tx.id ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            ) : (
+                              <Rocket className="h-3.5 w-3.5 mr-1.5" />
+                            )}
+                            {alreadyBilled ? "View launch link" : "Mark Ready for Launch"}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -444,6 +512,178 @@ export default function PayPalOrdersPage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLinkDialog(null)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Re-issue dialog */}
+      <Dialog
+        open={Boolean(reissueDialog)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setReissueDialog(null);
+            setReissueAmount("");
+          }
+        }}
+      >
+        <DialogContent data-testid="paypal-orders-reissue-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-[#1E3A8A]" />
+              Re-issue launch balance
+            </DialogTitle>
+            <DialogDescription>
+              Cancels the current PayPal launch order and creates a new one
+              with the amount below. Useful after a scope change.
+            </DialogDescription>
+          </DialogHeader>
+          {reissueDialog?.tx && (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border bg-[var(--warm-50)] px-3 py-3 text-sm">
+                <div className="text-xs text-muted-foreground">Order</div>
+                <div className="font-mono text-xs mt-0.5 break-all">{reissueDialog.tx.id}</div>
+                <div className="text-xs text-muted-foreground mt-2">Original balance</div>
+                <div className="tabular-nums">
+                  {fmtMoney(reissueDialog.tx.charge_later, reissueDialog.tx.currency)}
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="reissue-amount">New balance ({reissueDialog.tx.currency || "USD"})</Label>
+                <Input
+                  id="reissue-amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={reissueAmount}
+                  onChange={(e) => setReissueAmount(e.target.value)}
+                  placeholder="e.g. 3500.00"
+                  className="mt-1.5"
+                  data-testid="paypal-orders-reissue-amount-input"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  We&apos;ll void the existing PayPal launch order locally and
+                  email the client a fresh PayPal link for the new amount.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setReissueDialog(null);
+                setReissueAmount("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!reissueDialog) return;
+                const tx = reissueDialog.tx;
+                const amt = (reissueAmount || "").trim();
+                if (!amt || isNaN(parseFloat(amt)) || parseFloat(amt) <= 0) {
+                  toast.error("Enter a positive numeric amount");
+                  return;
+                }
+                // Cancel old child first, then create new with override
+                setReissueDialog(null);
+                try {
+                  await api.post(
+                    `/paypal/admin/transactions/${tx.id}/cancel-installment-2`,
+                    { reason: "Re-issuing with new amount" }
+                  );
+                } catch (e) {
+                  toast.error(
+                    e?.response?.data?.detail || "Could not void prior launch order"
+                  );
+                  return;
+                }
+                await markReadyForLaunch(tx.id, amt);
+                setReissueAmount("");
+              }}
+              className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+              data-testid="paypal-orders-reissue-submit"
+            >
+              <Pencil className="h-3.5 w-3.5 mr-1.5" />
+              Re-issue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel dialog */}
+      <Dialog
+        open={Boolean(cancelDialog)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setCancelDialog(null);
+            setCancelReason("");
+          }
+        }}
+      >
+        <DialogContent data-testid="paypal-orders-cancel-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-rose-600" />
+              Cancel launch balance
+            </DialogTitle>
+            <DialogDescription>
+              Voids the uncaptured PayPal launch order locally and resets the
+              project to <em>pending launch</em>. The first 50% capture is
+              untouched.
+            </DialogDescription>
+          </DialogHeader>
+          {cancelDialog?.tx && (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border bg-[var(--warm-50)] px-3 py-3 text-sm">
+                <div className="text-xs text-muted-foreground">Client</div>
+                <div>{cancelDialog.tx.customer_email || "—"}</div>
+                <div className="text-xs text-muted-foreground mt-2">Balance</div>
+                <div className="tabular-nums">
+                  {fmtMoney(cancelDialog.tx.charge_later, cancelDialog.tx.currency)}
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="cancel-reason">Reason (optional)</Label>
+                <Textarea
+                  id="cancel-reason"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g. Client churned before launch"
+                  rows={2}
+                  className="mt-1.5"
+                  data-testid="paypal-orders-cancel-reason-input"
+                />
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
+                <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                <span>
+                  PayPal Orders v2 has no public void endpoint — uncaptured
+                  orders expire after 21 days. This action only updates our
+                  records and notifies you.
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCancelDialog(null);
+                setCancelReason("");
+              }}
+            >
+              Keep
+            </Button>
+            <Button
+              onClick={() => cancelDialog && cancelInstallment2(cancelDialog.tx.id, cancelReason)}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              data-testid="paypal-orders-cancel-submit"
+            >
+              <XCircle className="h-3.5 w-3.5 mr-1.5" />
+              Cancel installment 2
             </Button>
           </DialogFooter>
         </DialogContent>

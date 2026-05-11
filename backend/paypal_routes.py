@@ -473,18 +473,26 @@ async def list_transactions(
     return docs
 
 
+class MarkReadyForLaunchRequest(BaseModel):
+    amount_override: Optional[str] = None  # optional re-issue with different balance
+
+
 @paypal_admin_router.post("/transactions/{order_id}/mark-ready-for-launch")
 async def mark_ready_for_launch(
     order_id: str,
     request: Request,
     pp: PayPalClient = Depends(get_pp),
     db: AsyncIOMotorDatabase = Depends(get_db),
+    req: MarkReadyForLaunchRequest = Body(default=MarkReadyForLaunchRequest()),
 ) -> Dict[str, Any]:
     """Bill the remaining 50% for a split-payment order.
 
     Creates a brand-new PayPal order for the `charge_later` balance,
     stores it linked to the parent, emails the client a payment link
     (best-effort) and returns the approval URL so the admin can copy it.
+
+    Optional `amount_override` lets admin re-issue with a different total
+    (e.g. after a scope change). Defaults to the originally computed balance.
     """
     if not pp.is_configured:
         raise HTTPException(503, "PayPal not configured")
@@ -513,7 +521,17 @@ async def mark_ready_for_launch(
             "already_initiated": True,
         }
 
-    balance = parent.get("charge_later") or "0.00"
+    # Resolve balance: optional override, else the original charge_later.
+    if req.amount_override:
+        try:
+            override_val = float(req.amount_override)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "amount_override must be a numeric string")
+        if override_val <= 0:
+            raise HTTPException(400, "amount_override must be positive")
+        balance = _money(override_val)
+    else:
+        balance = parent.get("charge_later") or "0.00"
     if float(balance) <= 0:
         raise HTTPException(400, "No remaining balance to charge")
 
@@ -559,6 +577,7 @@ async def mark_ready_for_launch(
         "installment_index": 2,
         "parent_order_id": order_id,
         "approval_url": approval_url,
+        "amount_overridden": bool(req.amount_override),
         "created_at": _now().isoformat(),
         "updated_at": _now().isoformat(),
     }
@@ -636,6 +655,79 @@ def _launch_balance_email_html(name: str, amount: str, approval_url: str, plan_n
   </div>
 </body></html>
 """.strip()
+
+
+class CancelInstallmentRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+@paypal_admin_router.post("/transactions/{order_id}/cancel-installment-2")
+async def cancel_installment_2(
+    order_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    req: CancelInstallmentRequest = Body(default=CancelInstallmentRequest()),
+) -> Dict[str, Any]:
+    """Cancel an uncaptured launch-balance order so admin can re-issue or void.
+
+    PayPal Orders v2 has no first-party void endpoint — uncaptured orders
+    expire after 21 days. We mark the child VOIDED_LOCAL, clear the parent's
+    `installment_2_order_id` and reset its status to `pending_launch` so the
+    admin can either re-issue (optionally with a new amount) or simply walk
+    away if the client churned.
+
+    Refusing to cancel if the child has already been captured — for that
+    case admin must refund through the PayPal dashboard (out of scope).
+    """
+    parent = await db.paypal_transactions.find_one({"id": order_id}, {"_id": 0})
+    if not parent:
+        raise HTTPException(404, "Order not found")
+    if parent.get("payment_plan") != "split_50_50" or parent.get("installment_index") != 1:
+        raise HTTPException(400, "Only split 50/50 parent orders support cancellation")
+    child_id = parent.get("installment_2_order_id")
+    if not child_id:
+        raise HTTPException(400, "No installment-2 order to cancel")
+    child = await db.paypal_transactions.find_one({"id": child_id}, {"_id": 0})
+    if not child:
+        raise HTTPException(404, "Installment-2 order record missing")
+    if child.get("status") == "COMPLETED":
+        raise HTTPException(
+            409,
+            "Installment-2 already captured — issue a refund from the PayPal dashboard.",
+        )
+
+    now_iso = _now().isoformat()
+    reason = (req.reason or "Cancelled by admin").strip()
+
+    # Mark child as locally voided
+    await db.paypal_transactions.update_one(
+        {"id": child_id},
+        {"$set": {
+            "status": "VOIDED_LOCAL",
+            "cancelled_at": now_iso,
+            "cancel_reason": reason,
+            "updated_at": now_iso,
+        }},
+    )
+
+    # Reset parent so admin can re-mark Ready for Launch
+    await db.paypal_transactions.update_one(
+        {"id": order_id},
+        {"$set": {
+            "installment_2_status": "pending_launch",
+            "updated_at": now_iso,
+        }, "$unset": {
+            "installment_2_order_id": "",
+            "installment_2_billed_at": "",
+        }},
+    )
+
+    return {
+        "ok": True,
+        "parent_id": order_id,
+        "cancelled_child_id": child_id,
+        "reason": reason,
+        "parent_installment_2_status": "pending_launch",
+    }
 
 
 @paypal_admin_router.get("/subscriptions")

@@ -237,3 +237,291 @@ class TestMarkReadyForLaunch:
         finally:
             loop.run_until_complete(cleanup(db, doc_id))
             loop.close()
+
+
+class TestCancelInstallment2:
+    """Admin cancel endpoint for uncaptured installment-2 orders."""
+
+    def test_requires_auth(self):
+        r = requests.post(
+            f"{API}/paypal/admin/transactions/FAKE/cancel-installment-2",
+            timeout=15,
+        )
+        assert r.status_code in (401, 403)
+
+    def test_unknown_order_returns_404(self, admin_token):
+        r = requests.post(
+            f"{API}/paypal/admin/transactions/UNKNOWN-{uuid.uuid4().hex}/cancel-installment-2",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            timeout=15,
+        )
+        assert r.status_code == 404, r.text
+
+    def test_rejects_non_split_parent(self, admin_token):
+        import asyncio
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        async def seed():
+            client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+            db = client[os.environ["DB_NAME"]]
+            doc_id = f"TEST-CANCEL-NONSPLIT-{uuid.uuid4().hex[:8]}"
+            await db.paypal_transactions.insert_one({
+                "id": doc_id,
+                "kind": "order",
+                "status": "COMPLETED",
+                "payment_plan": "full_upfront",
+                "installment_index": 1,
+            })
+            return db, doc_id
+
+        async def cleanup(db, doc_id):
+            await db.paypal_transactions.delete_one({"id": doc_id})
+
+        loop = asyncio.new_event_loop()
+        db, doc_id = loop.run_until_complete(seed())
+        try:
+            r = requests.post(
+                f"{API}/paypal/admin/transactions/{doc_id}/cancel-installment-2",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                timeout=15,
+            )
+            assert r.status_code == 400, r.text
+        finally:
+            loop.run_until_complete(cleanup(db, doc_id))
+            loop.close()
+
+    def test_rejects_when_no_installment_2_billed(self, admin_token):
+        """Split parent without an installment_2_order_id can't be cancelled."""
+        import asyncio
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        async def seed():
+            client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+            db = client[os.environ["DB_NAME"]]
+            doc_id = f"TEST-CANCEL-NOINS2-{uuid.uuid4().hex[:8]}"
+            await db.paypal_transactions.insert_one({
+                "id": doc_id,
+                "kind": "order",
+                "status": "COMPLETED",
+                "payment_plan": "split_50_50",
+                "installment_index": 1,
+                "installment_2_status": "pending_launch",
+            })
+            return db, doc_id
+
+        async def cleanup(db, doc_id):
+            await db.paypal_transactions.delete_one({"id": doc_id})
+
+        loop = asyncio.new_event_loop()
+        db, doc_id = loop.run_until_complete(seed())
+        try:
+            r = requests.post(
+                f"{API}/paypal/admin/transactions/{doc_id}/cancel-installment-2",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                timeout=15,
+            )
+            assert r.status_code == 400, r.text
+            assert "no installment-2" in r.text.lower()
+        finally:
+            loop.run_until_complete(cleanup(db, doc_id))
+            loop.close()
+
+    def test_happy_path_voids_child_resets_parent(self, admin_token):
+        """Seed a parent with a fake billed child → cancel → child VOIDED_LOCAL,
+        parent reset to pending_launch with installment_2_order_id removed."""
+        import asyncio
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        async def seed():
+            client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+            db = client[os.environ["DB_NAME"]]
+            parent_id = f"TEST-CANCEL-PARENT-{uuid.uuid4().hex[:8]}"
+            child_id = f"TEST-CANCEL-CHILD-{uuid.uuid4().hex[:8]}"
+            await db.paypal_transactions.insert_one({
+                "id": parent_id,
+                "kind": "order",
+                "status": "COMPLETED",
+                "payment_plan": "split_50_50",
+                "installment_index": 1,
+                "installment_2_status": "billed",
+                "installment_2_order_id": child_id,
+                "installment_2_billed_at": "2026-02-11T00:00:00+00:00",
+                "charge_later": "2997.50",
+                "currency": "USD",
+                "customer_email": "cancel-e2e@bybloomlabs.com",
+            })
+            await db.paypal_transactions.insert_one({
+                "id": child_id,
+                "kind": "order",
+                "status": "CREATED",
+                "payment_plan": "split_50_50",
+                "installment_index": 2,
+                "parent_order_id": parent_id,
+                "amount": "2997.50",
+                "currency": "USD",
+            })
+            return db, parent_id, child_id
+
+        async def cleanup(db, parent_id, child_id):
+            await db.paypal_transactions.delete_many(
+                {"id": {"$in": [parent_id, child_id]}}
+            )
+
+        async def fetch(db, doc_id):
+            return await db.paypal_transactions.find_one({"id": doc_id}, {"_id": 0})
+
+        loop = asyncio.new_event_loop()
+        db, parent_id, child_id = loop.run_until_complete(seed())
+        try:
+            r = requests.post(
+                f"{API}/paypal/admin/transactions/{parent_id}/cancel-installment-2",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={"reason": "E2E cancel test"},
+                timeout=15,
+            )
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert body["ok"] is True
+            assert body["cancelled_child_id"] == child_id
+            assert body["parent_installment_2_status"] == "pending_launch"
+
+            child = loop.run_until_complete(fetch(db, child_id))
+            parent = loop.run_until_complete(fetch(db, parent_id))
+            assert child["status"] == "VOIDED_LOCAL"
+            assert child["cancel_reason"] == "E2E cancel test"
+            assert parent["installment_2_status"] == "pending_launch"
+            assert parent.get("installment_2_order_id") is None
+            assert parent.get("installment_2_billed_at") is None
+        finally:
+            loop.run_until_complete(cleanup(db, parent_id, child_id))
+            loop.close()
+
+    def test_rejects_when_child_already_captured(self, admin_token):
+        """If the child installment-2 has been captured, cancel must fail."""
+        import asyncio
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        async def seed():
+            client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+            db = client[os.environ["DB_NAME"]]
+            parent_id = f"TEST-CANCEL-CAP-PARENT-{uuid.uuid4().hex[:8]}"
+            child_id = f"TEST-CANCEL-CAP-CHILD-{uuid.uuid4().hex[:8]}"
+            await db.paypal_transactions.insert_one({
+                "id": parent_id,
+                "kind": "order",
+                "status": "COMPLETED",
+                "payment_plan": "split_50_50",
+                "installment_index": 1,
+                "installment_2_status": "paid",
+                "installment_2_order_id": child_id,
+            })
+            await db.paypal_transactions.insert_one({
+                "id": child_id,
+                "kind": "order",
+                "status": "COMPLETED",  # already captured
+                "payment_plan": "split_50_50",
+                "installment_index": 2,
+                "parent_order_id": parent_id,
+            })
+            return db, parent_id, child_id
+
+        async def cleanup(db, parent_id, child_id):
+            await db.paypal_transactions.delete_many(
+                {"id": {"$in": [parent_id, child_id]}}
+            )
+
+        loop = asyncio.new_event_loop()
+        db, parent_id, child_id = loop.run_until_complete(seed())
+        try:
+            r = requests.post(
+                f"{API}/paypal/admin/transactions/{parent_id}/cancel-installment-2",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                timeout=15,
+            )
+            assert r.status_code == 409, r.text
+            assert "refund" in r.text.lower()
+        finally:
+            loop.run_until_complete(cleanup(db, parent_id, child_id))
+            loop.close()
+
+
+class TestAmountOverride:
+    """mark-ready-for-launch accepts an optional amount_override."""
+
+    def test_rejects_negative_amount_override(self, admin_token):
+        import asyncio
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        async def seed():
+            client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+            db = client[os.environ["DB_NAME"]]
+            doc_id = f"TEST-OVERRIDE-NEG-{uuid.uuid4().hex[:8]}"
+            await db.paypal_transactions.insert_one({
+                "id": doc_id,
+                "kind": "order",
+                "status": "COMPLETED",
+                "tier": "express",
+                "payment_plan": "split_50_50",
+                "installment_index": 1,
+                "installment_2_status": "pending_launch",
+                "charge_later": "2997.50",
+                "currency": "USD",
+            })
+            return db, doc_id
+
+        async def cleanup(db, doc_id):
+            await db.paypal_transactions.delete_one({"id": doc_id})
+
+        loop = asyncio.new_event_loop()
+        db, doc_id = loop.run_until_complete(seed())
+        try:
+            r = requests.post(
+                f"{API}/paypal/admin/transactions/{doc_id}/mark-ready-for-launch",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={"amount_override": "-50.00"},
+                timeout=15,
+            )
+            assert r.status_code == 400, r.text
+            assert "positive" in r.text.lower()
+        finally:
+            loop.run_until_complete(cleanup(db, doc_id))
+            loop.close()
+
+    def test_rejects_non_numeric_amount_override(self, admin_token):
+        import asyncio
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        async def seed():
+            client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+            db = client[os.environ["DB_NAME"]]
+            doc_id = f"TEST-OVERRIDE-NAN-{uuid.uuid4().hex[:8]}"
+            await db.paypal_transactions.insert_one({
+                "id": doc_id,
+                "kind": "order",
+                "status": "COMPLETED",
+                "tier": "express",
+                "payment_plan": "split_50_50",
+                "installment_index": 1,
+                "installment_2_status": "pending_launch",
+                "charge_later": "2997.50",
+                "currency": "USD",
+            })
+            return db, doc_id
+
+        async def cleanup(db, doc_id):
+            await db.paypal_transactions.delete_one({"id": doc_id})
+
+        loop = asyncio.new_event_loop()
+        db, doc_id = loop.run_until_complete(seed())
+        try:
+            r = requests.post(
+                f"{API}/paypal/admin/transactions/{doc_id}/mark-ready-for-launch",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={"amount_override": "abc"},
+                timeout=15,
+            )
+            assert r.status_code == 400, r.text
+            assert "numeric" in r.text.lower()
+        finally:
+            loop.run_until_complete(cleanup(db, doc_id))
+            loop.close()
