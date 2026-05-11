@@ -155,6 +155,27 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 **Test results:**
 - iteration_13 8/8 phase13 backend tests + 26/26 phase 11+12 regression = **34/34 PASS**.
 - iteration_13 100% frontend verification — every selector + flow rendered correctly. Zero functional bugs.
+
+### ✅ Phase 14 — Slack LIVE + Public Sandbox Tour at /tour (Feb 2026)
+
+**Slack incoming webhook configured:**
+- User pasted webhook URL into `/admin/integrations` → Credentials → Slack. Live test message landed in `#urgent-support`. Health pill: green.
+- 6 of 8 integrations now LIVE (only Approval Studio + Nifty remain pending real credentials).
+
+**P3 — Public Sandbox Tour at /tour (NEW):**
+- New public route `/tour` — no auth required. Walks prospects through the full automation flywheel using real demo data fetched from `GET /api/public/tour/snapshot`.
+- **Backend `public_tour_routes.py`** — auto-seeds the demo dataset on first request if empty; strips `hashed_password` and `raw_data` from every response; returns curated featured items (urgent escalation, in_review approval, complete milestone) + full arrays + stats.
+- **Frontend `PublicSandboxTour.jsx`** — IntersectionObserver-driven scrollytelling layout:
+  - Hero with bold gradient (#0F172A → #1E40AF), "Start the tour" CTA + "Skip — talk to founder" secondary
+  - 6 step sections with sticky preview panel that swaps content based on scroll position
+  - Each preview is a browser-framed card: Onboarding wizard preview, Approval Studio comment, Comment thread, Urgent escalation card, Slack message rendering, Resolution timeline
+  - Closing CTA section with "Book a 15-min call" + "See pricing"
+- **GA4 instrumentation** — fires `tour_step_view` (per step on scroll) and `tour_cta_click` events (with `location: header|hero|footer` labels).
+- **SEO** — added `/tour` to `sitemap.xml` with priority 0.95. Added "See it live" link to main site Header nav.
+
+**Test results:**
+- iteration_14 7/7 phase14 backend tests + 34/34 phase 11-13 regression = **41/41 PASS**.
+- iteration_14 100% frontend verification — every data-testid covered, scrollytelling preview-swap verified, Header nav-link routes correctly, sitemap includes /tour. Zero bugs.
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
@@ -203,10 +224,13 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - Automated Nifty project creation on Phase 3 onboarding submit (currently logs to admin notifications).
 - Stripe as backup payment processor.
 - Google Calendar sync.
-- ~~Slack notifications.~~ ✅ Done (Phase 12 — wired into urgent ThriveDesk escalations).
+- ~~Slack notifications.~~ ✅ Done (Phase 12 — wired into urgent ThriveDesk escalations; LIVE Phase 14).
 - Approval Studio: real-time annotation preview inside `/admin/approvals` (currently shows mock log only).
-- ThriveDesk: visual escalation timeline showing message thread + status transitions.
+- ~~ThriveDesk: visual escalation timeline.~~ ✅ Done (Phase 13).
 - Multi-workspace Nifty support (currently single workspace).
+- ~~Public "Sandbox tour" route at /tour~~ ✅ Done (Phase 14).
+- A/B-test the CTA position on /tour (header vs hero vs sticky bottom bar).
+- Embed a 15-second product demo video on /tour above the fold.
 
 ## API Endpoints (cumulative reference)
 
