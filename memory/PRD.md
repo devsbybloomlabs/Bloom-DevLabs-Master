@@ -251,18 +251,25 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - Capture pipeline marks the parent's `installment_2_status` → `pending_launch` on first capture, then `paid` when the child installment captures. Skips duplicate client provisioning for installment 2.
 - New admin endpoint `POST /api/paypal/admin/transactions/{order_id}/mark-ready-for-launch`:
   - Idempotent (returns the existing child if already billed).
+  - Optional `amount_override` body field lets admin re-issue at a different total after a scope change.
   - Creates a second PayPal order for `charge_later`, persists it linked to the parent (`parent_order_id`, `installment_index: 2`), emails the client (best-effort via Emailit), and notifies the admin in the in-app notification feed.
+- New admin endpoint `POST /api/paypal/admin/transactions/{order_id}/cancel-installment-2`:
+  - Voids an uncaptured launch-balance order locally (`VOIDED_LOCAL`) and resets the parent's `installment_2_status` back to `pending_launch` (clears `installment_2_order_id`).
+  - Rejects with 409 if the child has already been captured (admin must refund through the PayPal dashboard — out of scope).
 
 **Frontend:**
 - `/app/frontend/src/components/sections/Pricing.jsx` — CheckoutDialog renders a radio group (split_50_50 / full_upfront) with a live summary panel (base, discount line, due today, due at launch). CTA dynamically reflects `charge_now`.
 - `/app/frontend/src/components/payment/PayPalCheckoutButton.jsx` — forwards `paymentPlan` to backend.
-- `/app/frontend/src/pages/admin/PayPalOrdersPage.jsx` (new) — list view of all PayPal orders with payment-plan badge, installment-2 status, and a one-click **Mark Ready for Launch** action that opens a dialog with the copy-able approval URL.
+- `/app/frontend/src/pages/admin/PayPalOrdersPage.jsx` (new) — list view of all PayPal orders with payment-plan badge, installment-2 status, and three actions on COMPLETED 50/50 deposits:
+  - **Mark Ready for Launch** — bills the remaining 50% (default).
+  - **Re-issue** — voids the current launch order and creates a new one at a different amount (after scope change).
+  - **Cancel** — voids the uncaptured launch order locally (with reason), resets the project to `pending_launch`.
 - Admin sidebar gained "PayPal Orders" entry (`/admin/paypal-orders`).
 
 **Tests:**
-- `/app/backend/tests/test_payment_plans.py` — 11 pytest cases (compute_charge math × 4, payload validation × 3, admin endpoint guardrails × 4). All pass.
-- Regression: 27/27 `test_paypal_clients.py` still green.
-- `iteration_17.json` confirms 100% backend + frontend coverage (10/10 listed feature checks pass, no bugs).
+- `/app/backend/tests/test_payment_plans.py` — 19 pytest cases (compute_charge math × 4, payload validation × 3, mark-ready-for-launch guardrails × 4, cancel-installment-2 paths × 6 incl. happy path, amount_override validation × 2). All pass.
+- Regression: 27/27 `test_paypal_clients.py` still green = 46/46 backend.
+- `iteration_17.json` confirms 100% backend + frontend coverage on the original 10 feature checks (cancel/re-issue UI added after testing-agent run; covered by the new pytest suite + admin smoke test).
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
@@ -346,7 +353,8 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 ### Admin-auth
 - All `/api/admin/*` routes: case-studies, testimonials, blog (incl. `/admin/blog/ai/draft`), onboarding, clients, lead-magnets, leads (+ drip-tick), milestones (+ sync-history)
 - PayPal admin: `/api/paypal/admin/{health,plans,transactions,subscriptions,webhooks}`
-- PayPal admin (Phase 17): `POST /api/paypal/admin/transactions/{order_id}/mark-ready-for-launch` — bills the remaining 50% for split-payment orders.
+- PayPal admin (Phase 17): `POST /api/paypal/admin/transactions/{order_id}/mark-ready-for-launch` — bills the remaining 50% for split-payment orders (optional `amount_override`).
+- PayPal admin (Phase 17): `POST /api/paypal/admin/transactions/{order_id}/cancel-installment-2` — voids an uncaptured launch-balance order locally and resets the parent.
 
 ## MongoDB Collections (cumulative)
 - `users`, `daily_routines`, `prospects`, `case_studies`, `testimonials`, `notifications`, `thought_leadership`, `authority_score`
