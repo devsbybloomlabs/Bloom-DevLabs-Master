@@ -1,0 +1,54 @@
+{
+  "summary": "Phase 10 verification pass — all 3 iteration_9 bugs are FIXED. Backend: 18/18 phase10 + 3/3 new phase10_regression tests pass. Frontend: no 403/polling cascade after manual token save (only 3 requests in 10s window), 0 toasts, all 4 provider cards remain rendered, all 6 Nifty UI elements (sync + 4 selects + save) visible after manual token save, empty-string clears default_project_id, GA4 gtag loaded.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/integrations/paypal/test", "issue": "Same live-OAuth flake risk as iteration_9 (RemoteDisconnected) — passed in both this run's direct curl and pytest, but suggest httpx retry for CI stability."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase10_integrations.py",
+    "/app/backend/tests/test_phase10_regression.py",
+    "/app/test_reports/pytest/phase10.xml",
+    "/app/test_reports/pytest/phase10_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "useAdminApi() now correctly memoizes axios via useMemo([token]) — useEffect dep stability confirmed by the request count test (3 requests in 10s vs hundreds before).",
+    "Backend nifty_set_preferences correctly treats empty string + empty list as explicit clear intent — verified by 3 new regression tests.",
+    "Sonner toast queue still unbounded by default; consider adding visibleToasts limit as defensive measure (out of scope for this fix but good housekeeping)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase10_regression.py (new — 3 regression tests for the 3 iteration_9 bugs)"
+  ],
+  "success_rate": {"backend": "100% (21/21: 18 phase10 + 3 regression)", "frontend": "100% — all specified flows pass"},
+  "test_credentials": "Admin founder@thesalvador.group / admin123 (used).",
+  "seed_data_creation": "Cleanup PUT executed at end — preferences fully cleared and Nifty manual token disconnected. No leftover state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 10 frictionreducer is fully shipped and verified. The polling-loop bug (useAdminApi stable identity), the gating bug (connected vs ping_ok), and the empty-string clear bug are all confirmed fixed via UI + pytest. test_phase10_regression.py guards against future regressions. GA4 G-KTSD1H6KMX verified live in DOM. Set REACT_APP_BACKEND_URL env var before pytest runs (the test file uses os.environ[...] without default by design).",
+  "frontend_verification_details": {
+    "providers_grid_cards": ["provider-card-openrouter", "provider-card-emailit", "provider-card-agencyhandy", "provider-card-paypal"],
+    "ga4": {"window_gtag_is_function": true, "gtag_script_src": "https://www.googletagmanager.com/gtag/js?id=G-KTSD1H6KMX"},
+    "polling_requests_to_integrations_in_10s_after_manual_token_save": 3,
+    "polling_request_methods": ["POST manual-token", "GET status", "GET cache"],
+    "toasts_after_manual_token_save": 0,
+    "nifty_ui_elements_after_save": {
+      "nifty-sync-button": true,
+      "nifty-default-project-select": true,
+      "nifty-designer-select": true,
+      "nifty-pm-select": true,
+      "nifty-developer-select": true,
+      "nifty-save-prefs-button": true
+    },
+    "none_no_default_option_visible_in_empty_cache": true,
+    "openrouter_test_connection_toast": "OpenRouter ✓ connection OK",
+    "paypal_test_endpoint_direct_curl": "{ok: true, env: sandbox}"
+  },
+  "rca of the issue": "All 3 iteration_9 bugs verified resolved. (1) Polling cascade: useAdminApi now uses useMemo([token]) so the axios `api` reference is stable across renders, breaking the useEffect-[load]-dep infinite re-trigger. Measured: 3 requests in 10s window vs the previously observed hundreds. (2) UI gating: `{connected && (...)}` now shows Sync + preferences regardless of ping_ok — all 6 testids visible after fake-token save. (3) Empty-string/list clear: PUT prefs with '' or [] now persists as cleared values (verified via 3 regression tests + direct curl roundtrip)."
+}

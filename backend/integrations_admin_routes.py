@@ -265,6 +265,7 @@ async def nifty_set_preferences(
 ) -> Dict[str, Any]:
     existing = await get_setting(db, PREFS_KEY) or {}
     update = {**existing}
+    # Treat empty-string and empty-list as explicit "clear" intent.
     for k in (
         "default_project_id",
         "designer_assignees",
@@ -272,10 +273,16 @@ async def nifty_set_preferences(
         "developer_assignees",
     ):
         v = getattr(req, k)
-        if v is not None:
+        if v is None:
+            continue
+        if isinstance(v, str):
+            update[k] = v.strip()  # may be ""
+        elif isinstance(v, list):
+            cleaned = [x.strip() for x in v if isinstance(x, str) and x.strip()]
+            update[k] = cleaned  # may be []
+        else:
             update[k] = v
     saved = await set_setting(db, PREFS_KEY, update)
-    # Update the live NiftyClient instance so subsequent task creation uses the new project id
     if "default_project_id" in update:
         nifty.default_project_id = update["default_project_id"] or nifty.default_project_id
     return saved["value"]

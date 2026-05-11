@@ -301,8 +301,15 @@ function NiftyCard() {
           </div>
         )}
 
-        {connected && pingOk && (
+        {connected && (
           <>
+            {!pingOk && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Token saved but live ping failed — Sync may not retrieve data
+                until you reconnect with a valid token.
+              </div>
+            )}
+
             {/* SYNC SECTION */}
             <div className="rounded-xl border border-border bg-[var(--warm-50)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -335,84 +342,82 @@ function NiftyCard() {
               </div>
             </div>
 
-            {/* PREFERENCES — dropdowns */}
-            {cache && (projects.length > 0 || members.length > 0) && (
-              <div className="rounded-xl border border-border bg-background p-4 space-y-4" data-testid="nifty-preferences-section">
-                <p className="font-display text-sm font-medium flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-[#1E3A8A]" />
-                  Default project + team assignees
+            {/* PREFERENCES — always show; dropdowns are empty if no cache yet */}
+            <div className="rounded-xl border border-border bg-background p-4 space-y-4" data-testid="nifty-preferences-section">
+              <p className="font-display text-sm font-medium flex items-center gap-2">
+                <Activity className="h-4 w-4 text-[#1E3A8A]" />
+                Default project + team assignees
+              </p>
+
+              <div>
+                <Label className="text-sm">Default project</Label>
+                <Select
+                  value={draftPrefs.default_project_id || "__none__"}
+                  onValueChange={(v) =>
+                    setDraftPrefs((p) => ({ ...p, default_project_id: v === "__none__" ? "" : v }))
+                  }
+                >
+                  <SelectTrigger className="mt-1.5" data-testid="nifty-default-project-select">
+                    <SelectValue placeholder={projects.length === 0 ? "Sync first to see projects" : "Select a project..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None (no default) —</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id} data-testid={`nifty-project-option-${p.id}`}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  Onboarding tasks land in this project unless overridden per phase.
                 </p>
-
-                <div>
-                  <Label className="text-sm">Default project</Label>
-                  <Select
-                    value={draftPrefs.default_project_id || "__none__"}
-                    onValueChange={(v) =>
-                      setDraftPrefs((p) => ({ ...p, default_project_id: v === "__none__" ? "" : v }))
-                    }
-                  >
-                    <SelectTrigger className="mt-1.5" data-testid="nifty-default-project-select">
-                      <SelectValue placeholder="Select a project..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— None (no default) —</SelectItem>
-                      {projects.map((p) => (
-                        <SelectItem key={p.id} value={p.id} data-testid={`nifty-project-option-${p.id}`}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    Onboarding tasks land in this project unless overridden per phase.
-                  </p>
-                </div>
-
-                {members.length > 0 ? (
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <AssigneeSelect
-                      label="Lead Designer"
-                      members={members}
-                      value={draftPrefs.designer_assignees[0] || ""}
-                      onChange={(v) => setAssignee("designer_assignees", v)}
-                      testid="nifty-designer-select"
-                    />
-                    <AssigneeSelect
-                      label="Project Manager"
-                      members={members}
-                      value={draftPrefs.pm_assignees[0] || ""}
-                      onChange={(v) => setAssignee("pm_assignees", v)}
-                      testid="nifty-pm-select"
-                    />
-                    <AssigneeSelect
-                      label="Lead Developer"
-                      members={members}
-                      value={draftPrefs.developer_assignees[0] || ""}
-                      onChange={(v) => setAssignee("developer_assignees", v)}
-                      testid="nifty-developer-select"
-                    />
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No members cached. Tip: members are scoped to a project — click Sync after
-                    selecting a default project above to load members for it.
-                  </p>
-                )}
-
-                <div className="flex items-center justify-end">
-                  <Button
-                    size="sm"
-                    onClick={onSavePrefs}
-                    disabled={savingPrefs}
-                    className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
-                    data-testid="nifty-save-prefs-button"
-                  >
-                    {savingPrefs ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                    Save preferences
-                  </Button>
-                </div>
               </div>
-            )}
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <AssigneeSelect
+                  label="Lead Designer"
+                  members={members}
+                  value={draftPrefs.designer_assignees[0] || ""}
+                  onChange={(v) => setAssignee("designer_assignees", v)}
+                  testid="nifty-designer-select"
+                />
+                <AssigneeSelect
+                  label="Project Manager"
+                  members={members}
+                  value={draftPrefs.pm_assignees[0] || ""}
+                  onChange={(v) => setAssignee("pm_assignees", v)}
+                  testid="nifty-pm-select"
+                />
+                <AssigneeSelect
+                  label="Lead Developer"
+                  members={members}
+                  value={draftPrefs.developer_assignees[0] || ""}
+                  onChange={(v) => setAssignee("developer_assignees", v)}
+                  testid="nifty-developer-select"
+                />
+              </div>
+              {members.length === 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  No members cached. Click Sync to load members — they&apos;re
+                  scoped to your default project, so pick one above first if
+                  needed.
+                </p>
+              )}
+
+              <div className="flex items-center justify-end">
+                <Button
+                  size="sm"
+                  onClick={onSavePrefs}
+                  disabled={savingPrefs}
+                  className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+                  data-testid="nifty-save-prefs-button"
+                >
+                  {savingPrefs ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Save preferences
+                </Button>
+              </div>
+            </div>
           </>
         )}
 

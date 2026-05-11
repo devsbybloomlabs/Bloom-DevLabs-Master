@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import axios from "axios";
 
@@ -108,8 +108,10 @@ export function authClient(token) {
   return inst;
 }
 
-// Convenience hook: returns an axios instance pre-bound to the admin token.
+// Convenience hook: returns a STABLE axios instance pre-bound to the admin token.
+// Memoized on `token` so callers can include it in useCallback/useEffect deps
+// without causing infinite render loops.
 export function useAdminApi() {
   const { token } = useAuth();
-  return authClient(token);
+  return useMemo(() => authClient(token), [token]);
 }
