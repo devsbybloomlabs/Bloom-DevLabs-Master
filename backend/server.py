@@ -49,6 +49,12 @@ from milestone_routes import (  # noqa: E402
     nifty_timeline_refresh,
     nifty_webhook_router,
 )
+from approval_studio_client import ApprovalStudioClient  # noqa: E402
+from approval_studio_routes import (  # noqa: E402
+    approvals_admin_router,
+    approvals_webhook_router,
+    designer_reminder_cron,
+)
 from blog_extras_routes import blog_extras_router  # noqa: E402
 from integrations_admin_routes import integrations_admin_router  # noqa: E402
 from client_routes import (  # noqa: E402
@@ -104,6 +110,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.paypal = PayPalClient()
     app.state.nifty = NiftyClient()
     app.state.nifty.bind_db(db)
+    app.state.approval_studio = ApprovalStudioClient()
 
     # Seed founder + settings + authority metric
     try:
@@ -155,12 +162,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("Nifty timeline cron failed: %s", exc)
 
+    async def approval_reminder_cron_wrapper() -> None:
+        try:
+            res = await designer_reminder_cron(app)
+            if res.get("reminders_sent", 0) > 0:
+                log.info("Designer reminders: %s", res)
+        except Exception as exc:
+            log.exception("Designer reminder cron failed: %s", exc)
+
     # Hourly drip ticks
     scheduler.add_job(drip_cron, CronTrigger(minute=15))
     # Every 5 min Nifty comment poll
     scheduler.add_job(nifty_comment_cron, CronTrigger(minute="*/5"))
     # Daily 8am Nifty timeline refresh
     scheduler.add_job(nifty_timeline_cron, CronTrigger(hour=8, minute=0))
+    # Hourly designer reminder check for stale approvals
+    scheduler.add_job(approval_reminder_cron_wrapper, CronTrigger(minute=30))
 
     scheduler.start()
     app.state.scheduler = scheduler
@@ -235,6 +252,8 @@ api.include_router(leads_admin_router)
 api.include_router(nifty_webhook_router)
 api.include_router(milestone_client_router)
 api.include_router(milestone_admin_router)
+api.include_router(approvals_admin_router)
+api.include_router(approvals_webhook_router)
 
 app.include_router(api)
 

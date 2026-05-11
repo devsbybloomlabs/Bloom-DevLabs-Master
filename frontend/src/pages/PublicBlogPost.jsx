@@ -77,8 +77,9 @@ export default function PublicBlogPost() {
   }, [slug]);
 
   const canonicalUrl = `https://bybloomlabs.com/blog/${slug}`;
+  // PNG is preferred by Twitter Cards; modern OpenGraph scrapers accept either.
   const ogImage = post
-    ? `${process.env.REACT_APP_BACKEND_URL}/api/og/blog/${slug}.svg`
+    ? `${process.env.REACT_APP_BACKEND_URL}/api/og/blog/${slug}.png`
     : undefined;
 
   const articleJsonLd = post && {

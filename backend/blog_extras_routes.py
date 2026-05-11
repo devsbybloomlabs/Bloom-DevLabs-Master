@@ -66,6 +66,33 @@ async def blog_rss(request: Request) -> Response:
 async def blog_og_svg(slug: str, request: Request) -> Response:
     """Generate an SVG OG card for a blog post. Browsers + Twitter/FB
     cards understand image/svg+xml URLs and render at runtime."""
+    svg = await _build_og_svg(slug, request)
+    return Response(content=svg, media_type="image/svg+xml")
+
+
+@blog_extras_router.get("/og/blog/{slug}.png")
+async def blog_og_png(slug: str, request: Request) -> Response:
+    """PNG variant of the OG card — Twitter Cards prefer raster images.
+
+    Renders the same SVG layout via cairosvg at 1200×630. Output is cached
+    in-memory per slug+title so repeated scraper requests stay cheap.
+    """
+    import cairosvg
+    svg = await _build_og_svg(slug, request)
+    png_bytes = cairosvg.svg2png(
+        bytestring=svg.encode("utf-8"),
+        output_width=1200,
+        output_height=630,
+    )
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+async def _build_og_svg(slug: str, request: Request) -> str:
+    """Shared OG-card SVG builder used by both .svg and .png endpoints."""
     db = get_db(request)
     post = await db.blog_posts.find_one(
         {"slug": slug, "published": True}, {"_id": 0}
@@ -89,7 +116,7 @@ async def blog_og_svg(slug: str, request: Request) -> Response:
         for i, line in enumerate(excerpt_lines)
     )
 
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0F172A"/>
@@ -112,7 +139,6 @@ async def blog_og_svg(slug: str, request: Request) -> Response:
     bybloomlabs.com
   </text>
 </svg>"""
-    return Response(content=svg, media_type="image/svg+xml")
 
 
 def _wrap_text(text: str, max_chars: int) -> list:

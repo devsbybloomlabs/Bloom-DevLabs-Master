@@ -1,0 +1,51 @@
+{
+  "summary": "Phase 11 full verification — Integrations Health Strip, AgencyHandy HMAC, OG PNG, /admin/clients UI, /admin/approvals UI + Approval Studio loop. Backend: 12/12 phase11 + 21/21 phase10 regression all PASS. Frontend: all 6 health pills render on dashboard, OpenRouter pill turns green after /test fire, sidebar nav links present, /admin/clients renders with testclient row + search + refresh + resend, /admin/approvals dialog uploads design (mock mode) and surfaces mock-log dialog, client portal login + 5 tabs all visible.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase11.py",
+    "/app/test_reports/pytest/phase11.xml",
+    "/app/test_reports/pytest/phase10_retest.xml"
+  ],
+  "action_items": [
+    "Test IDs in upload dialog (upload-client-email-input, upload-project-name-input, upload-asset-name-input, upload-design-url-input, upload-submit-button) differ from review-request-stated names (admin-approvals-*). No functional bug — just doc discrepancy. Consider aligning either the spec or the testids for consistency with other admin-* prefix conventions."
+  ],
+  "critical_code_review_comments": [
+    "Approval Studio upload flow correctly bumps version on re-upload via (client_email, asset_name) tuple match — verified by test_aps_re_upload_bumps_version.",
+    "Health strip query uses /admin/integrations/health which aggregates last ping across all 6 providers — pill colour driven by status field (green/yellow/red), consistent with backend _record_ping shape.",
+    "AgencyHandy HMAC: when no AH_WEBHOOK_SECRET env var is set, behaviour is correctly fail-open with verified=false but ok=true (so AH won't retry). x-ah-sig=test header trusted path verified.",
+    "ApprovalsAdmin upload dialog form has inputs without surrounding <form> element and no client-side validation for required fields — backend still validates, but consider adding HTML5 required/pattern for better UX.",
+    "OG PNG: cairosvg render produces 67.8 KB at 1200x630 — well within social-card guidelines."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (33/33: 12 phase11 + 21 phase10 regression)", "frontend": "100% — all specified flows pass"},
+  "test_credentials": "Admin founder@thesalvador.group / admin123 and client testclient@bybloomlabs.com / clientpass123 — both work.",
+  "seed_data_creation": "Test only created mock-mode approvals (test_aps_*@example.com + 'UI Test Project A'). Mock-mode entries persist in DB but are harmless seed-style records used by future regression tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 11 is fully shipped and verified. The Approval Studio is intentionally in MOCK mode (APPROVAL_STUDIO_USERNAME/PASSWORD not set) — surfaced via aps_mode=mock in upload response and via /admin/approvals/mock-log endpoint. Nifty PM token still empty — design approvals correctly skip Nifty comment sync (nifty_synced.comment=false). Pass REACT_APP_BACKEND_URL env var before running pytest as the test file reads os.environ[REACT_APP_BACKEND_URL] without a default. If you need to verify HMAC live verification (verified=true with non-test sig), set AH_WEBHOOK_SECRET in /app/backend/.env first.",
+  "frontend_verification_details": {
+    "health_pills_rendered": ["openrouter","emailit","agencyhandy","paypal","nifty","approval_studio"],
+    "openrouter_pill_class_after_test_fire": "bg-emerald-100 text-emerald-900 border-emerald-200 (GREEN)",
+    "openrouter_pill_text": "OpenRouter· 1m ago",
+    "sidebar_links_present": ["sidebar-link-clients","sidebar-link-design-approvals"],
+    "admin_clients_page_seed_visible": "testclient@bybloomlabs.com row present, search filter works, refresh fires re-fetch, admin-client-resend-testclient@bybloomlabs.com button rendered",
+    "admin_approvals_upload_flow": "Dialog opens, form fills (testids: upload-client-email-input, upload-project-name-input, upload-asset-name-input, upload-design-url-input, upload-submit-button), submit shows toast 'Uploaded · Approval Studio link copied', new row appears in list",
+    "admin_approvals_mock_log_dialog": "opens and renders entries successfully",
+    "client_portal_tabs": ["Milestones","Orders","Subscriptions","Invoices","Proposals"],
+    "client_portal_errors": []
+  },
+  "curl_verification": {
+    "og_png": "200 image/png 67802 bytes",
+    "ah_webhook_no_sig": "ok=true verified=false (correct fail-open behaviour, no AH_WEBHOOK_SECRET set)",
+    "ah_webhook_x_ah_sig_test": "ok=true verified=true (test event trusted)",
+    "aps_webhook_unknown_pid": "ok=true verified=true (no approval matched — graceful)"
+  }
+}

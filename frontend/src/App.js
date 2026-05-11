@@ -23,6 +23,8 @@ import PayPalPlansPage from "@/pages/admin/PayPalPlansPage";
 import LeadMagnetsAdmin from "@/pages/admin/LeadMagnetsAdmin";
 import MilestonesAdmin from "@/pages/admin/MilestonesAdmin";
 import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
+import ClientsAdmin from "@/pages/admin/ClientsAdmin";
+import ApprovalsAdmin from "@/pages/admin/ApprovalsAdmin";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
 import { ClientAuthProvider, RequireClient } from "@/lib/clientAuth";
 import ClientLogin from "@/pages/client/ClientLogin";
@@ -100,6 +102,8 @@ function App() {
                 <Route path="paypal-plans" element={<PayPalPlansPage />} />
                 <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
                 <Route path="milestones" element={<MilestonesAdmin />} />
+                <Route path="approvals" element={<ApprovalsAdmin />} />
+                <Route path="clients" element={<ClientsAdmin />} />
                 <Route path="integrations" element={<IntegrationsAdmin />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />

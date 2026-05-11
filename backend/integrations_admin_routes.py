@@ -91,6 +91,11 @@ async def nifty_status(
     if connected:
         res = await nifty.list_projects()
         ping_ok = bool(res.get("success"))
+        await _record_ping(
+            db, "nifty",
+            ok=ping_ok,
+            detail=None if ping_ok else str(res.get("error"))[:80],
+        )
     return {
         "oauth_configured": nifty.is_oauth_configured,
         "client_id_set": bool(nifty.client_id),
@@ -302,6 +307,31 @@ def _provider_status_envelope(
     }
 
 
+PINGS_KEY = "integration_pings"
+
+
+async def _record_ping(
+    db: AsyncIOMotorDatabase,
+    provider: str,
+    *,
+    ok: bool,
+    detail: Optional[str] = None,
+) -> None:
+    """Persist the last-ping result per provider.
+
+    Stored under app_settings.integration_pings as `{provider: {ok, at, detail}}`
+    so the dashboard health strip can show last-checked timestamps without
+    re-pinging upstream APIs.
+    """
+    existing = await get_setting(db, PINGS_KEY) or {}
+    existing[provider] = {
+        "ok": bool(ok),
+        "at": _now(),
+        "detail": (detail or "")[:200] if detail else None,
+    }
+    await set_setting(db, PINGS_KEY, existing)
+
+
 @integrations_admin_router.get("/providers")
 async def list_provider_statuses(request: Request) -> List[Dict[str, Any]]:
     """Unified status snapshot for all 'simple' API-key integrations."""
@@ -339,9 +369,12 @@ async def list_provider_statuses(request: Request) -> List[Dict[str, Any]]:
 
 
 @integrations_admin_router.post("/openrouter/test")
-async def test_openrouter(request: Request) -> Dict[str, Any]:
+async def test_openrouter(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
     client = request.app.state.openrouter
     if not getattr(client, "api_key", None):
+        await _record_ping(db, "openrouter", ok=False, detail="not configured")
         raise HTTPException(503, "OPENROUTER_API_KEY not configured")
     try:
         out = await client.chat(
@@ -349,16 +382,21 @@ async def test_openrouter(request: Request) -> Dict[str, Any]:
             max_tokens=8,
             temperature=0,
         )
+        await _record_ping(db, "openrouter", ok=True)
         return {"ok": True, "echo": (out or "")[:50]}
     except Exception as exc:
         log.warning("openrouter test failed: %s", exc)
+        await _record_ping(db, "openrouter", ok=False, detail=str(exc))
         raise HTTPException(502, f"OpenRouter test failed: {exc}")
 
 
 @integrations_admin_router.post("/emailit/test")
-async def test_emailit(request: Request) -> Dict[str, Any]:
+async def test_emailit(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
     client = request.app.state.emailit
     if not client.is_configured:
+        await _record_ping(db, "emailit", ok=False, detail="not configured")
         raise HTTPException(503, "EMAILIT_API_KEY not configured")
     # We can't send a real email without a target; just verify auth by listing
     # quotas (a cheap GET if available) — fallback: send a smoke email to admin
@@ -372,32 +410,146 @@ async def test_emailit(request: Request) -> Dict[str, Any]:
             html="<p>Connectivity test — please ignore.</p>",
             text="Connectivity test — please ignore.",
         )
+        await _record_ping(db, "emailit", ok=True)
         return {"ok": True}
     except Exception as exc:
         msg = str(exc)
         # If error is auth-related, surface as 502; if rate/domain related, treat as ok
         if "401" in msg or "403" in msg:
+            await _record_ping(db, "emailit", ok=False, detail=msg)
             raise HTTPException(502, f"Emailit auth failed: {msg}")
+        await _record_ping(db, "emailit", ok=True, detail=f"send response: {msg[:80]}")
         return {"ok": True, "warning": f"Auth ok; send response: {msg[:200]}"}
 
 
 @integrations_admin_router.post("/agencyhandy/test")
-async def test_agencyhandy(request: Request) -> Dict[str, Any]:
+async def test_agencyhandy(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
     client = request.app.state.agencyhandy
     if not client.is_configured:
+        await _record_ping(db, "agencyhandy", ok=False, detail="not configured")
         raise HTTPException(503, "AGENCYHANDY_API_KEY not configured")
     res = await client.list_orders()
     if not res.get("success"):
+        await _record_ping(db, "agencyhandy", ok=False, detail=str(res.get("error"))[:80])
         raise HTTPException(502, f"AgencyHandy test failed: {res.get('error')}")
+    await _record_ping(db, "agencyhandy", ok=True)
     return {"ok": True, "endpoint": "list_orders", "status": res.get("status")}
 
 
 @integrations_admin_router.post("/paypal/test")
-async def test_paypal(request: Request) -> Dict[str, Any]:
+async def test_paypal(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
     client = request.app.state.paypal
     if not client.is_configured:
+        await _record_ping(db, "paypal", ok=False, detail="not configured")
         raise HTTPException(503, "PayPal not configured")
     token = await client._get_access_token()
     if not token:
+        await _record_ping(db, "paypal", ok=False, detail="OAuth failed")
         raise HTTPException(502, "PayPal OAuth failed — check CLIENT_ID/SECRET")
+    await _record_ping(db, "paypal", ok=True)
     return {"ok": True, "env": client.env}
+
+
+@integrations_admin_router.get("/health")
+async def integrations_health(
+    request: Request,
+    nifty: NiftyClient = Depends(get_nifty),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Unified health snapshot for ALL integrations.
+
+    Light by design — no upstream ping is performed here. Status is inferred
+    from configuration + the last persisted test result. Use the per-provider
+    `/test` endpoints to refresh a specific provider.
+
+    Status values:
+      • green  — configured AND last ping ok (or no ping yet but configured for Nifty connected)
+      • yellow — configured but never tested / last ping failed
+      • red    — not configured
+    """
+    import os
+    pings = await get_setting(db, PINGS_KEY) or {}
+
+    def _status(provider: str, configured: bool) -> Dict[str, Any]:
+        if not configured:
+            return {
+                "provider": provider,
+                "status": "red",
+                "configured": False,
+                "last_ping": None,
+            }
+        last = pings.get(provider)
+        if last is None:
+            return {
+                "provider": provider,
+                "status": "yellow",
+                "configured": True,
+                "last_ping": None,
+                "detail": "never tested",
+            }
+        return {
+            "provider": provider,
+            "status": "green" if last.get("ok") else "yellow",
+            "configured": True,
+            "last_ping": last,
+        }
+
+    items: List[Dict[str, Any]] = [
+        _status("openrouter", bool(os.environ.get("OPENROUTER_API_KEY"))),
+        _status("emailit", bool(os.environ.get("EMAILIT_API_KEY"))),
+        _status("agencyhandy", bool(os.environ.get("AGENCYHANDY_API_KEY"))),
+        _status("paypal", bool(os.environ.get("PAYPAL_CLIENT_ID"))),
+    ]
+
+    # Nifty — based on token presence + last stored connectivity
+    nifty_connected = await nifty.is_connected()
+    nifty_last = pings.get("nifty")
+    if nifty_connected:
+        items.append({
+            "provider": "nifty",
+            "status": "green" if (nifty_last is None or nifty_last.get("ok")) else "yellow",
+            "configured": True,
+            "last_ping": nifty_last,
+        })
+    elif nifty.is_oauth_configured:
+        items.append({
+            "provider": "nifty",
+            "status": "yellow",
+            "configured": True,
+            "last_ping": nifty_last,
+            "detail": "OAuth configured but not connected",
+        })
+    else:
+        items.append({
+            "provider": "nifty",
+            "status": "red",
+            "configured": False,
+            "last_ping": None,
+        })
+
+    # Approval Studio — read from app.state if registered later
+    aps = getattr(request.app.state, "approval_studio", None)
+    if aps is not None:
+        configured = getattr(aps, "is_configured", False)
+        aps_last = pings.get("approval_studio")
+        if configured:
+            items.append({
+                "provider": "approval_studio",
+                "status": "green" if (aps_last and aps_last.get("ok")) else "yellow",
+                "configured": True,
+                "last_ping": aps_last,
+            })
+        else:
+            items.append({
+                "provider": "approval_studio",
+                "status": "yellow",
+                "configured": False,
+                "last_ping": aps_last,
+                "detail": "running in MOCK mode",
+            })
+
+    return {"providers": items, "checked_at": _now()}

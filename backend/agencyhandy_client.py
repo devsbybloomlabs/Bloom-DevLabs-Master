@@ -125,6 +125,69 @@ class AgencyHandyClient:
     async def list_orders(self, **params: Any) -> Dict[str, Any]:
         return await self._request("GET", "/orders", params=params or None)
 
+    async def list_orders_for_client_email(
+        self, client_email: str, **params: Any
+    ) -> Dict[str, Any]:
+        """Server-side filter orders by a client's email.
+
+        Strategy:
+          1) Look up the client member by email (`/company/{id}/members?role=client&q=<email>`).
+          2) If found, hit `/orders` filtered by `clientId` server-side.
+          3) Otherwise return an envelope with `data: { data: [] }` and a hint
+             so the caller can decide whether to fall back to client-side filtering.
+        """
+        email_lc = (client_email or "").strip().lower()
+        if not email_lc:
+            return {
+                "success": False,
+                "status": 400,
+                "data": None,
+                "error": "client_email required",
+            }
+        if not self.company_id:
+            return {
+                "success": False,
+                "status": 0,
+                "data": None,
+                "error": "AGENCYHANDY_COMPANY_ID not configured — cannot resolve client by email",
+            }
+        members_res = await self._request(
+            "GET",
+            f"/company/{self.company_id}/members",
+            params={"role": "client", "q": email_lc},
+        )
+        if not members_res.get("success"):
+            return members_res
+        items = (
+            ((members_res.get("data") or {}).get("data") or [])
+            if isinstance(members_res.get("data"), dict)
+            else []
+        )
+        client = next(
+            (
+                m
+                for m in items
+                if isinstance(m, dict)
+                and (m.get("email") or "").lower() == email_lc
+            ),
+            None,
+        )
+        if not client:
+            return {
+                "success": True,
+                "status": 200,
+                "data": {"data": []},
+                "error": None,
+                "client_resolved": False,
+            }
+        client_id = client.get("_id") or client.get("id")
+        orders_params = {**params, "clientId": client_id}
+        res = await self._request("GET", "/orders", params=orders_params)
+        if isinstance(res, dict):
+            res["client_resolved"] = True
+            res["resolved_client_id"] = client_id
+        return res
+
     async def get_order(self, project_id: str) -> Dict[str, Any]:
         return await self._request("GET", f"/orders/{project_id}")
 

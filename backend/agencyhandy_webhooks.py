@@ -24,6 +24,8 @@ Event automation (selective, all idempotent):
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import os
 from datetime import datetime, timezone
@@ -130,6 +132,50 @@ def _is_signed_test(headers: Dict[str, str]) -> bool:
     return bool(headers.get("x-ah-sig") or headers.get("X-Ah-Sig"))
 
 
+def _hmac_secret() -> str:
+    """Optional HMAC shared secret used to verify the `x-ah-sig` header.
+
+    When `AGENCYHANDY_WEBHOOK_HMAC_SECRET` is set, every incoming webhook MUST
+    carry an `x-ah-sig` header matching `hex(hmac_sha256(secret, raw_body))`.
+    When not set, signed-test header presence is accepted as a soft signal
+    (existing behaviour preserved).
+    """
+    return os.environ.get("AGENCYHANDY_WEBHOOK_HMAC_SECRET", "")
+
+
+def _compute_signature(secret: str, raw_body: bytes) -> str:
+    """HMAC-SHA256 hex digest of the raw request body."""
+    return hmac.new(
+        secret.encode("utf-8"), raw_body, hashlib.sha256
+    ).hexdigest()
+
+
+def _verify_hmac(headers: Dict[str, str], raw_body: bytes) -> Optional[bool]:
+    """Verify `x-ah-sig` against the configured HMAC secret.
+
+    Returns:
+      • True  — secret configured AND signature matches
+      • False — secret configured AND signature missing/mismatch
+      • None  — no secret configured (HMAC enforcement disabled)
+    """
+    secret = _hmac_secret()
+    if not secret:
+        return None
+    provided = (
+        headers.get("x-ah-sig")
+        or headers.get("X-Ah-Sig")
+        or headers.get("x-ah-signature")
+        or ""
+    ).strip()
+    if not provided:
+        return False
+    # Allow optional "sha256=" prefix to be defensive
+    if provided.lower().startswith("sha256="):
+        provided = provided.split("=", 1)[1].strip()
+    expected = _compute_signature(secret, raw_body)
+    return hmac.compare_digest(provided.lower(), expected.lower())
+
+
 def _client_field(payload: Dict[str, Any]) -> Dict[str, Any]:
     data = payload.get("data") or payload
     if not isinstance(data, dict):
@@ -165,26 +211,34 @@ async def agencyhandy_webhook(request: Request) -> Dict[str, Any]:
     """
     db = request.app.state.db
     headers = {k.lower(): v for k, v in request.headers.items()}
+    raw_body = await request.body()
     try:
-        payload = await request.json()
+        payload = await request.json() if raw_body else {}
     except Exception:
-        body_text = (await request.body()).decode("utf-8", "replace")
+        body_text = raw_body.decode("utf-8", "replace")
         payload = {"raw": body_text[:4000]}
 
     event_name = _extract_event_name(payload if isinstance(payload, dict) else {}, headers)
     token = _extract_token(headers)
     expected = _expected_token()
     is_test = _is_signed_test(headers)
+    hmac_result = _verify_hmac(headers, raw_body)  # True / False / None
     token_ok = (
         is_test  # AH-issued test event
         or (not expected)  # not enforcing yet
         or (token and token == expected)  # token match
     )
+    # HMAC takes precedence when enforced — overrides any token-ok signal
+    if hmac_result is True:
+        token_ok = True
+    elif hmac_result is False:
+        token_ok = False
 
     log.info(
-        "AH webhook received: event=%s token_ok=%s headers=%s",
+        "AH webhook received: event=%s token_ok=%s hmac=%s headers=%s",
         event_name,
         token_ok,
+        hmac_result,
         {k: v for k, v in headers.items() if k.startswith("x-")},
     )
 
@@ -192,6 +246,7 @@ async def agencyhandy_webhook(request: Request) -> Dict[str, Any]:
         "received_at": _iso(_now()),
         "event_name": event_name,
         "token_ok": bool(token_ok),
+        "hmac_verified": hmac_result,
         "headers": {k: v for k, v in headers.items() if not k.startswith("cookie")},
         "payload": payload,
     }
@@ -202,7 +257,8 @@ async def agencyhandy_webhook(request: Request) -> Dict[str, Any]:
 
     if not token_ok:
         # Do not run automation on unverified events, but accept the request so AH does not retry.
-        return {"ok": True, "verified": False, "note": "Token mismatch — automation skipped."}
+        reason = "hmac_mismatch" if hmac_result is False else "token_mismatch"
+        return {"ok": True, "verified": False, "note": f"Verification failed: {reason} — automation skipped."}
 
     handler = _DISPATCH.get(event_name)
     automation_result: Dict[str, Any] = {}
