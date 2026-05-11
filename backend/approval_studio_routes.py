@@ -313,9 +313,9 @@ async def admin_resolve_approval(
 approvals_webhook_router = APIRouter(prefix="/webhooks", tags=["approval-webhooks"])
 
 
-def _verify_aps_signature(raw_body: bytes, headers: Dict[str, str]) -> Optional[bool]:
+def _verify_aps_signature(raw_body: bytes, headers: Dict[str, str], db_secret: str = "") -> Optional[bool]:
     """Verify Approval Studio webhook signature when a shared secret is set."""
-    secret = os.environ.get("APPROVAL_STUDIO_WEBHOOK_SECRET", "")
+    secret = (os.environ.get("APPROVAL_STUDIO_WEBHOOK_SECRET", "") or db_secret or "").strip()
     if not secret:
         return None
     provided = (
@@ -337,6 +337,7 @@ async def approval_studio_webhook(request: Request) -> Dict[str, Any]:
     """Receive events from Approval Studio. Always 200 to avoid retry storms."""
     db: AsyncIOMotorDatabase = request.app.state.db
     nifty: NiftyClient = request.app.state.nifty
+    aps: ApprovalStudioClient = request.app.state.approval_studio
     headers = {k.lower(): v for k, v in request.headers.items()}
     raw_body = await request.body()
     try:
@@ -344,7 +345,9 @@ async def approval_studio_webhook(request: Request) -> Dict[str, Any]:
     except Exception:
         payload = {"raw": raw_body.decode("utf-8", "replace")[:2000]}
 
-    sig_ok = _verify_aps_signature(raw_body, headers)
+    # Allow DB-stored webhook secret in addition to env var
+    await aps._resolve_creds()
+    sig_ok = _verify_aps_signature(raw_body, headers, db_secret=aps.webhook_secret)
     event_type = (payload.get("eventType") or payload.get("event_type") or "").upper()
     log.info("Approval Studio webhook: event=%s sig_ok=%s", event_type, sig_ok)
 

@@ -20,7 +20,12 @@ from pydantic import BaseModel
 from auth import get_current_user
 from app_settings import get_setting, get_settings_bulk, set_setting
 from db_utils import prepare_for_mongo, serialize_doc
+from integration_credentials import (
+    list_masked_credentials,
+    set_provider_credentials,
+)
 from nifty_client import NiftyClient
+import slack_notifier
 
 log = logging.getLogger("integrations")
 
@@ -454,6 +459,116 @@ async def test_paypal(
     return {"ok": True, "env": client.env}
 
 
+# ============================================================
+# ThriveDesk + Slack + Approval Studio test endpoints
+# ============================================================
+@integrations_admin_router.post("/thrivedesk/test")
+async def test_thrivedesk(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
+    """Verify ThriveDesk auth by doing a no-op GET. In mock mode returns ok=true."""
+    td = request.app.state.thrivedesk
+    await td._resolve_creds()
+    if not td.is_configured:
+        await _record_ping(db, "thrivedesk", ok=False, detail="not configured (mock mode)")
+        return {"ok": False, "mode": "mock", "reason": "not configured"}
+    # Light probe — ThriveDesk doesn't have a dedicated /me endpoint; use GET /conversations
+    res = await td._request("GET", "/conversations", params={"limit": 1})
+    ok = bool(res.get("success"))
+    await _record_ping(
+        db, "thrivedesk", ok=ok, detail=None if ok else str(res.get("error"))[:80]
+    )
+    return {"ok": ok, "mode": "live", "status": res.get("status")}
+
+
+@integrations_admin_router.post("/slack/test")
+async def test_slack(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
+    """Send a smoke message to the configured Slack webhook."""
+    res = await slack_notifier.post_message(
+        db,
+        text="✅ Bloom Labs · Slack webhook test (you can ignore this message)",
+    )
+    ok = bool(res.get("ok"))
+    await _record_ping(
+        db, "slack", ok=ok, detail=None if ok else str(res.get("reason"))[:80]
+    )
+    if not ok and res.get("reason") == "not_configured":
+        raise HTTPException(503, "SLACK_WEBHOOK_URL not configured (env or DB)")
+    if not ok:
+        raise HTTPException(502, f"Slack POST failed: {res.get('reason')}")
+    return {"ok": True}
+
+
+@integrations_admin_router.post("/approval-studio/test")
+async def test_approval_studio(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
+    """In mock mode this always succeeds (with a flag); in live mode it auths."""
+    aps = request.app.state.approval_studio
+    await aps._resolve_creds()
+    if not aps.is_configured:
+        await _record_ping(db, "approval_studio", ok=False, detail="mock mode")
+        return {"ok": False, "mode": "mock", "reason": "not configured"}
+    token = await aps._ensure_token()
+    ok = bool(token)
+    await _record_ping(
+        db, "approval_studio", ok=ok, detail=None if ok else "login failed"
+    )
+    if not ok:
+        raise HTTPException(502, "Approval Studio login failed — check username/password")
+    return {"ok": True, "mode": "live"}
+
+
+# ============================================================
+# DB-stored credentials (admin UI alternative to .env edits)
+# ============================================================
+ALLOWED_CRED_PROVIDERS = {"approval_studio", "thrivedesk", "slack"}
+
+
+class CredentialsUpdate(BaseModel):
+    # Free-form dict — keys depend on provider:
+    #   approval_studio: {username, password, token?, webhook_secret?}
+    #   thrivedesk:      {api_key, webhook_secret?, workspace_url?}
+    #   slack:           {webhook_url}
+    fields: Dict[str, Any]
+
+
+@integrations_admin_router.get("/credentials")
+async def get_all_credentials(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return all DB-stored creds with secret values masked."""
+    return {"providers": await list_masked_credentials(db)}
+
+
+@integrations_admin_router.put("/credentials/{provider}")
+async def update_provider_credentials(
+    provider: str,
+    req: CredentialsUpdate,
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    if provider not in ALLOWED_CRED_PROVIDERS:
+        raise HTTPException(400, f"Provider must be one of {sorted(ALLOWED_CRED_PROVIDERS)}")
+    await set_provider_credentials(db, provider, req.fields)
+    # Trigger client refresh so the live instance picks up new creds without restart
+    if provider == "approval_studio":
+        aps = request.app.state.approval_studio
+        aps.username = ""
+        aps.password = ""
+        aps._auth_token = None
+        await aps._resolve_creds()
+    elif provider == "thrivedesk":
+        td = request.app.state.thrivedesk
+        td.api_key = ""
+        td.webhook_secret = ""
+        await td._resolve_creds()
+    masked = await list_masked_credentials(db)
+    return {"ok": True, "provider": provider, "fields": masked.get(provider, {})}
+
+
 @integrations_admin_router.get("/health")
 async def integrations_health(
     request: Request,
@@ -534,6 +649,11 @@ async def integrations_health(
     # Approval Studio — read from app.state if registered later
     aps = getattr(request.app.state, "approval_studio", None)
     if aps is not None:
+        # Resolve DB-stored creds so configured flag reflects UI input
+        try:
+            await aps._resolve_creds()
+        except Exception:
+            pass
         configured = getattr(aps, "is_configured", False)
         aps_last = pings.get("approval_studio")
         if configured:
@@ -551,5 +671,49 @@ async def integrations_health(
                 "last_ping": aps_last,
                 "detail": "running in MOCK mode",
             })
+
+    # ThriveDesk
+    td = getattr(request.app.state, "thrivedesk", None)
+    if td is not None:
+        try:
+            await td._resolve_creds()
+        except Exception:
+            pass
+        configured = getattr(td, "is_configured", False)
+        td_last = pings.get("thrivedesk")
+        if configured:
+            items.append({
+                "provider": "thrivedesk",
+                "status": "green" if (td_last and td_last.get("ok")) else "yellow",
+                "configured": True,
+                "last_ping": td_last,
+            })
+        else:
+            items.append({
+                "provider": "thrivedesk",
+                "status": "yellow",
+                "configured": False,
+                "last_ping": td_last,
+                "detail": "running in MOCK mode",
+            })
+
+    # Slack (incoming webhook)
+    slack_last = pings.get("slack")
+    slack_configured = await slack_notifier.is_configured(db)
+    if slack_configured:
+        items.append({
+            "provider": "slack",
+            "status": "green" if (slack_last and slack_last.get("ok")) else "yellow",
+            "configured": True,
+            "last_ping": slack_last,
+        })
+    else:
+        items.append({
+            "provider": "slack",
+            "status": "red",
+            "configured": False,
+            "last_ping": slack_last,
+            "detail": "webhook URL not set",
+        })
 
     return {"providers": items, "checked_at": _now()}

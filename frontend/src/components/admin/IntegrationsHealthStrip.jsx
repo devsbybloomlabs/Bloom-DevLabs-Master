@@ -19,6 +19,8 @@ import {
   ImagePlus,
   Plug,
   ArrowRight,
+  LifeBuoy,
+  MessageSquare,
 } from "lucide-react";
 
 const META = {
@@ -28,6 +30,8 @@ const META = {
   paypal: { label: "PayPal", icon: CreditCard },
   nifty: { label: "Nifty PM", icon: Activity },
   approval_studio: { label: "Approval Studio", icon: ImagePlus },
+  thrivedesk: { label: "ThriveDesk", icon: LifeBuoy },
+  slack: { label: "Slack", icon: MessageSquare },
 };
 
 const COLOR = {

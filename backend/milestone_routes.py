@@ -241,6 +241,20 @@ async def nifty_webhook(request: Request) -> Dict[str, Any]:
     except Exception:
         return {"ok": False, "reason": "invalid_json"}
     result = await handle_nifty_event(request, db, event)
+
+    # Reverse-sync: if a Nifty task with a ThriveDesk_Ticket_ID custom field
+    # was just completed, relay completion to ThriveDesk + close escalation.
+    resource = event.get("resource") or event.get("data") or event.get("task") or {}
+    raw_status = resource.get("status") or resource.get("state") or ""
+    if _normalize_status(str(raw_status)) == "complete":
+        try:
+            from thrivedesk_routes import relay_nifty_completion_to_thrivedesk
+            td_result = await relay_nifty_completion_to_thrivedesk(request, db, resource)
+            if td_result:
+                result = {**(result or {}), "thrivedesk_relay": td_result}
+        except Exception as exc:  # pragma: no cover
+            log.warning("thrivedesk relay failed: %s", exc)
+
     return {"ok": True, **result}
 
 

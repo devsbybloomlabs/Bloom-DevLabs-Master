@@ -55,6 +55,11 @@ from approval_studio_routes import (  # noqa: E402
     approvals_webhook_router,
     designer_reminder_cron,
 )
+from thrivedesk_client import ThriveDeskClient  # noqa: E402
+from thrivedesk_routes import (  # noqa: E402
+    support_admin_router,
+    thrivedesk_webhook_router,
+)
 from blog_extras_routes import blog_extras_router  # noqa: E402
 from integrations_admin_routes import integrations_admin_router  # noqa: E402
 from client_routes import (  # noqa: E402
@@ -111,6 +116,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.nifty = NiftyClient()
     app.state.nifty.bind_db(db)
     app.state.approval_studio = ApprovalStudioClient()
+    app.state.approval_studio.bind_db(db)
+    app.state.thrivedesk = ThriveDeskClient()
+    app.state.thrivedesk.bind_db(db)
 
     # Seed founder + settings + authority metric
     try:
@@ -254,6 +262,8 @@ api.include_router(milestone_client_router)
 api.include_router(milestone_admin_router)
 api.include_router(approvals_admin_router)
 api.include_router(approvals_webhook_router)
+api.include_router(support_admin_router)
+api.include_router(thrivedesk_webhook_router)
 
 app.include_router(api)
 

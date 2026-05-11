@@ -53,6 +53,33 @@ class ApprovalStudioClient:
         # In-memory cache of latest bearer token + mock activity log
         self._auth_token: Optional[str] = self._static_token or None
         self.mock_log: List[Dict[str, Any]] = []
+        # DB binding (set after startup) — lets admins paste credentials via the UI
+        self.db = None
+
+    def bind_db(self, db) -> None:
+        self.db = db
+
+    async def _resolve_creds(self) -> None:
+        """Pull DB-stored credentials when env vars are missing. Idempotent."""
+        if self.db is None:
+            return
+        if not self.username or not self.password:
+            try:
+                from integration_credentials import get_credentials
+                creds = await get_credentials(self.db, "approval_studio")
+                if not self.username:
+                    self.username = (creds.get("username") or "").strip()
+                if not self.password:
+                    self.password = (creds.get("password") or "").strip()
+                if not self._static_token:
+                    self._static_token = (creds.get("token") or "").strip()
+                    if self._static_token and not self._auth_token:
+                        self._auth_token = self._static_token
+                # Optional: webhook secret from DB too
+                if not self.webhook_secret:
+                    self.webhook_secret = (creds.get("webhook_secret") or "").strip()
+            except Exception:
+                pass
 
     @property
     def is_configured(self) -> bool:
@@ -62,6 +89,11 @@ class ApprovalStudioClient:
     @property
     def mode(self) -> str:
         return "live" if self.is_configured else "mock"
+
+    async def is_configured_async(self) -> bool:
+        """Same as `is_configured` but also resolves DB-stored creds first."""
+        await self._resolve_creds()
+        return self.is_configured
 
     # ------------------------------------------------------------------
     # Mock activity logger
@@ -158,6 +190,7 @@ class ApprovalStudioClient:
         customer: str,
         description: Optional[str] = None,
     ) -> Dict[str, Any]:
+        await self._resolve_creds()
         if not self.is_configured:
             mock = self._log_mock(
                 "create_project",
@@ -188,6 +221,7 @@ class ApprovalStudioClient:
         version: int = 1,
     ) -> Dict[str, Any]:
         """Upload an asset reference (a Figma/Drive URL) to a project."""
+        await self._resolve_creds()
         if not self.is_configured:
             mock = self._log_mock(
                 "upload_asset",
@@ -218,12 +252,14 @@ class ApprovalStudioClient:
         )
 
     async def list_comments(self, project_id: str) -> Dict[str, Any]:
+        await self._resolve_creds()
         if not self.is_configured:
             self._log_mock("list_comments", {"projectId": project_id})
             return {"success": True, "status": 200, "data": {"comments": []}, "error": None}
         return await self._request("GET", f"/project/{project_id}/comments")
 
     async def get_project(self, project_id: str) -> Dict[str, Any]:
+        await self._resolve_creds()
         if not self.is_configured:
             return {
                 "success": True,

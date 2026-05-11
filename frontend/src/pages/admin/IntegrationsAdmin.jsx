@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import IntegrationCredentialsForm from "@/components/admin/IntegrationCredentialsForm";
 import {
   Link2,
   Unlink,
@@ -69,6 +70,7 @@ export default function IntegrationsAdmin() {
       </div>
       <NiftyCard />
       <ProvidersGrid />
+      <IntegrationCredentialsForm />
     </div>
   );
 }
