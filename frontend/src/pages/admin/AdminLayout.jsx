@@ -22,6 +22,7 @@ import {
   Repeat,
   Sparkles,
   Target,
+  Plug,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { BRAND } from "@/lib/brand";
@@ -46,6 +47,7 @@ const NAV = [
   { to: "/admin/blog", label: "Blog", icon: Newspaper, group: "Authority" },
   { to: "/admin/authority", label: "Authority Score", icon: ShieldCheck, group: "Authority" },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3, group: "Insights" },
+  { to: "/admin/integrations", label: "Integrations", icon: Plug, group: "Insights" },
   { to: "/admin/settings", label: "Settings", icon: SettingsIcon, group: "Insights" },
 ];
 

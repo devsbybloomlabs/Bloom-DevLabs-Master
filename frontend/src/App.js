@@ -22,6 +22,7 @@ import OnboardingAdmin from "@/pages/admin/OnboardingAdmin";
 import PayPalPlansPage from "@/pages/admin/PayPalPlansPage";
 import LeadMagnetsAdmin from "@/pages/admin/LeadMagnetsAdmin";
 import MilestonesAdmin from "@/pages/admin/MilestonesAdmin";
+import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
 import { ClientAuthProvider, RequireClient } from "@/lib/clientAuth";
 import ClientLogin from "@/pages/client/ClientLogin";
@@ -35,6 +36,7 @@ import PublicCaseStudies from "@/pages/PublicCaseStudies";
 import PublicBlog from "@/pages/PublicBlog";
 import PublicBlogPost from "@/pages/PublicBlogPost";
 import AnalyticsTracker from "@/components/Analytics";
+import AuthCallback from "@/pages/AuthCallback";
 
 function App() {
   return (
@@ -57,6 +59,9 @@ function App() {
               <Route path="/reset-password" element={<SetPassword mode="reset" />} />
               <Route path="/checkout/success" element={<CheckoutSuccess />} />
               <Route path="/checkout/cancel" element={<Navigate to="/" replace />} />
+              {/* OAuth integration callbacks (Nifty et al.) */}
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/callback" element={<AuthCallback />} />
               {/* Public onboarding by token (no auth required) */}
               <Route path="/portal/onboarding" element={<OnboardingWizard />} />
               <Route
@@ -95,6 +100,7 @@ function App() {
                 <Route path="paypal-plans" element={<PayPalPlansPage />} />
                 <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
                 <Route path="milestones" element={<MilestonesAdmin />} />
+                <Route path="integrations" element={<IntegrationsAdmin />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

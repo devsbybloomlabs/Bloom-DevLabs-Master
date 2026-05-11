@@ -1,0 +1,54 @@
+{
+  "summary": "Phase 9 Nifty OAuth plumbing tested end-to-end. Backend (18/18 pytest pass) and Frontend (all flows pass).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase9_oauth.py",
+    "/app/test_reports/pytest/phase9.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "integrations_admin_routes.py:exchange — uses request.scope.get('user') which is None in FastAPI; the recorded oauth_state always has user=null. Cosmetic — replace with Depends(get_current_user) injection to capture the admin email. Non-blocking.",
+    "AuthCallback.jsx success copy says 'Token saved + verified' on manual-token save, but verification (ping) actually fails for fake tokens. The card transitions to 'Token saved · ping failed' badge correctly, so the toast wording is just slightly optimistic. Already flagged in problem statement.",
+    "NiftyClient._current_access_token — when refresh fails and stored is expired, falls back to stored access_token. Safe but logs nothing. Suggest log.warning to aid future debugging."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase9_oauth.py (new)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (all key flows)"},
+  "test_credentials": "Admin founder@thesalvador.group / admin123; Client testclient@bybloomlabs.com / clientpass123 (used for role separation).",
+  "seed_data_creation": "None persistent. The test suite saves a manual fake token then disconnects in cleanup fixture. oauth_states entries created by authorize-url calls — they are short-lived CSRF tokens, intentionally left in the collection (no TTL configured, but harmless).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 9 admin/integrations endpoints (status/authorize-url/exchange/manual-token/disconnect/projects/members) all working. Real OAuth handshake cannot be exercised (redirect URI locked to prod). Manual-token saves with source='manual', ping fails as expected with fake token, status correctly returns connected:true + ping_ok:false. Disconnect removes the doc. Auto-refresh path not exercised (would need real Nifty refresh_token).",
+  "backend_test_results": {
+    "TestAuthGating": "7/7 pass — unauthenticated + client-token blocked on all 6 admin endpoints",
+    "TestNiftyOAuth.test_status_initial_state": "PASS — oauth_configured/client_id_set true, redirect_uri matches prod URL, connected/ping_ok false",
+    "TestNiftyOAuth.test_authorize_url_shape_and_state_persisted": "PASS — URL is nifty.pm/authorize with correct client_id, response_type=code, redirect_uri, scope, and unique state",
+    "TestNiftyOAuth.test_exchange_fake_code_returns_502": "PASS — returns 502 envelope with detail message (no crash)",
+    "TestNiftyOAuth.test_manual_token_save": "PASS — stored.source=manual, ping_ok=false",
+    "TestNiftyOAuth.test_manual_token_empty_400": "PASS — empty token → 400",
+    "TestNiftyOAuth.test_status_after_manual_token": "PASS — connected:true, ping_ok:false; access_token/refresh_token never leak in response",
+    "TestNiftyOAuth.test_projects_returns_502_with_fake_token": "PASS — upstream 401 → 502 envelope",
+    "TestNiftyOAuth.test_members_returns_502_with_fake_token": "PASS",
+    "TestNiftyOAuth.test_disconnect + test_status_after_disconnect": "PASS — doc removed, connected:false",
+    "TestNiftyOAuth.test_zz_authorize_url_creates_new_state_each_time": "PASS — fresh state token each call"
+  },
+  "frontend_test_results": {
+    "/admin/integrations renders": "PASS — admin-integrations-page + nifty-integration-card testids present, redirect URI shown as https://bybloomlabs.com/auth/callback",
+    "buttons present": "PASS — nifty-connect-button, nifty-manual-token-button, nifty-refresh-status all visible",
+    "paste-token flow": "PASS — dialog opens, input accepts token, save POSTs to backend, card transitions to 'Token saved · ping failed' amber badge + Disconnect button replaces Connect/Paste",
+    "disconnect flow": "PASS — window.confirm accepted, disconnect API called, card reverts to Not Connected with Connect button",
+    "/auth/callback?error=access_denied&error_description=…": "PASS — auth-callback-error testid shows description 'User denied the request'",
+    "/auth/callback?code=test123&state=abc (logged in)": "PASS — attempts exchange, gets 502 from backend, renders 'Connection failed' with 'Invalid Request' in auth-callback-error",
+    "/auth/callback without admin token": "PASS — renders 'Admin login required' with go-to-login button",
+    "Admin nav Integrations link": "PASS — /admin/integrations href present in Insights group"
+  }
+}

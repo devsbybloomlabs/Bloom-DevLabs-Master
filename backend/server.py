@@ -50,6 +50,7 @@ from milestone_routes import (  # noqa: E402
     nifty_webhook_router,
 )
 from blog_extras_routes import blog_extras_router  # noqa: E402
+from integrations_admin_routes import integrations_admin_router  # noqa: E402
 from client_routes import (  # noqa: E402
     client_admin_router,
     client_auth_router,
@@ -102,6 +103,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.agencyhandy = AgencyHandyClient()
     app.state.paypal = PayPalClient()
     app.state.nifty = NiftyClient()
+    app.state.nifty.bind_db(db)
 
     # Seed founder + settings + authority metric
     try:
@@ -222,6 +224,7 @@ api.include_router(client_portal_router)
 api.include_router(client_admin_router)
 api.include_router(public_router)
 api.include_router(blog_extras_router)
+api.include_router(integrations_admin_router)
 api.include_router(blog_public_router)
 api.include_router(blog_admin_router)
 api.include_router(onboarding_public_router)

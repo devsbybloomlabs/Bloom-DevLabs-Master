@@ -341,8 +341,8 @@ async def nifty_comment_poll(app) -> Dict[str, int]:
     """Every 5 min — poll Nifty for comments on tracked tasks."""
     db = app.state.db
     nifty = app.state.nifty
-    if not nifty.is_configured:
-        return {"polled": 0, "reason": "nifty_not_configured"}
+    if not await nifty.is_connected():
+        return {"polled": 0, "reason": "nifty_not_connected"}
     # Find all milestones with a nifty_task_id
     cursor = db.milestones.find(
         {"nifty_task_id": {"$ne": None}}, {"_id": 0, "id": 1, "nifty_task_id": 1, "client_email": 1, "title": 1}
@@ -381,8 +381,8 @@ async def nifty_timeline_refresh(app) -> Dict[str, int]:
     """Daily — refresh due_dates from Nifty for all tracked milestones."""
     db = app.state.db
     nifty = app.state.nifty
-    if not nifty.is_configured:
-        return {"refreshed": 0, "reason": "nifty_not_configured"}
+    if not await nifty.is_connected():
+        return {"refreshed": 0, "reason": "nifty_not_connected"}
     cursor = db.milestones.find(
         {"nifty_task_id": {"$ne": None}}, {"_id": 0, "id": 1, "nifty_task_id": 1}
     )
