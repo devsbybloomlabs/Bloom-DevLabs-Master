@@ -238,6 +238,31 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - iteration_16 100% frontend verification.
 
 **Status:** OAuth client + tokens scaffolded; user must complete the one-time OAuth handshake by clicking "Connect" in `/admin/integrations` → Credentials → Google Calendar.
+
+### ✅ Phase 17 — Payment Plan Split + Launch Balance Billing (Feb 2026)
+**Pricing checkout supports two payment plans:**
+- **50% now / 50% at launch** (default): charges the first 50% via PayPal today; second 50% is billed when an admin marks the project "Ready for Launch" from `/admin/paypal-orders`.
+- **100% upfront**: applies a **$500 discount** to the base price and captures the full balance in a single PayPal order (no remaining balance later).
+
+**Backend (`/app/backend/paypal_routes.py`):**
+- `compute_charge(tier, payment_plan)` resolves base/charge_now/charge_later/discount math for express, custom, enterprise.
+- `CreateOrderRequest.payment_plan` accepts `split_50_50` or `full_upfront`; invalid values → HTTP 400.
+- Transactions persist `payment_plan`, `plan_label`, `base_amount`, `charge_now`, `charge_later`, `discount_applied`, `installment_index`, and `installment_2_status` on the `paypal_transactions` doc.
+- Capture pipeline marks the parent's `installment_2_status` → `pending_launch` on first capture, then `paid` when the child installment captures. Skips duplicate client provisioning for installment 2.
+- New admin endpoint `POST /api/paypal/admin/transactions/{order_id}/mark-ready-for-launch`:
+  - Idempotent (returns the existing child if already billed).
+  - Creates a second PayPal order for `charge_later`, persists it linked to the parent (`parent_order_id`, `installment_index: 2`), emails the client (best-effort via Emailit), and notifies the admin in the in-app notification feed.
+
+**Frontend:**
+- `/app/frontend/src/components/sections/Pricing.jsx` — CheckoutDialog renders a radio group (split_50_50 / full_upfront) with a live summary panel (base, discount line, due today, due at launch). CTA dynamically reflects `charge_now`.
+- `/app/frontend/src/components/payment/PayPalCheckoutButton.jsx` — forwards `paymentPlan` to backend.
+- `/app/frontend/src/pages/admin/PayPalOrdersPage.jsx` (new) — list view of all PayPal orders with payment-plan badge, installment-2 status, and a one-click **Mark Ready for Launch** action that opens a dialog with the copy-able approval URL.
+- Admin sidebar gained "PayPal Orders" entry (`/admin/paypal-orders`).
+
+**Tests:**
+- `/app/backend/tests/test_payment_plans.py` — 11 pytest cases (compute_charge math × 4, payload validation × 3, admin endpoint guardrails × 4). All pass.
+- Regression: 27/27 `test_paypal_clients.py` still green.
+- `iteration_17.json` confirms 100% backend + frontend coverage (10/10 listed feature checks pass, no bugs).
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
@@ -294,6 +319,7 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - ~~A/B-test the CTA position on /tour.~~ ✅ Done (Phase 15).
 - ~~Lead scoring + segmentation.~~ ✅ Done (Phase 15).
 - ~~Client portal Contact Us form (Part 6).~~ ✅ Done (Phase 15).
+- ~~Pricing checkout: 50/50 split vs 100% upfront ($500 discount).~~ ✅ Done (Phase 17, Feb 2026).
 - Embed a 15-second product demo video on /tour above the fold.
 
 ### P4
@@ -320,6 +346,7 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 ### Admin-auth
 - All `/api/admin/*` routes: case-studies, testimonials, blog (incl. `/admin/blog/ai/draft`), onboarding, clients, lead-magnets, leads (+ drip-tick), milestones (+ sync-history)
 - PayPal admin: `/api/paypal/admin/{health,plans,transactions,subscriptions,webhooks}`
+- PayPal admin (Phase 17): `POST /api/paypal/admin/transactions/{order_id}/mark-ready-for-launch` — bills the remaining 50% for split-payment orders.
 
 ## MongoDB Collections (cumulative)
 - `users`, `daily_routines`, `prospects`, `case_studies`, `testimonials`, `notifications`, `thought_leadership`, `authority_score`
