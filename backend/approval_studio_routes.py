@@ -170,6 +170,30 @@ async def admin_mock_log(
     return {"mode": aps.mode, "entries": list(reversed(aps.mock_log))[:50]}
 
 
+@approvals_admin_router.get("/{approval_id}/annotations")
+async def admin_get_annotations(
+    approval_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    aps: ApprovalStudioClient = Depends(get_aps),
+) -> Dict[str, Any]:
+    """Live annotation feed for a single approval.
+
+    Calls Approval Studio's `list_comments(project_id)` — in mock mode, returns
+    a deterministic synthetic thread so the UI stays useful before live
+    credentials are wired.
+    """
+    approval = await db.approvals.find_one({"id": approval_id}, {"_id": 0})
+    if not approval:
+        raise HTTPException(404, "Approval not found")
+    pid = approval.get("aps_project_id") or approval_id
+    res = await aps.list_comments(pid)
+    return {
+        "approval_id": approval_id,
+        "aps_mode": aps.mode,
+        "comments": ((res.get("data") or {}).get("comments") or []),
+    }
+
+
 @approvals_admin_router.post("/upload")
 async def admin_upload_design(
     req: ApprovalUploadRequest,

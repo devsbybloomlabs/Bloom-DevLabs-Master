@@ -41,9 +41,41 @@ import {
   Activity,
   ExternalLink,
   Hash,
+  X,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
+
+// A/B test: assign variant from {header, hero, sticky} on first visit
+const AB_EXPERIMENT = "tour_cta_position";
+const AB_VARIANTS = ["header", "hero", "sticky"];
+const AB_STORAGE_KEY = "bloom_ab_tour_cta";
+
+function getAbVariant() {
+  if (typeof window === "undefined") return "hero";
+  try {
+    const cached = window.localStorage.getItem(AB_STORAGE_KEY);
+    if (cached && AB_VARIANTS.includes(cached)) return cached;
+    const v = AB_VARIANTS[Math.floor(Math.random() * AB_VARIANTS.length)];
+    window.localStorage.setItem(AB_STORAGE_KEY, v);
+    return v;
+  } catch {
+    return "hero";
+  }
+}
+
+async function trackAb(variant, kind, ctaLocation) {
+  try {
+    await axios.post(`${API}/api/public/ab/track`, {
+      experiment: AB_EXPERIMENT,
+      variant,
+      kind,
+      cta_location: ctaLocation,
+    });
+  } catch {
+    // Silent fail — A/B tracking is best-effort
+  }
+}
 
 // ----------------------------------------------------------------------
 // Step definitions — each maps to a preview rendered in the sticky panel
@@ -115,7 +147,14 @@ export default function PublicSandboxTour() {
   const [data, setData] = useState(null);
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [stickyDismissed, setStickyDismissed] = useState(false);
   const sectionsRef = useRef([]);
+  // Stable A/B variant per visitor
+  const variant = useMemo(() => getAbVariant(), []);
+  // Record one impression when the page loads
+  useEffect(() => {
+    trackAb(variant, "impression");
+  }, [variant]);
 
   // Fetch snapshot on mount
   useEffect(() => {
@@ -162,8 +201,9 @@ export default function PublicSandboxTour() {
   }, []);
 
   const onCtaClick = (location) => {
+    trackAb(variant, "cta_click", location);
     if (typeof window.gtag === "function") {
-      window.gtag("event", "tour_cta_click", { location });
+      window.gtag("event", "tour_cta_click", { location, variant });
     }
   };
 
@@ -190,7 +230,9 @@ export default function PublicSandboxTour() {
           <Button
             asChild
             size="sm"
-            className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+            className={`bg-[#1E3A8A] hover:bg-[#1A3278] text-white ${
+              variant === "header" ? "" : "hidden sm:hidden"
+            }`}
             data-testid="tour-header-cta"
             onClick={() => onCtaClick("header")}
           >
@@ -199,6 +241,15 @@ export default function PublicSandboxTour() {
               Book a 15-min call
             </a>
           </Button>
+          {variant !== "header" && (
+            <span
+              className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground"
+              data-testid={`tour-variant-${variant}`}
+              aria-hidden="true"
+            >
+              variant: {variant}
+            </span>
+          )}
         </div>
       </div>
 
@@ -229,7 +280,9 @@ export default function PublicSandboxTour() {
             <a
               href="/#book"
               onClick={() => onCtaClick("hero")}
-              className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 text-white px-5 py-3 font-medium text-sm hover:bg-white/20 transition-colors"
+              className={`inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 text-white px-5 py-3 font-medium text-sm hover:bg-white/20 transition-colors ${
+                variant === "hero" ? "" : "hidden"
+              }`}
               data-testid="tour-hero-cta"
             >
               <Calendar className="h-4 w-4" />
@@ -346,6 +399,50 @@ export default function PublicSandboxTour() {
           </p>
         </div>
       </section>
+      {/* Sticky bottom CTA bar — only for the 'sticky' A/B variant */}
+      {variant === "sticky" && !stickyDismissed && (
+        <div
+          className="fixed bottom-0 inset-x-0 z-40 bg-[#0F172A] text-white shadow-2xl border-t border-white/10"
+          data-testid="tour-sticky-cta"
+        >
+          <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Sparkles className="h-5 w-5 text-amber-300 flex-shrink-0" />
+              <div className="text-sm min-w-0">
+                <div className="font-medium hidden sm:block">
+                  Ready to see this running for your agency?
+                </div>
+                <div className="text-xs text-white/70 truncate">
+                  15-min scoping call · we ballpark price live
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                asChild
+                size="sm"
+                className="bg-white text-[#0F172A] hover:bg-white/90"
+                data-testid="tour-sticky-book-button"
+                onClick={() => onCtaClick("sticky")}
+              >
+                <a href="/#book">
+                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                  Book a call
+                </a>
+              </Button>
+              <button
+                type="button"
+                onClick={() => setStickyDismissed(true)}
+                aria-label="Dismiss sticky CTA"
+                className="text-white/60 hover:text-white p-1.5"
+                data-testid="tour-sticky-dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

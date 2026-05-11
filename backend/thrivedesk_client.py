@@ -274,3 +274,32 @@ class ThriveDeskClient:
                 "scope_limited": True,
             }
         return res
+
+    async def create_conversation(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new conversation/ticket from a structured payload.
+
+        Used by the portal Contact Us form. Same scope-limited fallback as
+        other write endpoints: when ThriveDesk returns 401/403/404/405, we log
+        to mock_log and return `{success: True, data: {scope_limited: True}}`
+        so the caller can persist as 'queued' for hourly retry.
+        """
+        await self._resolve_creds()
+        if not self.is_configured:
+            entry = self._log_mock("create_conversation", payload)
+            return {
+                "success": True,
+                "status": 200,
+                "data": {"id": entry["id"], "mock": True},
+                "error": None,
+            }
+        res = await self._request("POST", "/conversations", json=payload)
+        if _is_scope_limited(res):
+            entry = self._log_mock("create_conversation (scope-limited)", payload)
+            return {
+                "success": True,
+                "status": 200,
+                "data": {"id": entry["id"], "scope_limited": True},
+                "error": None,
+                "scope_limited": True,
+            }
+        return res

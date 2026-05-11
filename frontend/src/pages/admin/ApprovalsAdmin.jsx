@@ -34,8 +34,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import ApprovalAnnotationsDialog from "@/components/admin/ApprovalAnnotationsDialog";
 import {
   ImagePlus,
+  MessageSquare,
   Upload,
   RefreshCw,
   CheckCircle2,
@@ -62,6 +64,7 @@ export default function ApprovalsAdmin() {
   const [mockLogOpen, setMockLogOpen] = useState(false);
   const [mockLog, setMockLog] = useState({ mode: "mock", entries: [] });
   const [resolving, setResolving] = useState(null);
+  const [annotationsTarget, setAnnotationsTarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -249,15 +252,37 @@ export default function ApprovalsAdmin() {
                         </div>
                       </div>
                       {a.status !== "approved" && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAnnotationsTarget(a.id)}
+                            data-testid={`admin-approval-annotations-${a.id}`}
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                            Annotations
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onResolve(a)}
+                            disabled={resolving === a.id}
+                            data-testid={`admin-approval-resolve-${a.id}`}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                            Mark approved
+                          </Button>
+                        </div>
+                      )}
+                      {a.status === "approved" && (
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => onResolve(a)}
-                          disabled={resolving === a.id}
-                          data-testid={`admin-approval-resolve-${a.id}`}
+                          variant="ghost"
+                          onClick={() => setAnnotationsTarget(a.id)}
+                          data-testid={`admin-approval-annotations-${a.id}`}
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                          Mark approved
+                          <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                          Annotations
                         </Button>
                       )}
                     </div>
@@ -277,6 +302,12 @@ export default function ApprovalsAdmin() {
           setUploadOpen(false);
           load();
         }}
+      />
+
+      <ApprovalAnnotationsDialog
+        approvalId={annotationsTarget}
+        open={!!annotationsTarget}
+        onClose={() => setAnnotationsTarget(null)}
       />
 
       <Dialog open={mockLogOpen} onOpenChange={setMockLogOpen}>

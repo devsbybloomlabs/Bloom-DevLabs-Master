@@ -320,13 +320,156 @@ async def admin_delete_magnet(
 async def admin_list_leads(
     db: AsyncIOMotorDatabase = Depends(get_db),
     magnet_id: Optional[str] = None,
+    magnet_slug: Optional[str] = None,
+    source_contains: Optional[str] = None,
+    status: Optional[str] = None,
+    score_min: Optional[int] = None,
+    segment: Optional[str] = None,
     limit: int = 500,
 ) -> List[Dict[str, Any]]:
+    """List leads with optional filters + computed score.
+
+    Filters:
+      • magnet_id / magnet_slug — filter by lead magnet
+      • source_contains — partial match against source_url (e.g. 'blog')
+      • status — `subscribed` | `unsubscribed`
+      • score_min — only return leads with score >= N (range 0–100)
+      • segment — `hot` (≥70) | `warm` (40–69) | `cold` (<40)
+    """
     query: Dict[str, Any] = {}
     if magnet_id:
         query["magnet_id"] = magnet_id
+    if magnet_slug:
+        query["magnet_slug"] = magnet_slug
+    if source_contains:
+        query["source_url"] = {"$regex": source_contains, "$options": "i"}
+    if status:
+        query["status"] = status
     docs = await db.leads.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
-    return [serialize_doc(d) for d in docs]
+    enriched: List[Dict[str, Any]] = []
+    for d in docs:
+        d = serialize_doc(d)
+        d["score"] = _score_lead(d)
+        d["segment"] = _segment_for_score(d["score"])
+        if score_min is not None and d["score"] < score_min:
+            continue
+        if segment and d["segment"] != segment.lower():
+            continue
+        enriched.append(d)
+    return enriched
+
+
+@leads_admin_router.get("/leads/segments")
+async def admin_lead_segments(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Aggregate counts by segment + by source for the admin dashboard."""
+    docs = await db.leads.find({}, {"_id": 0}).to_list(2000)
+    seg_counts = {"hot": 0, "warm": 0, "cold": 0}
+    src_counts: Dict[str, int] = {}
+    magnet_counts: Dict[str, int] = {}
+    total_score = 0
+    for d in docs:
+        score = _score_lead(d)
+        total_score += score
+        seg_counts[_segment_for_score(score)] += 1
+        src = _summarise_source(d.get("source_url") or "")
+        src_counts[src] = src_counts.get(src, 0) + 1
+        m = d.get("magnet_slug") or "—"
+        magnet_counts[m] = magnet_counts.get(m, 0) + 1
+    avg = round(total_score / len(docs), 1) if docs else 0
+    return {
+        "total": len(docs),
+        "avg_score": avg,
+        "segments": seg_counts,
+        "by_source": [
+            {"source": k, "count": v}
+            for k, v in sorted(src_counts.items(), key=lambda kv: -kv[1])[:10]
+        ],
+        "by_magnet": [
+            {"magnet": k, "count": v}
+            for k, v in sorted(magnet_counts.items(), key=lambda kv: -kv[1])[:10]
+        ],
+    }
+
+
+def _score_lead(lead: Dict[str, Any]) -> int:
+    """Heuristic lead score 0–100.
+
+    Signals:
+      • Magnet weight (premium magnets score higher) — 0–30
+      • Source weight (blog organic > paid > unknown) — 0–25
+      • Recency (newer = hotter) — 0–25
+      • Engagement (next_step_idx, has utm campaign tag) — 0–20
+    """
+    score = 0
+
+    # Magnet weight — give known magnet slugs +30; default to +15
+    if lead.get("magnet_slug"):
+        score += 30
+    else:
+        score += 15
+
+    # Source weight
+    src = (lead.get("source_url") or "").lower()
+    if "blog" in src or "/case-studies" in src:
+        score += 25
+    elif "utm_source" in src or src.startswith("http"):
+        score += 18
+    elif src:
+        score += 10
+
+    # Recency — based on created_at age in days
+    created_at = lead.get("created_at") or ""
+    try:
+        ts = datetime.fromisoformat((created_at or "").replace("Z", "+00:00"))
+        age_days = max(0, (_now() - ts).days)
+        if age_days <= 1:
+            score += 25
+        elif age_days <= 7:
+            score += 18
+        elif age_days <= 30:
+            score += 10
+        else:
+            score += 3
+    except Exception:
+        score += 10
+
+    # Engagement — has at least progressed past step 0 AND has utm
+    if lead.get("next_step_idx", 0) > 0:
+        score += 12
+    if lead.get("utm") and any((lead.get("utm") or {}).values()):
+        score += 8
+
+    return min(100, max(0, score))
+
+
+def _segment_for_score(score: int) -> str:
+    if score >= 70:
+        return "hot"
+    if score >= 40:
+        return "warm"
+    return "cold"
+
+
+def _summarise_source(url: str) -> str:
+    """Bucket a URL into a small set of human-readable sources."""
+    if not url:
+        return "direct"
+    u = url.lower()
+    if "blog/" in u or u.endswith("/blog"):
+        return "blog"
+    if "case-studies" in u:
+        return "case_studies"
+    if "tour" in u:
+        return "tour"
+    if "twitter.com" in u or "t.co" in u:
+        return "twitter"
+    if "linkedin.com" in u:
+        return "linkedin"
+    if "google.com" in u:
+        return "google"
+    return "other"
 
 
 @leads_admin_router.post("/leads/drip-tick")

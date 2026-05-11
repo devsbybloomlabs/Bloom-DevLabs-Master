@@ -9,6 +9,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { useAdminApi } from "@/lib/auth";
+import LeadsTablePanel from "@/components/admin/LeadsTablePanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -262,6 +263,8 @@ export default function LeadMagnetsAdmin() {
           load();
         }}
       />
+
+      <LeadsTablePanel api={api} />
     </div>
   );
 }

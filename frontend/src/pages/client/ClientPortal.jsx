@@ -25,8 +25,10 @@ import {
   PlayCircle,
   Circle,
   PartyPopper,
+  MessageSquare,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import ClientContactPanel from "@/pages/client/ClientContactPanel";
 
 function EmptyState({ icon: Icon = Inbox, title, message }) {
   return (
@@ -563,6 +565,9 @@ export default function ClientPortal() {
             <TabsTrigger value="proposals" data-testid="portal-tab-proposals" className="flex-shrink-0">
               <FileText className="h-4 w-4 mr-1.5" /> Proposals
             </TabsTrigger>
+            <TabsTrigger value="contact" data-testid="portal-tab-contact" className="flex-shrink-0">
+              <MessageSquare className="h-4 w-4 mr-1.5" /> Contact
+            </TabsTrigger>
             <TabsTrigger value="profile" data-testid="portal-tab-profile" className="flex-shrink-0">
               <UserIcon className="h-4 w-4 mr-1.5" /> Profile
             </TabsTrigger>
@@ -581,6 +586,9 @@ export default function ClientPortal() {
           </TabsContent>
           <TabsContent value="proposals" className="mt-6">
             <ProposalsList data={proposals} loading={loading} />
+          </TabsContent>
+          <TabsContent value="contact" className="mt-6">
+            <ClientContactPanel token={token} />
           </TabsContent>
           <TabsContent value="profile" className="mt-6">
             <ProfilePanel client={client} refreshClient={refreshClient} token={token} />

@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import IntegrationCredentialsForm from "@/components/admin/IntegrationCredentialsForm";
+import AbStatsCard from "@/components/admin/AbStatsCard";
+import NiftyWorkspacesPanel from "@/components/admin/NiftyWorkspacesPanel";
 import {
   Link2,
   Unlink,
@@ -71,6 +73,7 @@ export default function IntegrationsAdmin() {
       <NiftyCard />
       <ProvidersGrid />
       <IntegrationCredentialsForm />
+      <AbStatsCard />
     </div>
   );
 }
@@ -433,6 +436,9 @@ function NiftyCard() {
             </ul>
           </div>
         )}
+
+        {/* Multi-workspace snapshot panel (Phase 15) */}
+        <NiftyWorkspacesPanel />
       </CardContent>
 
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>

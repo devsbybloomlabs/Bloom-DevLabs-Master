@@ -62,6 +62,13 @@ from thrivedesk_routes import (  # noqa: E402
 )
 from demo_routes import demo_router  # noqa: E402
 from public_tour_routes import public_tour_router  # noqa: E402
+from contact_routes import (  # noqa: E402
+    client_contact_router,
+    contact_admin_router,
+    thrivedesk_retry_cron,
+)
+from ab_test_routes import public_ab_router, ab_admin_router  # noqa: E402
+from nifty_workspaces_routes import nifty_workspaces_router  # noqa: E402
 from blog_extras_routes import blog_extras_router  # noqa: E402
 from integrations_admin_routes import integrations_admin_router  # noqa: E402
 from client_routes import (  # noqa: E402
@@ -180,6 +187,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("Designer reminder cron failed: %s", exc)
 
+    async def thrivedesk_retry_cron_wrapper() -> None:
+        try:
+            res = await thrivedesk_retry_cron(app)
+            if (res.get("sent", 0) + res.get("failed", 0)) > 0:
+                log.info("Portal contact retries: %s", res)
+        except Exception as exc:
+            log.exception("ThriveDesk retry cron failed: %s", exc)
+
     # Hourly drip ticks
     scheduler.add_job(drip_cron, CronTrigger(minute=15))
     # Every 5 min Nifty comment poll
@@ -188,6 +203,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.add_job(nifty_timeline_cron, CronTrigger(hour=8, minute=0))
     # Hourly designer reminder check for stale approvals
     scheduler.add_job(approval_reminder_cron_wrapper, CronTrigger(minute=30))
+    # Hourly retry of queued portal contact submissions
+    scheduler.add_job(thrivedesk_retry_cron_wrapper, CronTrigger(minute=45))
 
     scheduler.start()
     app.state.scheduler = scheduler
@@ -268,6 +285,11 @@ api.include_router(support_admin_router)
 api.include_router(thrivedesk_webhook_router)
 api.include_router(demo_router)
 api.include_router(public_tour_router)
+api.include_router(client_contact_router)
+api.include_router(contact_admin_router)
+api.include_router(public_ab_router)
+api.include_router(ab_admin_router)
+api.include_router(nifty_workspaces_router)
 
 app.include_router(api)
 

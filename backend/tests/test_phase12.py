@@ -113,15 +113,14 @@ def test_health_endpoint_has_eight_providers(auth_headers):
 # Slack notifier — non-configured fast path
 # =========================================================================
 def test_slack_test_endpoint_returns_503_when_not_configured(auth_headers):
-    # Clear any slack creds first
-    httpx.put(
-        f"{ROOT}/admin/integrations/credentials/slack",
-        headers=auth_headers,
-        json={"fields": {"webhook_url": ""}},
-        timeout=10,
-    )
+    """Skipped when Slack is actually wired (we don't want to wipe real creds)."""
+    health = httpx.get(
+        f"{ROOT}/admin/integrations/health", headers=auth_headers, timeout=10
+    ).json()
+    slack_pill = next((p for p in health["providers"] if p["provider"] == "slack"), None)
+    if slack_pill and slack_pill.get("configured"):
+        pytest.skip("Slack live — skipping wipe-and-test")
     r = httpx.post(f"{ROOT}/admin/integrations/slack/test", headers=auth_headers, timeout=10)
-    # 503 = not configured (expected)
     assert r.status_code in (503, 502, 200)
 
 

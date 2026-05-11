@@ -254,8 +254,14 @@ class ApprovalStudioClient:
     async def list_comments(self, project_id: str) -> Dict[str, Any]:
         await self._resolve_creds()
         if not self.is_configured:
+            # In mock mode return a deterministic synthetic thread per project_id
             self._log_mock("list_comments", {"projectId": project_id})
-            return {"success": True, "status": 200, "data": {"comments": []}, "error": None}
+            return {
+                "success": True,
+                "status": 200,
+                "data": {"comments": _mock_annotations_for(project_id)},
+                "error": None,
+            }
         return await self._request("GET", f"/project/{project_id}/comments")
 
     async def get_project(self, project_id: str) -> Dict[str, Any]:
@@ -268,3 +274,36 @@ class ApprovalStudioClient:
                 "error": None,
             }
         return await self._request("GET", f"/project/{project_id}")
+
+
+# ----------------------------------------------------------------------
+# Mock annotation generator — deterministic per project so the UI is stable
+# ----------------------------------------------------------------------
+_MOCK_ANNOTATION_CORPUS = [
+    {"author": "Sienna Acme", "text": "Love the direction — can we try a warmer palette?", "resolved": False},
+    {"author": "Marcus NorthPeak", "text": "Headline too small on mobile. Bump 1.5×?", "resolved": False},
+    {"author": "Designer", "text": "Updated palette + headline. New version uploaded.", "resolved": True},
+    {"author": "Sienna Acme", "text": "Perfect — approved on my end ✓", "resolved": True},
+    {"author": "PM", "text": "Final QA on Safari before we ship?", "resolved": False},
+]
+
+
+def _mock_annotations_for(project_id: str) -> List[Dict[str, Any]]:
+    """Deterministic mock thread — pseudo-random based on project_id hash."""
+    import hashlib
+    from datetime import timedelta
+    h = int(hashlib.md5(project_id.encode()).hexdigest(), 16) % 100
+    n = (h % 4) + 2  # 2-5 comments
+    base = datetime.now(timezone.utc) - timedelta(hours=24)
+    out = []
+    for i in range(n):
+        c = _MOCK_ANNOTATION_CORPUS[(h + i) % len(_MOCK_ANNOTATION_CORPUS)]
+        out.append({
+            "id": f"mock_ann_{project_id[:6]}_{i}",
+            "author": c["author"],
+            "text": c["text"],
+            "resolved": c["resolved"],
+            "created_at": (base + timedelta(hours=i * 4)).isoformat(),
+            "anchor": {"x": (h * (i + 1)) % 100, "y": (h * (i + 2)) % 100},  # percent coords
+        })
+    return out

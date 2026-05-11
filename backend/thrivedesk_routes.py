@@ -348,6 +348,25 @@ async def thrivedesk_webhook(request: Request) -> Dict[str, Any]:
             return {"ok": True, "verified": True, "event": event_type, "result": result}
         return {"ok": True, "verified": True, "event": event_type, "result": {"outcome": "no_rule_matched"}}
 
+    # Resolution path — when a Portal_Contact ticket is Resolved/Closed,
+    # email the client (Part 6 reverse-sync)
+    if event_type == "conversation.status.updated":
+        new_status = (data.get("status") or "").lower()
+        if new_status in ("resolved", "closed"):
+            ticket_id = data.get("id") or data.get("ticketId") or data.get("ticket_id")
+            try:
+                from contact_routes import relay_td_resolution_to_client
+                relay_res = await relay_td_resolution_to_client(request, db, ticket_id)
+                if relay_res:
+                    return {
+                        "ok": True,
+                        "verified": True,
+                        "event": event_type,
+                        "result": {"outcome": "portal_contact_resolved", "relay": relay_res},
+                    }
+            except Exception as exc:  # pragma: no cover
+                log.warning("portal contact resolution relay failed: %s", exc)
+
     return {"ok": True, "verified": True, "event": event_type, "result": {"outcome": "ignored"}}
 
 
