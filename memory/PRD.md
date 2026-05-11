@@ -104,6 +104,34 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 **Test results:**
 - iteration_11 12/12 backend pytest (`/app/backend/tests/test_phase11.py`) — OG PNG, AH HMAC, health endpoint, Approval Studio upload + webhooks + manual resolve + mock log.
 - iteration_11 — 100% frontend verification: dashboard health pills (6) render and turn green after `/test` fires, sidebar nav has Clients + Design Approvals, ClientsAdmin renders + search + resend works, ApprovalsAdmin upload flow + mock-log dialog work, client portal login unchanged (5 tabs intact).
+
+### ✅ Phase 12 — DB-stored Credentials Store + ThriveDesk Escalation + Slack Notifier (Feb 2026)
+
+**Credentials UX (no more .env edits):**
+- `integration_credentials.py` (new): Centralised DB-stored credentials store at `app_settings.integration_credentials`. Resolution priority: env var → DB value. Helpers: `get_credentials`, `get_credential`, `set_provider_credentials`, `list_masked_credentials`.
+- New endpoints: `GET /api/admin/integrations/credentials` (masked read), `PUT /api/admin/integrations/credentials/{provider}` (write — accepts approval_studio / thrivedesk / slack only).
+- `IntegrationCredentialsForm.jsx` (new) embedded inside `/admin/integrations` — three provider cards (Approval Studio, ThriveDesk, Slack) with show/hide toggle on secret fields, Test connection + Save buttons. Saving auto-refreshes the live client instance (no restart needed).
+- `ApprovalStudioClient` + `ThriveDeskClient` both now have `bind_db()` + `_resolve_creds()` so they pick up DB creds at request time.
+
+**Part 4 — ThriveDesk → Nifty Escalation Loop (NEW):**
+- **`thrivedesk_client.py`** (new): Mockable REST client. Methods: `get_conversation`, `add_reply`, `add_note`, `update_status`, `add_tags`. Auth via Bearer API key. Mock mode logs every call to `mock_log` for inspection.
+- **`thrivedesk_routes.py`** (new):
+  - Classification engine: `URGENT_KEYWORDS` (urgent/blocked/asap/critical/emergency) + `URGENT_TAGS` (High Priority/urgent) + `FEATURE_REQUEST_TAGS` (Feature Request).
+  - `POST /webhooks/thrivedesk` — Receives `conversation.created`, `conversation.tags.updated`. Verifies HMAC-SHA1+base64 signature (per ThriveDesk spec) when webhook secret is set. Routes to `_create_escalation`.
+  - `_create_escalation` — Builds the Nifty task (urgent → "🚨 URGENT SUPPORT — {subject}", due today, custom field `ThriveDesk_Ticket_ID`; feature → "Feature Request — {subject}", custom field `Scope Creep?: To Be Determined`, tag "Client Request"). Persists to `support_escalations` Mongo collection. Idempotent per (ticket_id, classification).
+  - Slack alert for urgent — via `slack_notifier.post_message` to `#urgent-support`. When Slack not configured, falls back to admin notification.
+  - Error handling — when Nifty task creation fails, queues an admin notification with full ticket details for manual creation (per spec).
+  - `POST /admin/support-triage/simulate-ticket` — Synthetic test endpoint for QA / demos.
+  - `POST /admin/support-triage/{id}/resolve` — Manual fallback: posts ThriveDesk reply + optionally closes ticket.
+  - `GET /admin/support-triage/mock-log` — ThriveDesk activity inspection.
+- **Reverse-sync (Nifty → ThriveDesk)**: `milestone_routes.nifty_webhook` calls `relay_nifty_completion_to_thrivedesk()` whenever a Nifty task with `ThriveDesk_Ticket_ID` custom field is marked Complete. Posts public reply ("We've resolved your request! …") + optionally closes the ticket when custom field `Close Ticket: Yes`.
+- **`slack_notifier.py`** (new): Simple async webhook POST (no SDK). Reads `SLACK_WEBHOOK_URL` env var first, falls back to DB-stored credentials. Returns `{ok, status, reason}`; never raises. `reason='not_configured'` lets callers fall back to admin notifications.
+- **`SupportTriageAdmin.jsx`** (new admin page at `/admin/support-triage`): Stats tiles (open / urgent open / feature requests open / resolved), type+status filters, Resolve dialog (summary + close ticket checkbox), Simulate Ticket dialog, Mock Log dialog.
+- Health endpoint extended to 8 providers (added `thrivedesk` + `slack`).
+
+**Test results:**
+- iteration_12 14/14 phase12 backend pytest + 30/30 phase10+11 regression = **44/44 PASS**.
+- iteration_12 100% frontend verification — every spec'd selector and flow rendered correctly. Zero issues.
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
@@ -133,14 +161,18 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 ## Backlog
 
 ### P1
-- Generate Nifty access token at https://developers.niftypm.com → paste into `/app/backend/.env`. Once set, Phase 7 onboarding tasks auto-create AND Phase 8 milestone status syncs run live, AND Phase 11 design approvals auto-comment on the linked Nifty task.
-- Wire real Approval Studio credentials (`APPROVAL_STUDIO_USERNAME` + `APPROVAL_STUDIO_PASSWORD`) in `/app/backend/.env` to flip from mock → live mode. No code change required.
+- Generate Nifty access token at https://developers.niftypm.com → paste into `/app/backend/.env` OR use `/admin/integrations` Manual Token form. Once set, Phase 7 onboarding tasks auto-create, Phase 8 milestone status syncs run live, Phase 11 design approvals auto-comment on the linked Nifty task, AND Phase 12 ThriveDesk reverse-sync (Nifty Complete → ThriveDesk reply + close) goes live.
+- Wire real Approval Studio creds via `/admin/integrations` → Credentials → Approval Studio (paste username + password). No code change required.
+- Wire real ThriveDesk API key via `/admin/integrations` → Credentials → ThriveDesk. Set webhook URL inside ThriveDesk to `<backend>/api/webhooks/thrivedesk`.
+- Wire real Slack incoming webhook URL via `/admin/integrations` → Credentials → Slack. Urgent escalations auto-post to that webhook.
 
 ### P2
-- ~~HMAC signature verification on AgencyHandy webhooks.~~ ✅ Done (Phase 11) — set `AGENCYHANDY_WEBHOOK_HMAC_SECRET` in `.env` to enforce.
+- ~~HMAC signature verification on AgencyHandy webhooks.~~ ✅ Done (Phase 11).
 - ~~AgencyHandy server-side `list_orders(client_email=…)` filter.~~ ✅ Done (Phase 11).
 - ~~Admin `/admin/clients` UI page.~~ ✅ Done (Phase 11).
-- ~~Migrate dynamic OG SVG to also render to PNG.~~ ✅ Done (Phase 11) — `.png` route via cairosvg, used by Twitter Cards.
+- ~~Migrate dynamic OG SVG to also render to PNG.~~ ✅ Done (Phase 11).
+- ~~DB-stored credentials store + UI~~ ✅ Done (Phase 12).
+- ~~ThriveDesk ↔ Nifty escalation loop~~ ✅ Done (Phase 12).
 
 ### P3
 - Lead scoring + segmentation in Lead Magnets admin (e.g., filter by source_url, magnet_slug).
@@ -148,8 +180,10 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - Automated Nifty project creation on Phase 3 onboarding submit (currently logs to admin notifications).
 - Stripe as backup payment processor.
 - Google Calendar sync.
-- Slack notifications (deferred from Phase 11 Approval Studio loop).
+- ~~Slack notifications.~~ ✅ Done (Phase 12 — wired into urgent ThriveDesk escalations).
 - Approval Studio: real-time annotation preview inside `/admin/approvals` (currently shows mock log only).
+- ThriveDesk: visual escalation timeline showing message thread + status transitions.
+- Multi-workspace Nifty support (currently single workspace).
 
 ## API Endpoints (cumulative reference)
 
