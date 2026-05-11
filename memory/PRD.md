@@ -217,7 +217,7 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 
 **Real OAuth creds wired** (provided by user):
 - `client_id` = `728881545908-a752kc3enjgnadmb1c0m6ff90ruick4n.apps.googleusercontent.com`
-- Redirect URI = `https://client-portal-hub-18.preview.emergentagent.com/api/oauth/calendar/callback` (preview) + `https://bybloomlabs.com/api/oauth/calendar/callback` (prod)
+- Redirect URI = `https://paypal-discount-flow.preview.emergentagent.com/api/oauth/calendar/callback` (preview) + `https://bybloomlabs.com/api/oauth/calendar/callback` (prod)
 - Scope = `https://www.googleapis.com/auth/calendar`
 
 **New backend (`google_calendar_client.py` + `google_calendar_routes.py`):**

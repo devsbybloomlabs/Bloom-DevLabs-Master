@@ -37,6 +37,47 @@ PACKAGE_TIERS: Dict[str, Dict[str, Any]] = {
     "enterprise": {"name": "Enterprise", "price": "14995.00", "kind": "one_time"},
 }
 
+# Payment plan configuration
+PAYMENT_PLANS = ("split_50_50", "full_upfront")
+FULL_UPFRONT_DISCOUNT = 500.00
+
+
+def _money(val: float) -> str:
+    """Format a float as a 2-dp money string suitable for PayPal."""
+    return f"{round(val + 1e-9, 2):.2f}"
+
+
+def compute_charge(tier: str, payment_plan: str) -> Dict[str, Any]:
+    """Resolve base price + payment plan → charge breakdown.
+
+    Returns:
+      base_amount, charge_now, charge_later, discount_applied, plan_label,
+      installment_index (1 for the initial charge).
+    """
+    cfg = PACKAGE_TIERS[tier]
+    base = float(cfg["price"])
+    if payment_plan == "full_upfront":
+        discount = FULL_UPFRONT_DISCOUNT
+        charge_now = max(0.0, base - discount)
+        return {
+            "base_amount": _money(base),
+            "charge_now": _money(charge_now),
+            "charge_later": "0.00",
+            "discount_applied": _money(discount),
+            "plan_label": "100% upfront — $500 discount applied",
+            "installment_index": 1,
+        }
+    # default: split_50_50
+    half = round(base / 2.0, 2)
+    return {
+        "base_amount": _money(base),
+        "charge_now": _money(half),
+        "charge_later": _money(base - half),
+        "discount_applied": "0.00",
+        "plan_label": "50% now / 50% at launch",
+        "installment_index": 1,
+    }
+
 
 # ---------- Request/response shapes ----------
 class CreateOrderRequest(BaseModel):
@@ -47,6 +88,7 @@ class CreateOrderRequest(BaseModel):
     customer_email: Optional[EmailStr] = None
     customer_name: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    payment_plan: Optional[str] = None  # split_50_50 | full_upfront
 
 
 class CreateSubscriptionRequest(BaseModel):
@@ -98,9 +140,22 @@ async def create_order(
     amount = req.amount
     tier = (req.tier or "").lower() if req.tier else None
     description = req.description
+
+    # Payment plan applies only to tier-based checkout. Custom amounts use req.amount as-is.
+    payment_plan = (req.payment_plan or "split_50_50").lower() if tier else None
+    if payment_plan and payment_plan not in PAYMENT_PLANS:
+        raise HTTPException(400, f"Invalid payment_plan. Use one of: {', '.join(PAYMENT_PLANS)}")
+
+    charge: Optional[Dict[str, Any]] = None
     if tier and tier in PACKAGE_TIERS:
-        amount = amount or PACKAGE_TIERS[tier]["price"]
-        description = description or PACKAGE_TIERS[tier]["name"]
+        charge = compute_charge(tier, payment_plan or "split_50_50")
+        amount = amount or charge["charge_now"]
+        plan_suffix = (
+            " — 50% deposit (1 of 2)"
+            if payment_plan == "split_50_50"
+            else " — full upfront (save $500)"
+        )
+        description = description or f"{PACKAGE_TIERS[tier]['name']}{plan_suffix}"
     if not amount:
         raise HTTPException(400, "amount or valid tier required")
 
@@ -134,10 +189,29 @@ async def create_order(
         "created_at": _now().isoformat(),
         "updated_at": _now().isoformat(),
     }
+    if charge:
+        doc.update({
+            "payment_plan": payment_plan,
+            "plan_label": charge["plan_label"],
+            "base_amount": charge["base_amount"],
+            "charge_now": charge["charge_now"],
+            "charge_later": charge["charge_later"],
+            "discount_applied": charge["discount_applied"],
+            "installment_index": charge["installment_index"],
+            "installment_2_status": "pending_capture" if payment_plan == "split_50_50" else "not_applicable",
+        })
     await db.paypal_transactions.update_one(
         {"id": order["id"]}, {"$set": prepare_for_mongo(doc)}, upsert=True
     )
-    return {"id": order["id"], "status": order.get("status")}
+    return {
+        "id": order["id"],
+        "status": order.get("status"),
+        "amount": amount,
+        "currency": doc["currency"],
+        "payment_plan": payment_plan,
+        "charge_later": charge["charge_later"] if charge else None,
+        "discount_applied": charge["discount_applied"] if charge else None,
+    }
 
 
 @paypal_router.post("/orders/{order_id}/capture")
@@ -174,12 +248,38 @@ async def capture_order(
         update["customer_email"] = payer_email
     if payer_name:
         update["customer_name"] = payer_name
+
+    # Flag remaining installment for split 50/50 plans so admin can later
+    # "Mark Ready for Launch" and bill the balance.
+    existing = await db.paypal_transactions.find_one({"id": order_id}, {"_id": 0}) or {}
+    if (
+        status_str == "COMPLETED"
+        and existing.get("payment_plan") == "split_50_50"
+        and existing.get("installment_index") == 1
+        and existing.get("installment_2_status") in (None, "pending_capture")
+    ):
+        update["installment_2_status"] = "pending_launch"
+
+    # If this capture is for installment 2 of a split plan, mark parent as paid in full.
+    parent_id = existing.get("parent_order_id") if existing else None
+    if status_str == "COMPLETED" and parent_id and existing.get("installment_index") == 2:
+        await db.paypal_transactions.update_one(
+            {"id": parent_id},
+            {"$set": {
+                "installment_2_status": "paid",
+                "installment_2_paid_at": _now().isoformat(),
+                "updated_at": _now().isoformat(),
+            }},
+        )
+
     await db.paypal_transactions.update_one(
         {"id": order_id}, {"$set": update}, upsert=True
     )
 
-    # Auto-provision client account on COMPLETED
-    if status_str == "COMPLETED" and payer_email:
+    # Auto-provision client account on COMPLETED. Skip if this is the
+    # 2nd installment of a split plan (parent capture already provisioned).
+    skip_provision = bool(existing.get("parent_order_id"))
+    if status_str == "COMPLETED" and payer_email and not skip_provision:
         try:
             from client_routes import auto_provision_client_from_payment
 
@@ -371,6 +471,171 @@ async def list_transactions(
 ) -> List[Dict[str, Any]]:
     docs = await db.paypal_transactions.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
     return docs
+
+
+@paypal_admin_router.post("/transactions/{order_id}/mark-ready-for-launch")
+async def mark_ready_for_launch(
+    order_id: str,
+    request: Request,
+    pp: PayPalClient = Depends(get_pp),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Bill the remaining 50% for a split-payment order.
+
+    Creates a brand-new PayPal order for the `charge_later` balance,
+    stores it linked to the parent, emails the client a payment link
+    (best-effort) and returns the approval URL so the admin can copy it.
+    """
+    if not pp.is_configured:
+        raise HTTPException(503, "PayPal not configured")
+    parent = await db.paypal_transactions.find_one({"id": order_id}, {"_id": 0})
+    if not parent:
+        raise HTTPException(404, "Order not found")
+    if parent.get("payment_plan") != "split_50_50":
+        raise HTTPException(400, "Order is not on a 50/50 split plan")
+    if parent.get("installment_index") != 1:
+        raise HTTPException(400, "Only the first installment can trigger a launch charge")
+    if parent.get("status") != "COMPLETED":
+        raise HTTPException(400, "Initial 50% has not been captured yet")
+    if parent.get("installment_2_status") == "paid":
+        raise HTTPException(409, "Second installment already paid")
+    if parent.get("installment_2_order_id"):
+        # Idempotent: return existing pending order
+        existing = await db.paypal_transactions.find_one(
+            {"id": parent["installment_2_order_id"]}, {"_id": 0}
+        ) or {}
+        return {
+            "id": existing.get("id"),
+            "status": existing.get("status"),
+            "approval_url": existing.get("approval_url"),
+            "amount": existing.get("amount"),
+            "currency": existing.get("currency"),
+            "already_initiated": True,
+        }
+
+    balance = parent.get("charge_later") or "0.00"
+    if float(balance) <= 0:
+        raise HTTPException(400, "No remaining balance to charge")
+
+    tier = parent.get("tier") or "custom"
+    base_url = os.environ.get("APP_BASE_URL", "https://bybloomlabs.com").rstrip("/")
+    description = f"{PACKAGE_TIERS.get(tier, {}).get('name', 'Bloom Labs Service')} — launch balance (2 of 2)"
+    res = await pp.create_order(
+        amount=balance,
+        currency=parent.get("currency"),
+        reference_id=f"{tier}-installment-2",
+        description=description,
+        custom_id=parent.get("customer_email") or "guest",
+        return_url=f"{base_url}/checkout/success?installment=2",
+        cancel_url=f"{base_url}/checkout/cancel",
+    )
+    if not res.get("success"):
+        raise HTTPException(502, res.get("error") or "PayPal create order failed")
+    order = res["data"]
+    approval_url = next(
+        (lk["href"] for lk in (order.get("links") or []) if lk.get("rel") == "approve"),
+        None,
+    )
+
+    # Persist the new installment-2 order
+    child_doc = {
+        "id": order["id"],
+        "kind": "order",
+        "status": order.get("status", "CREATED"),
+        "tier": tier,
+        "amount": balance,
+        "currency": parent.get("currency") or pp.default_currency,
+        "customer_email": parent.get("customer_email"),
+        "customer_name": parent.get("customer_name"),
+        "description": description,
+        "metadata": {"installment_of": order_id},
+        "raw": order,
+        "payment_plan": "split_50_50",
+        "plan_label": "Launch balance (2 of 2)",
+        "base_amount": parent.get("base_amount"),
+        "charge_now": balance,
+        "charge_later": "0.00",
+        "discount_applied": "0.00",
+        "installment_index": 2,
+        "parent_order_id": order_id,
+        "approval_url": approval_url,
+        "created_at": _now().isoformat(),
+        "updated_at": _now().isoformat(),
+    }
+    await db.paypal_transactions.insert_one(prepare_for_mongo(child_doc))
+    child_doc.pop("_id", None)
+
+    # Update parent
+    await db.paypal_transactions.update_one(
+        {"id": order_id},
+        {"$set": {
+            "installment_2_order_id": order["id"],
+            "installment_2_status": "billed",
+            "installment_2_billed_at": _now().isoformat(),
+            "updated_at": _now().isoformat(),
+        }},
+    )
+
+    # Best-effort email the client
+    payer_email = parent.get("customer_email")
+    payer_name = parent.get("customer_name") or (payer_email.split("@")[0] if payer_email else "there")
+    if payer_email and approval_url:
+        try:
+            emailit = getattr(request.app.state, "emailit", None)
+            if emailit and getattr(emailit, "is_configured", False):
+                html = _launch_balance_email_html(
+                    payer_name, balance, approval_url,
+                    plan_name=PACKAGE_TIERS.get(tier, {}).get("name", "your project"),
+                )
+                await emailit.send_email(
+                    to=payer_email,
+                    subject="Your launch is ready — final 50% invoice",
+                    html=html,
+                    text=f"Hi {payer_name}, your project is ready for launch. "
+                         f"Please complete the final 50% (${balance}): {approval_url}",
+                )
+        except Exception as exc:  # pragma: no cover
+            log.warning("Emailit send failed for launch balance: %s", exc)
+
+    # Notify admin so they have a record + manual fallback
+    try:
+        from models import NotificationItem
+
+        notif = NotificationItem(
+            kind="payment",
+            title=f"🚀 Launch balance billed: {payer_email or order_id}",
+            body=f"Order {order['id']} for ${balance} — approval URL: {approval_url}",
+            link="/admin/paypal-orders",
+        )
+        await db.notifications.insert_one(prepare_for_mongo(notif.model_dump()))
+    except Exception as exc:  # pragma: no cover
+        log.warning("Failed to create launch notification: %s", exc)
+
+    return {
+        "id": order["id"],
+        "status": order.get("status"),
+        "approval_url": approval_url,
+        "amount": balance,
+        "currency": child_doc["currency"],
+        "already_initiated": False,
+    }
+
+
+def _launch_balance_email_html(name: str, amount: str, approval_url: str, plan_name: str) -> str:
+    return f"""
+<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0F172A;background:#F8FAFC;padding:32px;">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;padding:32px;box-shadow:0 4px 12px rgba(15,23,42,0.06);">
+    <h1 style="margin:0 0 16px;font-size:22px;color:#1E3A8A;">{plan_name} — ready for launch 🚀</h1>
+    <p style="line-height:1.6;color:#475569;">Hey {name}, your project has been marked <strong>Ready for Launch</strong>. To go live, please complete the remaining 50% balance below.</p>
+    <p style="margin:28px 0;font-size:18px;"><strong>Balance due: ${amount}</strong></p>
+    <p style="margin:28px 0;">
+      <a href="{approval_url}" style="background:#1E3A8A;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:600;">Pay launch balance</a>
+    </p>
+    <p style="color:#94A3B8;font-size:12px;">Or copy this link: {approval_url}</p>
+  </div>
+</body></html>
+""".strip()
 
 
 @paypal_admin_router.get("/subscriptions")

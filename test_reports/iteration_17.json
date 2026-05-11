@@ -1,0 +1,39 @@
+{
+  "summary": "Phase 17 review — payment-plan split (50/50 vs 100% upfront with $500 discount) on the public pricing modal + new /admin/paypal-orders page. Backend: 38/38 tests pass (test_payment_plans.py 11/11 + test_paypal_clients.py 27/27 regression). compute_charge() math verified for express/custom/enterprise on both plans. POST /api/paypal/orders rejects invalid payment_plan with HTTP 400 (assertion in test_create_order_invalid_payment_plan_returns_400) and the valid split/full_upfront calls reach PayPal returning 502 (expected — sandbox creds invalid). Admin mark-ready-for-launch endpoint enforces 401 unauth, 404 unknown order, 400 non-split, 400 uncaptured-split correctly. Frontend verified live on https://paypal-discount-flow.preview.emergentagent.com: Pricing modal on landing /#pricing opens for Express, both radios present with correct data-testids (pricing-checkout-express-plan-split-radio, pricing-checkout-express-plan-full-radio). Default split state shows charge_now=$2,997.50, charge_later=$2,997.50, button='Continue · pay $2,997.50', and discount summary line is hidden. Clicking the full_upfront option flips charge_now to $5,495, shows green discount line '−$500' (pricing-checkout-express-summary-discount), and updates the button label to 'Continue · pay $5,495'. /admin/paypal-orders renders with data-testid admin-paypal-orders-page after admin login, sidebar contains the new 'PayPal Orders' nav entry, list shows 17 historical orders with correct badge rendering (CREATED · 50% deposit · 1 of 2 · waiting deposit OR 100% upfront · −$500). /admin/paypal-plans regression page still loads with the 2 seeded Server Management Tier 1 plans — no regression.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_payment_plans.py",
+    "/app/backend/tests/test_paypal_clients.py",
+    "/app/test_reports/pytest/iteration_17.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "paypal_routes.py compute_charge() correctly clamps full_upfront discount with max(0, base - 500) so a tier priced below $500 would yield $0 charge_now without going negative — matches the PRD note 'No minimum price floor'.",
+    "paypal_routes.py:145 — payment_plan defaults to 'split_50_50' only when a tier is provided. Custom-amount checkouts (req.amount with no tier) deliberately skip the payment_plan path; the test test_create_order_no_amount_no_tier_returns_400 covers the invalid combo. Good separation.",
+    "paypal_routes.py:264-273 — capture_order() updates the PARENT order's installment_2_status to 'paid' + installment_2_paid_at when the child (installment_index=2) capture completes. Solid 2-installment bookkeeping.",
+    "paypal_routes.py:281 — skip_provision guard correctly prevents double client-provisioning when the 2nd installment captures (parent already provisioned on first capture).",
+    "paypal_routes.py mark_ready_for_launch — idempotent: if installment_2_order_id is already set, returns the existing child with already_initiated=true (status 200) instead of double-charging. Good UX for admin double-clicks.",
+    "Pricing.jsx CheckoutDialog — radio group is fully accessible (RadioGroup + RadioGroupItem with htmlFor labels) and dynamic summary recalculates on every plan change via useMemo over computeCharge — verified live in browser.",
+    "PayPalOrdersPage.jsx — uses installment_2_status to render contextual badge colors and shows AWAITING LAUNCH count card (0 on this env since no order has reached COMPLETED state yet). Mark-Ready-for-Launch button correctly hidden until status=COMPLETED + payment_plan=split_50_50.",
+    "No MongoDB _id leakage detected — list_transactions, mark_ready_for_launch, and create_order all project {_id:0} or pop _id before returning."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (38/38 across test_payment_plans.py + test_paypal_clients.py regression)",
+    "frontend": "100% (pricing modal split + full_upfront math + dynamic button label + discount line + /admin/paypal-orders rendering + sidebar nav + /admin/paypal-plans regression all verified live)"
+  },
+  "test_credentials": "Admin: founder@thesalvador.group / admin123 (unchanged)",
+  "seed_data_creation": "test_rejects_non_split_orders + test_rejects_uncaptured_split create TEST-NONSPLIT-* and TEST-PENDING-* docs in paypal_transactions and delete them in their finally blocks. No residual seed data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 17 (payment-plan split) is fully green — both backend (38 tests) and frontend (modal radios, dynamic charge_now / charge_later / button label / discount line, admin/paypal-orders page, sidebar nav, /admin/paypal-plans regression) verified live on https://paypal-discount-flow.preview.emergentagent.com. PayPal sandbox creds still return invalid_client so any 200-success path through PayPal capture is untestable in this environment — relevant tests assert 502 as the contract. The /admin/paypal-orders list currently contains 17 historical orders (mix of split/full_upfront/legacy custom), none in COMPLETED state, so the Mark Ready for Launch button is hidden on all rows — this is expected behavior, not a UI bug. To exercise the launch-balance flow end-to-end, an admin would need to manually flip a paypal_transactions doc to status='COMPLETED' + payment_plan='split_50_50' + installment_index=1 in Mongo (or use a real PayPal sandbox capture).",
+  "rca_of_the_issue": "N/A — no defects found. All 10 listed feature checks pass."
+}

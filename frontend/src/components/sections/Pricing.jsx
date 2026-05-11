@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,9 +10,40 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, Sparkles, ArrowRight } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Check, Sparkles, ArrowRight, BadgePercent, CalendarClock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PayPalCheckoutButton } from "@/components/payment/PayPalCheckoutButton";
+
+const FULL_UPFRONT_DISCOUNT = 500;
+
+function computeCharge(price, plan) {
+  if (plan === "full_upfront") {
+    const chargeNow = Math.max(0, price - FULL_UPFRONT_DISCOUNT);
+    return {
+      base: price,
+      chargeNow,
+      chargeLater: 0,
+      discount: FULL_UPFRONT_DISCOUNT,
+      label: "100% upfront",
+    };
+  }
+  const half = Math.round((price / 2) * 100) / 100;
+  return {
+    base: price,
+    chargeNow: half,
+    chargeLater: price - half,
+    discount: 0,
+    label: "50% now / 50% at launch",
+  };
+}
+
+function fmt(n) {
+  return Number(n).toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+}
 
 const PLANS = [
   {
@@ -71,10 +102,16 @@ const PLANS = [
 function CheckoutDialog({ plan, open, onOpenChange }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", name: "" });
+  const [paymentPlan, setPaymentPlan] = useState("split_50_50");
   const [showButtons, setShowButtons] = useState(false);
 
   const canStart =
     form.email.trim().length > 3 && form.email.includes("@") && form.name.trim().length > 1;
+
+  const charge = useMemo(
+    () => (plan ? computeCharge(plan.price, paymentPlan) : null),
+    [plan, paymentPlan]
+  );
 
   if (!plan) return null;
 
@@ -90,19 +127,127 @@ function CheckoutDialog({ plan, open, onOpenChange }) {
             Get started — {plan.name}
           </DialogTitle>
           <DialogDescription>
-            Pay <span className="font-medium text-foreground tabular-nums">
-              ${plan.price.toLocaleString()}
-            </span>{" "}
-            securely via PayPal. We&apos;ll create your client portal
-            automatically.
+            Choose how you&apos;d like to pay. Secure checkout via PayPal — your
+            client portal is created automatically once payment is confirmed.
           </DialogDescription>
         </DialogHeader>
         <p id={`pricing-checkout-desc-${plan.key}`} className="sr-only">
-          Secure PayPal checkout for {plan.name} — ${plan.price.toLocaleString()}.
+          Secure PayPal checkout for {plan.name} — base price ${plan.price.toLocaleString()}.
         </p>
 
+        {/* Payment plan selector */}
+        <div className="space-y-2" data-testid={`pricing-checkout-${plan.key}-plan-section`}>
+          <Label className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            Payment plan
+          </Label>
+          <RadioGroup
+            value={paymentPlan}
+            onValueChange={(v) => setPaymentPlan(v)}
+            className="grid gap-2"
+            data-testid={`pricing-checkout-${plan.key}-payment-plan-radio`}
+          >
+            <label
+              htmlFor={`pp-split-${plan.key}`}
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3 transition-colors ${
+                paymentPlan === "split_50_50"
+                  ? "border-[#1E3A8A] bg-[#1E3A8A]/5 ring-1 ring-[#1E3A8A]/20"
+                  : "border-border hover:border-foreground/30 hover:bg-secondary/50"
+              }`}
+              data-testid={`pricing-checkout-${plan.key}-plan-split-option`}
+            >
+              <RadioGroupItem
+                id={`pp-split-${plan.key}`}
+                value="split_50_50"
+                className="mt-1"
+                data-testid={`pricing-checkout-${plan.key}-plan-split-radio`}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium">50% now · 50% at launch</span>
+                  <Badge variant="outline" className="text-[10px] gap-1 border-border">
+                    <CalendarClock className="h-3 w-3" />
+                    flexible
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Pay <span className="font-medium text-foreground tabular-nums">
+                    ${fmt(plan.price / 2)}
+                  </span>{" "}
+                  today, balance billed when we mark the project Ready for Launch.
+                </p>
+              </div>
+            </label>
+
+            <label
+              htmlFor={`pp-full-${plan.key}`}
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3 transition-colors ${
+                paymentPlan === "full_upfront"
+                  ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600/20"
+                  : "border-border hover:border-foreground/30 hover:bg-secondary/50"
+              }`}
+              data-testid={`pricing-checkout-${plan.key}-plan-full-option`}
+            >
+              <RadioGroupItem
+                id={`pp-full-${plan.key}`}
+                value="full_upfront"
+                className="mt-1"
+                data-testid={`pricing-checkout-${plan.key}-plan-full-radio`}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium">100% upfront</span>
+                  <Badge className="text-[10px] gap-1 bg-emerald-600 hover:bg-emerald-600 text-white border-0">
+                    <BadgePercent className="h-3 w-3" />
+                    save $500
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Pay <span className="font-medium text-foreground tabular-nums">
+                    ${fmt(plan.price - FULL_UPFRONT_DISCOUNT)}
+                  </span>{" "}
+                  today and we knock <span className="font-medium text-emerald-700">$500</span>{" "}
+                  off the total — nothing more to pay later.
+                </p>
+              </div>
+            </label>
+          </RadioGroup>
+
+          {/* Inline summary */}
+          <div
+            className="rounded-lg border border-border bg-[var(--warm-50)] px-3.5 py-3 text-xs space-y-1.5 tabular-nums"
+            data-testid={`pricing-checkout-${plan.key}-summary`}
+          >
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Base price</span>
+              <span>${fmt(charge.base)}</span>
+            </div>
+            {charge.discount > 0 && (
+              <div className="flex items-center justify-between text-emerald-700">
+                <span>Upfront discount</span>
+                <span data-testid={`pricing-checkout-${plan.key}-summary-discount`}>
+                  −${fmt(charge.discount)}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between font-medium text-foreground pt-1.5 border-t border-border/60">
+              <span>Due today</span>
+              <span data-testid={`pricing-checkout-${plan.key}-summary-charge-now`}>
+                ${fmt(charge.chargeNow)}
+              </span>
+            </div>
+            {charge.chargeLater > 0 && (
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Due at launch</span>
+                <span data-testid={`pricing-checkout-${plan.key}-summary-charge-later`}>
+                  ${fmt(charge.chargeLater)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {!showButtons ? (
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor={`co-name-${plan.key}`} className="text-sm">
                 Full name
@@ -138,7 +283,7 @@ function CheckoutDialog({ plan, open, onOpenChange }) {
               onClick={() => setShowButtons(true)}
               data-testid={`pricing-checkout-${plan.key}-continue-button`}
             >
-              Continue to PayPal
+              Continue · pay ${fmt(charge.chargeNow)}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
             <p className="text-[11px] text-muted-foreground text-center">
@@ -146,14 +291,18 @@ function CheckoutDialog({ plan, open, onOpenChange }) {
             </p>
           </div>
         ) : (
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4 mt-1">
             <div className="rounded-lg border border-border bg-[var(--warm-50)] px-3 py-3 text-sm">
               <p className="font-medium">{form.name}</p>
               <p className="text-muted-foreground text-xs">{form.email}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {charge.label} · charging ${fmt(charge.chargeNow)} now
+              </p>
             </div>
             <PayPalCheckoutButton
               mode="order"
               tier={plan.tier}
+              paymentPlan={paymentPlan}
               customerEmail={form.email}
               customerName={form.name}
               onSuccess={(result) => {

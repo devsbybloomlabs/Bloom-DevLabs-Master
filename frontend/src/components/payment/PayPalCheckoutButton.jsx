@@ -28,6 +28,7 @@ export function PayPalCheckoutButton({
   amount,
   description,
   planKey,
+  paymentPlan,
   customerEmail,
   customerName,
   onSuccess,
@@ -128,6 +129,7 @@ export function PayPalCheckoutButton({
               if (description) body.description = description;
               if (customerEmail) body.customer_email = customerEmail;
               if (customerName) body.customer_name = customerName;
+              if (paymentPlan) body.payment_plan = paymentPlan;
               const r = await axios.post(`${API}/paypal/orders`, body);
               return r.data.id;
             } catch (e) {
