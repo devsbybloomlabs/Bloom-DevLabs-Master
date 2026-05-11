@@ -21,6 +21,7 @@ import {
   ArrowRight,
   LifeBuoy,
   MessageSquare,
+  CalendarDays,
 } from "lucide-react";
 
 const META = {
@@ -32,6 +33,7 @@ const META = {
   approval_studio: { label: "Approval Studio", icon: ImagePlus },
   thrivedesk: { label: "ThriveDesk", icon: LifeBuoy },
   slack: { label: "Slack", icon: MessageSquare },
+  google_calendar: { label: "Google Calendar", icon: CalendarDays },
 };
 
 const COLOR = {

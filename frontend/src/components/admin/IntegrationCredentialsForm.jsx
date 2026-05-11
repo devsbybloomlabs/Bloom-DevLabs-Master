@@ -27,6 +27,8 @@ import {
   MessageSquare,
   Eye,
   EyeOff,
+  CalendarDays,
+  PlugZap,
 } from "lucide-react";
 
 const PROVIDER_SPECS = [
@@ -85,6 +87,25 @@ const PROVIDER_SPECS = [
       },
     ],
   },
+  {
+    key: "google_calendar",
+    label: "Google Calendar",
+    icon: CalendarDays,
+    color: "#10B981",
+    helpUrl: "https://console.cloud.google.com/",
+    description:
+      "OAuth2 client from Google Cloud Console. Click Connect button after saving.",
+    fields: [
+      { name: "client_id", label: "OAuth client ID", placeholder: "xxxxxxxx.apps.googleusercontent.com" },
+      { name: "client_secret", label: "OAuth client secret", secret: true },
+      {
+        name: "redirect_uri",
+        label: "Redirect URI (must match Google Cloud)",
+        placeholder: "https://your-app/api/oauth/calendar/callback",
+      },
+    ],
+    customConnect: true,
+  },
 ];
 
 export default function IntegrationCredentialsForm() {
@@ -137,7 +158,11 @@ export default function IntegrationCredentialsForm() {
     setBusy({ ...busy, [`${providerKey}_test`]: true });
     try {
       // Backend test endpoints follow the `-` separator
-      const slug = providerKey === "approval_studio" ? "approval-studio" : providerKey;
+      const SLUG_OVERRIDES = {
+        approval_studio: "approval-studio",
+        google_calendar: "calendar",
+      };
+      const slug = SLUG_OVERRIDES[providerKey] || providerKey;
       const r = await api.post(`/admin/integrations/${slug}/test`);
       if (r.data?.ok) {
         toast.success(`${providerKey} ✓ test passed`);
@@ -150,6 +175,22 @@ export default function IntegrationCredentialsForm() {
       toast.error(e?.response?.data?.detail || "Test failed");
     } finally {
       setBusy({ ...busy, [`${providerKey}_test`]: false });
+    }
+  };
+
+  const onConnect = async (providerKey) => {
+    setBusy({ ...busy, [`${providerKey}_connect`]: true });
+    try {
+      const slug = providerKey === "google_calendar" ? "calendar" : providerKey;
+      const r = await api.get(`/admin/integrations/${slug}/start`);
+      if (r.data?.authorization_url) {
+        window.open(r.data.authorization_url, "_blank", "noopener,noreferrer");
+        toast.info("Approve access in the new tab, then refresh this page");
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not start OAuth");
+    } finally {
+      setBusy({ ...busy, [`${providerKey}_connect`]: false });
     }
   };
 
@@ -274,6 +315,22 @@ export default function IntegrationCredentialsForm() {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-2">
+                  {spec.customConnect && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onConnect(spec.key)}
+                      disabled={busy[`${spec.key}_connect`]}
+                      data-testid={`credentials-${spec.key}-connect-button`}
+                    >
+                      {busy[`${spec.key}_connect`] ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <PlugZap className="h-4 w-4 mr-2" />
+                      )}
+                      Connect
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"

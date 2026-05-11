@@ -538,7 +538,7 @@ async def test_approval_studio(
 # ============================================================
 # DB-stored credentials (admin UI alternative to .env edits)
 # ============================================================
-ALLOWED_CRED_PROVIDERS = {"approval_studio", "thrivedesk", "slack"}
+ALLOWED_CRED_PROVIDERS = {"approval_studio", "thrivedesk", "slack", "google_calendar"}
 
 
 class CredentialsUpdate(BaseModel):
@@ -579,6 +579,12 @@ async def update_provider_credentials(
         td.api_key = ""
         td.webhook_secret = ""
         await td._resolve_creds()
+    elif provider == "google_calendar":
+        cal = request.app.state.google_calendar
+        cal.client_id = ""
+        cal.client_secret = ""
+        cal.redirect_uri = ""
+        await cal._resolve_creds()
     masked = await list_masked_credentials(db)
     return {"ok": True, "provider": provider, "fields": masked.get(provider, {})}
 
@@ -729,5 +735,38 @@ async def integrations_health(
             "last_ping": slack_last,
             "detail": "webhook URL not set",
         })
+
+    # Google Calendar
+    cal = getattr(request.app.state, "google_calendar", None)
+    if cal is not None:
+        try:
+            await cal._resolve_creds()
+            cal_connected = await cal.is_connected()
+        except Exception:
+            cal_connected = False
+        cal_last = pings.get("google_calendar")
+        if cal_connected:
+            items.append({
+                "provider": "google_calendar",
+                "status": "green" if (cal_last is None or cal_last.get("ok")) else "yellow",
+                "configured": True,
+                "last_ping": cal_last,
+            })
+        elif cal.is_oauth_configured:
+            items.append({
+                "provider": "google_calendar",
+                "status": "yellow",
+                "configured": True,
+                "last_ping": cal_last,
+                "detail": "OAuth configured but not connected",
+            })
+        else:
+            items.append({
+                "provider": "google_calendar",
+                "status": "red",
+                "configured": False,
+                "last_ping": cal_last,
+                "detail": "client id/secret missing",
+            })
 
     return {"providers": items, "checked_at": _now()}

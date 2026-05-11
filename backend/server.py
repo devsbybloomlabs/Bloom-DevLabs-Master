@@ -69,6 +69,12 @@ from contact_routes import (  # noqa: E402
 )
 from ab_test_routes import public_ab_router, ab_admin_router  # noqa: E402
 from nifty_workspaces_routes import nifty_workspaces_router  # noqa: E402
+from google_calendar_client import GoogleCalendarClient  # noqa: E402
+from google_calendar_routes import (  # noqa: E402
+    calendar_admin_router,
+    calendar_milestones_router,
+    calendar_oauth_router,
+)
 from blog_extras_routes import blog_extras_router  # noqa: E402
 from integrations_admin_routes import integrations_admin_router  # noqa: E402
 from client_routes import (  # noqa: E402
@@ -128,6 +134,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.approval_studio.bind_db(db)
     app.state.thrivedesk = ThriveDeskClient()
     app.state.thrivedesk.bind_db(db)
+    app.state.google_calendar = GoogleCalendarClient()
+    app.state.google_calendar.bind_db(db)
 
     # Seed founder + settings + authority metric
     try:
@@ -290,6 +298,9 @@ api.include_router(contact_admin_router)
 api.include_router(public_ab_router)
 api.include_router(ab_admin_router)
 api.include_router(nifty_workspaces_router)
+api.include_router(calendar_oauth_router)
+api.include_router(calendar_admin_router)
+api.include_router(calendar_milestones_router)
 
 app.include_router(api)
 

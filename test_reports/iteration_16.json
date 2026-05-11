@@ -1,0 +1,51 @@
+{
+  "summary": "Phase 16 review — Google Calendar OAuth + Calendar API integration. Backend: 63 passed, 1 skipped (Slack-not-configured legacy test) across Phases 11-16 = full regression green. All 8 new Phase 16 tests pass: health endpoint lists 9 providers including google_calendar, credentials store accepts google_calendar PUT + masks client_secret, /calendar/start returns the full Google authorize URL with scope=calendar+access_type=offline+prompt=consent+state=<random>, /calendar/status returns {oauth_configured:true,connected:false,primary:null}, /calendar/test returns 503 when not connected, /calendar/events returns 503 when not connected, OAuth callback ALWAYS redirects 302 to /admin/integrations with calendar_error=missing_code (verified curl: 302 -> https://bybloomlabs.com/admin/integrations?calendar_error=missing_code), and POST /admin/milestones/__nonexistent_id/calendar-event returns 503 (not 500) when not connected. Frontend verified live: /admin/integrations renders 'credentials-google_calendar-section' card with 3 inputs (client_id/client_secret/redirect_uri) + Connect/Test/Save buttons + Stored badge; /admin/dashboard renders all 9 health pills including 'health-pill-google_calendar' with CalendarDays icon + 'Google Calendar' label. NOTE the dummy creds were intentionally written by the test (test-client-id-do-not-overwrite.apps.googleusercontent.com) — user must repaste real client_id via UI as agreed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/integrations/slack/test", "issue": "Returns 502 'Slack POST failed: no_team' — webhook URL stored in app_settings.integration_credentials.slack.webhook_url is invalid / team disabled / channel archived. User claimed re-confirmation but Slack API responds 'no_team'. The dashboard health pill still reads '1m ago' because _record_ping logs all attempts. Needs the user to regenerate the incoming webhook URL in Slack and repaste."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase16.py",
+    "/app/backend/tests/test_phase15.py",
+    "/app/backend/tests/test_phase14.py",
+    "/app/backend/tests/test_phase13.py",
+    "/app/backend/tests/test_phase12.py",
+    "/app/backend/tests/test_phase11.py",
+    "/app/test_reports/pytest/phase11_to_16.xml"
+  ],
+  "action_items": [
+    "User must repaste the real Google Cloud client_id 728881545908-a752kc3enjgnadmb1c0m6ff90ruick4n.apps.googleusercontent.com via /admin/integrations -> Google Calendar (the Phase 16 test overwrote it with a dummy as documented in agent_to_agent_context_note).",
+    "User must regenerate Slack incoming webhook URL (current one returns 'no_team' — channel/team deleted) and repaste it via /admin/integrations -> Slack. The /api/admin/integrations/slack/test endpoint will return ok=true once a valid webhook is stored.",
+    "User must complete the actual Google Calendar OAuth handshake by clicking 'Connect' in the UI — the testing agent cannot finish a real browser OAuth flow; `connected` will stay false until then.",
+    "After OAuth handshake completes, re-run test_phase16.py — test_calendar_test_endpoint_returns_503_when_not_connected and test_calendar_events_returns_503_when_not_connected will then assert 200 path instead of 503."
+  ],
+  "critical_code_review_comments": [
+    "google_calendar_client.py — Solid token-refresh design: _persist_tokens never overwrites refresh_token when Google omits it on refresh responses; _refresh_if_needed uses a 60s safety margin; all API calls wrap try/except into a uniform {success, status, data, error} envelope.",
+    "google_calendar_routes.py — Callback handler ALWAYS returns RedirectResponse with status_code=302 even when code is missing / error param set / exchange fails / state mismatches. Verified via curl: GET /api/oauth/calendar/callback → 302 Location=https://bybloomlabs.com/admin/integrations?calendar_error=missing_code. State CSRF check is wired (stored_state issued in /start, validated in /callback).",
+    "google_calendar_routes.py:60-64 — APP_BASE_URL fallback hard-codes https://bybloomlabs.com when env var missing. This is fine for prod but during preview testing the redirect lands on bybloomlabs.com (which serves the prod build); minor cosmetic — set APP_BASE_URL=https://client-portal-hub-18.preview.emergentagent.com in backend/.env if you want callbacks to land in the preview frontend during a real OAuth dry-run.",
+    "google_calendar_routes.py — /admin/integrations/calendar/test correctly returns 503 (not 500) when not connected, AND records a red ping via _record_ping when the actual API call fails. Pattern matches the Slack/ThriveDesk endpoints — good consistency.",
+    "google_calendar_routes.py — Milestone sync persists calendar_event_id + calendar_event_link + calendar_synced_at on the milestone doc, so subsequent UI can deep-link to the Google Calendar event without re-fetching the API.",
+    "integrations_admin_routes.py — google_calendar correctly added to ALLOWED_CRED_PROVIDERS + health providers list (9 total). Health response includes google_calendar with status reflecting last ping.",
+    "IntegrationCredentialsForm.jsx — customConnect handler pops the authorization_url in window.open(...,'_blank','noopener,noreferrer') after fetching /calendar/start. UI shows 'Stored' badge once client_id is saved. Connect/Test/Save all have unique data-testids.",
+    "IntegrationsHealthStrip.jsx — google_calendar registered in META with CalendarDays icon. Pill renders with data-testid=health-pill-google_calendar on /admin/dashboard.",
+    "Phase 16 has zero new MongoDB _id leaks (verified status endpoint projects out _id, access_token, refresh_token before returning the `stored` block)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (63 passed / 1 skipped of 64 — Slack /test skip is the legacy Phase 12 test that runs only when Slack is not configured; the LIVE Slack /test endpoint returns 502 no_team — captured separately as a minor issue)",
+    "frontend": "100% — google_calendar credentials section, all 3 input testids, Connect button, Test button, Save button, health pill on dashboard all present and rendered correctly"
+  },
+  "test_credentials": "Admin: founder@thesalvador.group / admin123. Google OAuth client_id in DB has been REPLACED with the dummy 'test-client-id-do-not-overwrite.apps.googleusercontent.com' by test_credentials_accepts_google_calendar — user must repaste the real value.",
+  "seed_data_creation": "test_credentials_accepts_google_calendar wrote {client_id:'test-client-id-do-not-overwrite.apps.googleusercontent.com', client_secret:'GOCSPX-test-secret'} to app_settings.integration_credentials.google_calendar. Redirect URI was already stored as https://client-portal-hub-18.preview.emergentagent.com/api/oauth/calendar/callback and remains untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 11-16 fully green (63/63 backend tests pass + 1 expected skip). The Slack /test endpoint currently returns 502 'no_team' — this is an upstream Slack issue, NOT a regression. The dummy google_calendar credentials written by the Phase 16 test will block any real /calendar/start authorization URL from working with Google's real OAuth servers UNTIL the user repastes the real client_id via the UI. The /calendar/start endpoint itself works correctly — it just constructs URLs from whatever creds are stored. After the user completes the OAuth handshake, `connected=true` in /status and /test will return ok=true with calendar_summary. Note APP_BASE_URL env var is unset so callback redirects land on https://bybloomlabs.com — main agent may want to set it to the preview URL for in-preview OAuth testing.",
+  "rca_of_the_issue": "Slack /test no_team: The webhook URL stored at app_settings.integration_credentials.slack.webhook_url corresponds to a Slack team that no longer exists or has revoked the integration. Slack's incoming-webhook endpoint returns 'no_team' when the workspace/team id encoded in the URL is invalid. Mitigation: Slack admin → Apps → Incoming Webhooks → regenerate URL → paste via /admin/integrations → Slack → Save → click Test connection. Phase 16 Google Calendar dummy creds: test_credentials_accepts_google_calendar PUTs dummy fields by design (per the agent_to_agent_context_note). To restore: open /admin/integrations → Google Calendar card → paste real client_id 728881545908-a752kc3enjgnadmb1c0m6ff90ruick4n.apps.googleusercontent.com + real client_secret → Save."
+}
