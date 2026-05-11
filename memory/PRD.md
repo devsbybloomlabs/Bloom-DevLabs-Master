@@ -212,6 +212,32 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 **Test results:**
 - iteration_15 15/15 phase15 backend + 40/40 phase 11-14 regression = **55/55 PASS**, 1 skipped (Slack live).
 - iteration_15 100% frontend verification — all 5 features + Part 6 verified via testids + flows. Zero issues.
+
+### ✅ Phase 16 — Google Calendar OAuth + Calendar API integration (Feb 2026)
+
+**Real OAuth creds wired** (provided by user):
+- `client_id` = `728881545908-a752kc3enjgnadmb1c0m6ff90ruick4n.apps.googleusercontent.com`
+- Redirect URI = `https://client-portal-hub-18.preview.emergentagent.com/api/oauth/calendar/callback` (preview) + `https://bybloomlabs.com/api/oauth/calendar/callback` (prod)
+- Scope = `https://www.googleapis.com/auth/calendar`
+
+**New backend (`google_calendar_client.py` + `google_calendar_routes.py`):**
+- `GoogleCalendarClient` — async wrapper around Calendar v3 REST API. Auto token refresh on each call. Tokens persisted in `integrations.google_calendar`.
+- 3 new routers wired into server.py:
+  - `calendar_oauth_router` — public `GET /api/oauth/calendar/callback` (always redirects, never 4xx)
+  - `calendar_admin_router` — `/start`, `/status`, `/test`, `/disconnect`, `/events` (admin auth)
+  - `calendar_milestones_router` — `POST /admin/milestones/{id}/calendar-event` creates a Calendar event from milestone deadline + attendees + persists `calendar_event_id` + `calendar_event_link` back on the milestone.
+- Health endpoint now lists 9 providers including `google_calendar`.
+- DB-stored credentials store accepts new provider key — masked on read.
+
+**Frontend (`IntegrationCredentialsForm.jsx` + `IntegrationsHealthStrip.jsx`):**
+- New "Google Calendar" card with 3 inputs (client_id, client_secret, redirect_uri) + **Connect button** that pops the Google authorization URL in a new tab.
+- Health Strip pill with CalendarDays icon — yellow until user completes OAuth handshake, green after.
+
+**Test results:**
+- iteration_16 8/8 phase16 backend tests + 55/55 phase 11-15 regression = **63/63 PASS** (1 skipped — legacy Slack-not-configured test).
+- iteration_16 100% frontend verification.
+
+**Status:** OAuth client + tokens scaffolded; user must complete the one-time OAuth handshake by clicking "Connect" in `/admin/integrations` → Credentials → Google Calendar.
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
