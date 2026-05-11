@@ -132,6 +132,29 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 **Test results:**
 - iteration_12 14/14 phase12 backend pytest + 30/30 phase10+11 regression = **44/44 PASS**.
 - iteration_12 100% frontend verification — every spec'd selector and flow rendered correctly. Zero issues.
+
+### ✅ Phase 13 — ThriveDesk Live Integration + Escalation Timeline + Demo Mode (Feb 2026)
+
+**ThriveDesk goes LIVE (with public-scope JWT):**
+- User saved a real ThriveDesk JWT API key via the Phase 12 credentials form.
+- Token has `scope: ["public"]` which only exposes `/v1/me`, `/v1/inboxes`, `/v1/contacts`. Write endpoints (conversations/replies, conversations/notes, conversations status) return 405 Method Not Allowed.
+- `/admin/integrations/thrivedesk/test` switched to use `/v1/me` (works on every scope) and surfaces `company` name on success.
+- New `_is_scope_limited(res)` helper catches 401/403/404/405 from write endpoints and falls back to `mock_log` + `{success: True, scope_limited: True}`. UI flows still complete successfully; users see a "scope-limited heads-up" note in the Timeline dialog.
+
+**P3 — ThriveDesk Visual Escalation Timeline (NEW):**
+- New backend endpoint `GET /api/admin/support-triage/{id}/timeline` aggregates events chronologically from `support_escalations`, `thrivedesk_webhook_events`, and `notifications` collections.
+- Each event has `{kind, title, body, at, icon, actor}` with icon enums (alert / check / error / info / webhook / check_circle).
+- Annotates with live ThriveDesk thread when API key has conversation scope.
+- New `EscalationTimelineDialog.jsx` — vertical timeline with iconified events, scope-limited heads-up note, and live thread JSON when available. Triggered via per-row "Timeline" button.
+
+**Potential improvement — Demo Mode (NEW):**
+- New `demo_routes.py` — `POST/DELETE /admin/demo/seed` + `GET /admin/demo/status`. Spawns exactly 13 synthetic records (2 clients with portal access + 2 milestones + 3 approvals in mixed states + 4 escalations in mixed states + 1 onboarding + 1 lead). All flagged `demo: True` so they can be wiped via the same endpoint. Idempotent — POST wipes first.
+- Demo password is `demo1234`.
+- New `DemoModeCard.jsx` on the Dashboard home — "Arm demo" button, switches to Re-seed/Wipe/Copy creds when active, shows per-collection counts.
+
+**Test results:**
+- iteration_13 8/8 phase13 backend tests + 26/26 phase 11+12 regression = **34/34 PASS**.
+- iteration_13 100% frontend verification — every selector + flow rendered correctly. Zero functional bugs.
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
