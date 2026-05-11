@@ -176,6 +176,42 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 **Test results:**
 - iteration_14 7/7 phase14 backend tests + 34/34 phase 11-13 regression = **41/41 PASS**.
 - iteration_14 100% frontend verification — every data-testid covered, scrollytelling preview-swap verified, Header nav-link routes correctly, sitemap includes /tour. Zero bugs.
+
+### ✅ Phase 15 — Part 6 + A/B test + Lead scoring + Multi-workspace + Approval annotations (Feb 2026)
+
+**Part 6 — Client Portal Contact Us → ThriveDesk (NEW):**
+- New `contact_routes.py` — POST `/api/clients/me/contact` accepts multipart {subject, body, priority, file<=10MB}, stores file under `/app/backend/uploads/<uuid>.<ext>`, calls ThriveDesk `create_conversation`, falls back to `status: 'queued'` when scope-limited (current public-scope JWT). Persists in `client_contacts` Mongo collection.
+- Slack notification on every submission (best-effort) + Emailit confirmation email to client.
+- Hourly `thrivedesk_retry_cron` retries queued submissions (up to 6 attempts).
+- Reverse-sync: ThriveDesk `conversation.status.updated → resolved/closed` triggers `relay_td_resolution_to_client` which emails the client.
+- Owner-only attachment download via `GET /api/clients/me/contact/attachment/{id}` (cross-tenant 404).
+- Frontend: new `ClientContactPanel.jsx` with subject + body + priority + file upload (with size preview, remove-chip, 10MB client-side cap), priority dropdown, submission history with status pills (sent / queued / resolved / failed).
+
+**A/B test CTA position on /tour:**
+- `ab_test_routes.py` — POST `/public/ab/track` (no auth) with `{experiment, variant, kind}`. GET `/admin/ab/{exp}/stats` returns per-variant CTR + winner detection.
+- 3 variants on `/tour`: `header` (CTA only in slim header) | `hero` (large CTA in hero) | `sticky` (bottom sticky bar with dismiss X). Assignment cached in `localStorage.bloom_ab_tour_cta`. Impressions + clicks tracked.
+- `AbStatsCard.jsx` embedded on `/admin/integrations` shows live CTR breakdown + winner badge.
+
+**Lead scoring + segmentation:**
+- `_score_lead()` heuristic (magnet weight 0-30 + source weight 0-25 + recency 0-25 + engagement 0-20 = 0-100).
+- `_segment_for_score()` → hot ≥70 · warm 40-69 · cold <40.
+- `/admin/leads` now accepts `?segment`, `?score_min`, `?source_contains`, `?magnet_slug` filters.
+- New `/admin/leads/segments` aggregation endpoint.
+- `LeadsTablePanel.jsx` embedded on `/admin/lead-magnets` — 4 stat tiles + filter row (segment/magnet/source-text/score slider) + scored leads table.
+
+**Multi-workspace Nifty:**
+- New `nifty_workspaces_routes.py` — `nifty_workspaces` Mongo collection stores snapshots {id, name, access_token, refresh_token, expires_at, last_activated_at}.
+- POST snapshots the current live OAuth into a named record. POST `/{id}/activate` copies tokens back into `integrations.nifty` so NiftyClient picks them up on next call.
+- `NiftyWorkspacesPanel.jsx` embedded in IntegrationsAdmin Nifty card — name input + Save/Activate/Delete buttons per snapshot.
+
+**Approval Studio real-time annotation preview:**
+- Extended `ApprovalStudioClient.list_comments()` to return a deterministic mock thread per project_id when in mock mode (2-5 comments seeded from `_MOCK_ANNOTATION_CORPUS`).
+- New `GET /admin/approvals/{id}/annotations` returns `{comments, aps_mode}`.
+- `ApprovalAnnotationsDialog.jsx` — vertical timeline with resolved/open status icons + anchor coordinates display.
+
+**Test results:**
+- iteration_15 15/15 phase15 backend + 40/40 phase 11-14 regression = **55/55 PASS**, 1 skipped (Slack live).
+- iteration_15 100% frontend verification — all 5 features + Part 6 verified via testids + flows. Zero issues.
 **New backend modules:**
 - `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
 - `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
@@ -205,10 +241,11 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 ## Backlog
 
 ### P1
-- Generate Nifty access token at https://developers.niftypm.com → paste into `/app/backend/.env` OR use `/admin/integrations` Manual Token form. Once set, Phase 7 onboarding tasks auto-create, Phase 8 milestone status syncs run live, Phase 11 design approvals auto-comment on the linked Nifty task, AND Phase 12 ThriveDesk reverse-sync (Nifty Complete → ThriveDesk reply + close) goes live.
-- Wire real Approval Studio creds via `/admin/integrations` → Credentials → Approval Studio (paste username + password). No code change required.
-- Wire real ThriveDesk API key via `/admin/integrations` → Credentials → ThriveDesk. Set webhook URL inside ThriveDesk to `<backend>/api/webhooks/thrivedesk`.
-- Wire real Slack incoming webhook URL via `/admin/integrations` → Credentials → Slack. Urgent escalations auto-post to that webhook.
+- ~~Generate Nifty access token~~ Still pending. With multi-workspace now live (Phase 15), you can snapshot + switch between multiple Nifty workspaces once you've OAuth'd at least one.
+- Wire **Google Calendar OAuth** — paste `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` (setup steps sent to user). Will enable client booking flow + milestone calendar sync.
+- Wire real Approval Studio creds (paste in /admin/integrations → Credentials → Approval Studio).
+- Upgrade ThriveDesk JWT scope from `public` → `admin` so write endpoints (replies, status) work live (currently scope-limited fallback queues for hourly retry).
+- Re-issue Slack webhook URL — the current one started returning `no_team` (likely revoked by Slack after many tests).
 
 ### P2
 - ~~HMAC signature verification on AgencyHandy webhooks.~~ ✅ Done (Phase 11).
@@ -219,18 +256,24 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - ~~ThriveDesk ↔ Nifty escalation loop~~ ✅ Done (Phase 12).
 
 ### P3
-- Lead scoring + segmentation in Lead Magnets admin (e.g., filter by source_url, magnet_slug).
 - A/B testing for lead magnet copy.
-- Automated Nifty project creation on Phase 3 onboarding submit (currently logs to admin notifications).
+- Automated Nifty project creation on Phase 3 onboarding submit.
 - Stripe as backup payment processor.
-- Google Calendar sync.
-- ~~Slack notifications.~~ ✅ Done (Phase 12 — wired into urgent ThriveDesk escalations; LIVE Phase 14).
-- Approval Studio: real-time annotation preview inside `/admin/approvals` (currently shows mock log only).
-- ~~ThriveDesk: visual escalation timeline.~~ ✅ Done (Phase 13).
-- Multi-workspace Nifty support (currently single workspace).
-- ~~Public "Sandbox tour" route at /tour~~ ✅ Done (Phase 14).
-- A/B-test the CTA position on /tour (header vs hero vs sticky bottom bar).
+- ~~Google Calendar sync.~~ DEFERRED — awaiting creds from user.
+- ~~Slack notifications.~~ ✅ Done (Phase 12/14).
+- ~~Approval Studio real-time annotation preview.~~ ✅ Done (Phase 15).
+- ~~ThriveDesk visual escalation timeline.~~ ✅ Done (Phase 13).
+- ~~Multi-workspace Nifty support.~~ ✅ Done (Phase 15).
+- ~~Public "Sandbox tour" route at /tour.~~ ✅ Done (Phase 14).
+- ~~A/B-test the CTA position on /tour.~~ ✅ Done (Phase 15).
+- ~~Lead scoring + segmentation.~~ ✅ Done (Phase 15).
+- ~~Client portal Contact Us form (Part 6).~~ ✅ Done (Phase 15).
 - Embed a 15-second product demo video on /tour above the fold.
+
+### P4
+- Project Files tab in the client portal (Google Drive integration for *continuous* deliverable folder sharing — distinct from Part 6 support attachments).
+- Sandbox tour i18n (Spanish/French translations for international prospects).
+- Email digest summary for admins (Mon-morning recap of pending escalations, queued contacts, fresh leads).
 
 ## API Endpoints (cumulative reference)
 
