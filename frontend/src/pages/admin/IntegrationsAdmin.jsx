@@ -125,7 +125,7 @@ function NiftyCard() {
       await api.post("/admin/integrations/nifty/manual-token", {
         access_token: manualToken.trim(),
       });
-      toast.success("Token saved + verified");
+      toast.success("Token saved (verification will run on next API call)");
       setManualOpen(false);
       setManualToken("");
       load();

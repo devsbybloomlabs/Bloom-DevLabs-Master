@@ -82,6 +82,7 @@ async def nifty_authorize_url(
     request: Request,
     nifty: NiftyClient = Depends(get_nifty),
     db: AsyncIOMotorDatabase = Depends(get_db),
+    current=Depends(get_current_user),
 ) -> Dict[str, Any]:
     if not nifty.is_oauth_configured:
         raise HTTPException(503, "Nifty OAuth not configured (NIFTY_CLIENT_ID/SECRET missing)")
@@ -92,7 +93,7 @@ async def nifty_authorize_url(
             {
                 "state": state,
                 "provider": "nifty",
-                "user": (request.scope.get("user") or {}).get("email") if hasattr(request, "scope") else None,
+                "user": current.get("email") if isinstance(current, dict) else None,
                 "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
             }
         )

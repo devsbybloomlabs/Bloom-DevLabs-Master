@@ -40,6 +40,45 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - `/app/backend/blog_extras_routes.py` — `/api/blog/rss.xml` (RSS 2.0) + `/api/og/blog/{slug}.svg` (dynamic SVG OG card generator)
 
 **New frontend components:**
+- `SeoHead.jsx` — drop-in SEO injector with hijack-in-place strategy (overrides static index.html tags, restores on unmount)
+- `Analytics.jsx` — GA4 loader + page-view tracker + `trackEvent()` helper
+- `LeadMagnetForm.jsx` — embeddable opt-in form auto-embedded on blog posts
+
+**New admin pages:** `/admin/lead-magnets` (3-step wizard), `/admin/milestones` (CRUD + sync history)
+
+**Test results:** iteration_6 26/26 pytest, iteration_7 SEO fix verified.
+
+### ✅ Phase 9 — Nifty OAuth Integration (Feb 2026)
+**Backend:**
+- `nifty_client.py` rewritten to support OAuth2 authorization-code flow with token storage in MongoDB `integrations` collection and **auto-refresh on 401** (one-shot retry). Falls back to static `NIFTY_ACCESS_TOKEN` env var if present.
+- `integrations_admin_routes.py` (new) — `/api/admin/integrations/nifty/*` endpoints:
+  - `GET /status` — connection state + ping
+  - `GET /authorize-url` — generate Nifty authorize URL with CSRF state
+  - `POST /exchange` — code → tokens (persists in MongoDB)
+  - `POST /manual-token` — testing escape hatch
+  - `POST /disconnect` — wipe stored tokens
+  - `GET /projects`, `GET /members` — read-only Nifty data
+- Milestone cron jobs now use async `nifty.is_connected()` instead of static check.
+
+**Frontend:**
+- `/auth/callback` — generic OAuth callback page (handles Nifty + future providers). Parses `?code/state/error`, posts to backend exchange, shows success/error/needs-login states.
+- `/admin/integrations` — new admin page with NiftyCard showing status, Connect button, Paste-token fallback, Disconnect, plus live project/member listings once connected.
+- Admin nav: added "Integrations" item.
+
+**Test results (iteration_8):**
+- 18/18 backend pytest pass (auth gating, status, authorize-url, exchange, manual-token, disconnect)
+- 8/8 frontend flows pass
+
+**User config:**
+- `NIFTY_CLIENT_ID=YWSnuABjapgejTQFGXse9Xc3LKiQjFqH`
+- `NIFTY_CLIENT_SECRET=` (set in `/app/backend/.env`)
+- `NIFTY_REDIRECT_URI=https://bybloomlabs.com/auth/callback`
+**New backend modules:**
+- `/app/backend/leads_routes.py` — Lead Magnets (admin CRUD + wizard-ready models) + public opt-in + APScheduler hourly drip ticks via Emailit
+- `/app/backend/milestone_routes.py` — Nifty webhook receiver, milestone CRUD (admin + client-portal), sync history, APScheduler 5-min comment poll + daily 8am timeline refresh
+- `/app/backend/blog_extras_routes.py` — `/api/blog/rss.xml` (RSS 2.0) + `/api/og/blog/{slug}.svg` (dynamic SVG OG card generator)
+
+**New frontend components:**
 - `/app/frontend/src/components/SeoHead.jsx` — drop-in SEO injector with **hijack-in-place** strategy (overrides static index.html tags, restores on unmount)
 - `/app/frontend/src/components/Analytics.jsx` — GA4 loader + page-view tracker + `trackEvent()` helper
 - `/app/frontend/src/components/LeadMagnetForm.jsx` — embeddable opt-in form (auto-fetches active magnet)
