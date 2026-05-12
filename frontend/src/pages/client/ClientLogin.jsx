@@ -13,7 +13,12 @@ export default function ClientLogin() {
   const { login, token } = useClientAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || "/portal";
+  // Preserve query params (?tab=invoices, etc.) when bouncing back after login —
+  // emails deep-link straight into a specific portal tab.
+  const fromLoc = location.state?.from;
+  const from = fromLoc
+    ? `${fromLoc.pathname}${fromLoc.search || ""}${fromLoc.hash || ""}`
+    : "/portal";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

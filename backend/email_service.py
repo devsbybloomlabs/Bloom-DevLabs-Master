@@ -30,8 +30,10 @@ BRAND_BG = "#F8FAFC"
 BRAND_BG_CARD = "#FFFFFF"
 BRAND_BORDER = "#E2E8F0"
 LOGO_URL = (
+    # Dark-text "MASTER" variant — readable on the white email card.
+    # (The "Light" variant is for dark backgrounds and renders as white-on-white here.)
     "https://customer-assets.emergentagent.com/job_6ae936eb-6f62-4e1a-8f50-8423b436560b/"
-    "artifacts/blmz5br3_Logo%20-%20Full%20-%20Light.png"
+    "artifacts/xayvxy1s_Logo%20-%20Full%20-%20MASTER.png"
 )
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://bybloomlabs.com").rstrip("/")
 
@@ -198,7 +200,7 @@ async def send_payment_receipt(
     captured_at: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """Receipt email with invoice number + downloadable invoice link."""
-    portal_url = f"{APP_BASE_URL}/portal/invoices"
+    portal_url = f"{APP_BASE_URL}/portal?tab=invoices"
     captured_at_str = (captured_at or datetime.utcnow()).strftime("%b %d, %Y · %H:%M UTC")
     rows = [
         {"label": "Plan", "value": plan_name},
@@ -284,7 +286,7 @@ async def send_invoice_issued(
 async def send_milestone_complete(
     emailit, *, to: str, name: str, milestone_title: str, project_name: str = ""
 ) -> Dict[str, Any]:
-    portal_url = f"{APP_BASE_URL}/portal/milestones"
+    portal_url = f"{APP_BASE_URL}/portal?tab=milestones"
     body = (
         _h1(f"✅ Milestone complete — {milestone_title}")
         + _p(f"Great news, {name}! We've just marked <strong>{milestone_title}</strong> as complete.")
@@ -303,7 +305,7 @@ async def send_milestone_complete(
 
 async def send_support_ack(emailit, *, to: str, name: str, subject_line: str, ticket_id: str = "") -> Dict[str, Any]:
     """Acknowledge a Contact Support form submission."""
-    portal_url = f"{APP_BASE_URL}/portal/support"
+    portal_url = f"{APP_BASE_URL}/portal?tab=contact"
     body = (
         _h1("We've got your message 👋")
         + _p(f"Hi {name}, thanks for reaching out. We've logged your request and someone from the team will reply within one business day.")
@@ -326,7 +328,7 @@ async def send_support_ack(emailit, *, to: str, name: str, subject_line: str, ti
 async def send_subscription_activated(
     emailit, *, to: str, name: str, plan_name: str, amount: str, currency: str, period: str = "month"
 ) -> Dict[str, Any]:
-    portal_url = f"{APP_BASE_URL}/portal/subscriptions"
+    portal_url = f"{APP_BASE_URL}/portal?tab=subscriptions"
     body = (
         _h1(f"Subscription activated — {plan_name}")
         + _p(f"Hi {name}, your <strong>{plan_name}</strong> subscription is now active. We'll bill {currency} {amount} every {period}.")

@@ -75,6 +75,17 @@ function App() {
               <Route path="/callback" element={<AuthCallback />} />
               {/* Public onboarding by token (no auth required) */}
               <Route path="/portal/onboarding" element={<OnboardingWizard />} />
+              {/* Legacy email deep-links — redirect to the right tab. Older
+                  invoice/receipt emails point to /portal/invoices etc. which
+                  used to 404 silently (white screen). */}
+              <Route path="/portal/invoices" element={<Navigate to="/portal?tab=invoices" replace />} />
+              <Route path="/portal/milestones" element={<Navigate to="/portal?tab=milestones" replace />} />
+              <Route path="/portal/subscriptions" element={<Navigate to="/portal?tab=subscriptions" replace />} />
+              <Route path="/portal/proposals" element={<Navigate to="/portal?tab=proposals" replace />} />
+              <Route path="/portal/orders" element={<Navigate to="/portal?tab=orders" replace />} />
+              <Route path="/portal/support" element={<Navigate to="/portal?tab=contact" replace />} />
+              <Route path="/portal/contact" element={<Navigate to="/portal?tab=contact" replace />} />
+              <Route path="/portal/profile" element={<Navigate to="/portal?tab=profile" replace />} />
               <Route
                 path="/portal"
                 element={

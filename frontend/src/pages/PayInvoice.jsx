@@ -26,7 +26,7 @@ import { CheckCircle2, AlertTriangle, FileText, Shield, Download, ArrowRight } f
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL =
-  "https://customer-assets.emergentagent.com/job_6ae936eb-6f62-4e1a-8f50-8423b436560b/artifacts/blmz5br3_Logo%20-%20Full%20-%20Light.png";
+  "https://customer-assets.emergentagent.com/job_6ae936eb-6f62-4e1a-8f50-8423b436560b/artifacts/xayvxy1s_Logo%20-%20Full%20-%20MASTER.png";
 
 function fmtMoney(n, c = "USD") {
   try {

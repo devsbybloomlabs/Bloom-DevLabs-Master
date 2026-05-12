@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useClientAuth, clientApi } from "@/lib/clientAuth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -640,6 +640,30 @@ export default function ClientPortal() {
   const [milestones, setMilestones] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Tab state synced with `?tab=...` URL param so deep-links from emails work
+  // (e.g. /portal?tab=invoices, /portal?tab=subscriptions).
+  const VALID_TABS = ["milestones", "orders", "subscriptions", "invoices", "proposals", "contact", "profile"];
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(VALID_TABS.includes(urlTab) ? urlTab : "milestones");
+
+  useEffect(() => {
+    // If the URL changes externally, mirror it into state.
+    if (urlTab && VALID_TABS.includes(urlTab) && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlTab]);
+
+  const onTabChange = (value) => {
+    setActiveTab(value);
+    // Push the new tab into the URL without scrolling so refresh / share works.
+    const next = new URLSearchParams(searchParams);
+    if (value === "milestones") next.delete("tab");
+    else next.set("tab", value);
+    setSearchParams(next, { replace: true });
+  };
+
   useEffect(() => {
     document.title = "Client Portal — Bloom Labs";
   }, []);
@@ -748,7 +772,7 @@ export default function ClientPortal() {
           </Card>
         )}
 
-        <Tabs defaultValue="milestones" className="w-full">
+        <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
           <TabsList className="flex w-full overflow-x-auto no-scrollbar gap-1 bg-background border border-border p-1 h-auto">
             <TabsTrigger value="milestones" data-testid="portal-tab-milestones" className="flex-shrink-0">
               <Target className="h-4 w-4 mr-1.5" /> Milestones
