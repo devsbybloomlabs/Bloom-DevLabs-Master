@@ -24,6 +24,61 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase B — Companies + Contacts foundation (Feb 2026)
+**Goal**: Replace the flat `clients` model with a proper Company → Contacts relationship. Build the unified "Client Detail Drawer" — a single tabbed view showing everything we know about a company. Add an `activity_log` that every key event writes to (invoice created, paid, refunded, proposal sent/signed, brief approved, milestone completed, support upgraded, manual notes).
+
+**Backend:**
+- New collections: `companies`, `contacts`, `activity_log`.
+- New modules: `/app/backend/companies_routes.py` (admin CRUD + nested contacts + activity + notes), `/app/backend/activity_log.py` (single `log_activity()` helper used by every other module).
+- Idempotent migration (`migrate_clients_to_companies`) — runs once at warmup, seeds every legacy client into a company with itself as the primary contact. Skips e2e/test-* fixture rows. **47 real companies migrated, 73 test rows filtered out.**
+- Activity log already hooked into `invoice_service.create_manual_invoice` (`invoice.created` event). More hooks coming in subsequent phases as the events get more interesting.
+
+**Endpoints:**
+- `GET/POST /admin/companies` · `GET/PATCH/DELETE /admin/companies/{id}`
+- `GET /admin/companies/{id}/detail` — denormalized "bird's-eye view": company + contacts + invoices + PayPal orders + subscriptions + proposals + onboarding + milestones + tickets + stats (lifetime_paid, outstanding, active_subscriptions, etc.)
+- `GET /admin/companies/{id}/activity` + `POST /admin/companies/{id}/notes`
+- `GET/POST /admin/companies/{id}/contacts` · `PATCH/DELETE /admin/contacts/{id}` · `POST /admin/contacts/{id}/promote`
+
+**Frontend:**
+- New page `CompaniesAdmin.jsx` at `/admin/companies` (sidebar renamed Clients → Companies). Search by name/email/domain, tier filter, stat tiles, new-company dialog.
+- New `CompanyDetailDrawer.jsx` — slide-in side sheet with 7 tabs:
+  - **Overview** (read/edit name, domain, industry, size, phone, notes)
+  - **Contacts** (multi-contact CRUD, primary star, promote/archive)
+  - **Projects** (current onboarding phase progress)
+  - **Transactions** (invoices, PayPal orders, subscriptions side-by-side)
+  - **Milestones** (status pills — Phase E will animate this)
+  - **Documents** (BreezeDocs proposals)
+  - **Activity** (chronological audit log + Quick Note add)
+
+**Tests:**
+- `/app/backend/tests/test_companies.py` — 7 new pytests: auth guards, list, full CRUD+detail, duplicate guard, contact promote/archive, note → activity, archive filtering. **All green.**
+- Full pre-existing suite (208 tests) still green.
+
+### ✅ Phase A — Cleanup & quick fixes (Feb 2026)
+**Goal**: Strip every removed integration so the codebase is foundation-ready for Phase B (Companies/Contacts). Fix the broken email logo + non-existent portal routes that were causing white screens. Add the missing BreezeDocs credentials field. Cleanup outcome:
+
+**Deletions:**
+- AgencyHandy — fully removed. Backend modules (`agencyhandy_client.py`, `agencyhandy_routes.py`, `agencyhandy_webhooks.py`) deleted, server.py imports/state/routers stripped, `.env` keys removed, `client_routes.py` endpoints simplified to no longer call AH, "View invoices in AH" tab removed.
+- Approval Studio (Design Approvals admin page) — fully removed. `approval_studio_client.py`, `approval_studio_routes.py`, `ApprovalsAdmin.jsx` deleted, sidebar entry removed, integrations credentials form entry removed, `designer_reminder_cron` removed.
+- ThriveDesk API connection — fully removed. `thrivedesk_client.py`, `thrivedesk_routes.py` deleted, `SupportTriageAdmin.jsx` deleted, sidebar entry removed, milestone-routes reverse-sync logic removed, `thrivedesk_retry_cron` removed. (The iframe chatbot widget in `index.html` stays — it's API-free.)
+- Test files for removed features: `test_phase11.py`, `test_phase12.py`, `test_phase13.py`, `test_phase15.py`, `test_master_workflow.py`.
+
+**Fixes:**
+- Email logo now uses the MASTER (dark-on-light) variant + is **inlined as a `data:` URI** on first send so Gmail/Outlook can never strip it. Same dark variant applied to the public `/pay/invoice/{id}` page.
+- Every `hello@bybloomlabs.com` → `support@bybloomlabs.com` (across `.env`, `brand.js`, `Landing.jsx`, `blog_extras_routes.py`, `emailit_client.py`, footer template).
+- Email CTAs use `?tab=...` deep-links to the existing `/portal` route + legacy `/portal/{section}` redirects added in `App.js` for emails already in inboxes.
+- ClientPortal now reads `?tab=` from URL on load and syncs URL on tab change (refresh-safe, share-safe).
+- ClientLogin preserves query string when bouncing back after auth.
+- BreezeDocs credentials field added to `/admin/integrations` Credentials form (#13).
+
+**Rewrites:**
+- `contact_routes.py` — drops ThriveDesk dependency, now writes to MongoDB + sends a branded founder-notification via Emailit + Slack alert. Auto-generates `BL-YYYY-####` ticket reference per submission (Phase I infra ready).
+
+**Tests:**
+- New: `test_email_branding.py` (7) pins logo + deep-link behaviour.
+- All `_aio` test helpers hardened against closed-loop races.
+- **208/208 backend tests pass.**
+
 ### ✅ Phase 18.5 — BreezeDocs auto-invoice + Nifty disconnect UX (Feb 2026)
 **Goal**: Wire two improvements requested by the user: (A) collapse "proposal signed → invoice received → payment" into a single click by auto-issuing the invoice the moment a BreezeDocs proposal reaches `completed`, and (B) turn the silent Phase 1 → Nifty sync failure into a visible, 1-click-fixable issue.
 

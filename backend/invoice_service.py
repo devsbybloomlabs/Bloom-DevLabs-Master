@@ -199,6 +199,18 @@ async def create_manual_invoice(
         source="manual",
     )
     await db.invoices.insert_one(prepare_for_mongo(inv.model_dump()))
+    # Phase B: emit activity_log event (best-effort)
+    try:
+        from activity_log import log_activity
+        await log_activity(
+            db,
+            company_email=req.client_email,
+            type="invoice.created",
+            title=f"Invoice {inv.number} issued — {req.currency} {total:.2f}",
+            meta={"invoice_id": inv.id, "number": inv.number, "total": total},
+        )
+    except Exception:
+        pass
     return inv.model_dump()
 
 

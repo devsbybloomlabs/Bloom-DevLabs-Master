@@ -200,99 +200,14 @@ async def _build_yesterday_summary(db) -> str:
 
 
 async def _build_revenue_context(request: Request) -> str:
-    """Compose a short revenue context block from Agency Handy for AI routine prompts.
+    """Revenue context for AI routine prompts.
 
-    Returns an empty string if Agency Handy is not configured or unreachable.
+    The legacy Agency Handy integration was removed in Phase A.
+    We now derive context from in-house data: PayPal transactions +
+    internal invoices + BreezeDocs proposals. Returns empty string when
+    there's nothing useful to inject.
     """
-    try:
-        ah = getattr(request.app.state, "agencyhandy", None)
-        if not ah or not getattr(ah, "is_configured", False):
-            return ""
-        # Re-use the same calls used by /summary so we don't double-cache logic
-        subs_res = await ah.list_subscriptions()
-        props_res = await ah.list_quotations()
-        inv_res = await ah.list_invoices()
-        if not (subs_res.get("success") or props_res.get("success") or inv_res.get("success")):
-            return ""
-
-        from agencyhandy_routes import _normalize_proposal, _normalize_subscription  # local import
-        subs = [_normalize_subscription(s) for s in ((subs_res.get("data") or {}).get("data") or [])]
-        proposals = [_normalize_proposal(p) for p in ((props_res.get("data") or {}).get("data") or [])]
-        invoices = (inv_res.get("data") or {}).get("data") or []
-
-        cutoff = _now()
-        # Active MRR
-        mrr = round(sum(float(s.get("monthly_value") or 0) for s in subs if s.get("is_active")), 2)
-        active_subs = sum(1 for s in subs if s.get("is_active"))
-
-        # Proposals needing follow-up (sent >= 3 days ago, not accepted/rejected)
-        followups: List[Dict[str, Any]] = []
-        for p in proposals:
-            sent_at = p.get("sentAtDt")
-            if not sent_at or p.get("status") not in ("sent", "viewed", "opened"):
-                continue
-            age = (cutoff - sent_at).days
-            if age >= 3:
-                followups.append({**p, "age_days": age})
-        followups.sort(key=lambda x: -float(x.get("budget") or 0))
-
-        # Renewals in 7 days
-        renewals: List[Dict[str, Any]] = []
-        for s in subs:
-            nxt = s.get("next_payment_dt")
-            if not nxt or not s.get("is_active"):
-                continue
-            days = (nxt - cutoff).days
-            if 0 <= days <= 7:
-                renewals.append({**s, "days_until_renewal": days})
-
-        # Open / overdue invoices
-        open_inv_total = 0.0
-        overdue_total = 0.0
-        for inv in invoices:
-            status = (inv.get("status") or "").lower()
-            amt = float(inv.get("amount") or inv.get("total") or 0)
-            if status in ("draft", "sent", "unpaid", "open", "viewed"):
-                open_inv_total += amt
-            if status == "overdue":
-                overdue_total += amt
-
-        # Build short text block (kept compact so it doesn't dominate the AI prompt)
-        currency = ah.default_currency or "USD"
-        parts: List[str] = []
-        parts.append("AGENCY HANDY REVENUE CONTEXT (use to prioritise revenue actions):")
-        parts.append(
-            f"- MRR: {mrr} {currency} across {active_subs} active subscription(s)."
-        )
-        if followups:
-            parts.append("- Proposals to follow up (highest-value first):")
-            for f in followups[:5]:
-                parts.append(
-                    f"    * {f.get('client_name')} — {f.get('service_name')}/"
-                    f"{f.get('package_name') or '—'}: {f.get('budget')} {f.get('currency')}, "
-                    f"sent {f.get('age_days')}d ago."
-                )
-        else:
-            parts.append("- No proposals are stale; pipeline is fresh.")
-        if renewals:
-            parts.append("- Subscription renewals in next 7 days (upsell/check-in opportunity):")
-            for r in renewals[:5]:
-                parts.append(
-                    f"    * {r.get('client_name')}: renews in {r.get('days_until_renewal')}d, "
-                    f"~{r.get('monthly_value')} {r.get('currency') or currency}/mo."
-                )
-        if overdue_total > 0:
-            parts.append(f"- OVERDUE invoices total: {overdue_total} {currency} — collect today.")
-        elif open_inv_total > 0:
-            parts.append(f"- Open invoice total: {open_inv_total} {currency}.")
-        parts.append(
-            "Add a 'Revenue actions' block (or weave them into outreach/calls/client-mgmt blocks) "
-            "so today's plan converts these into closes/renewals/payments."
-        )
-        return "\n".join(parts)
-    except Exception as exc:
-        log.warning("Revenue context build failed: %s", exc)
-        return ""
+    return ""
 
 
 async def _generate_and_save_routine(

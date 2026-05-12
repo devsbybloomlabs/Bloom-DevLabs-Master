@@ -36,7 +36,7 @@ class EmailitClient:
             base_url or os.environ.get("EMAILIT_BASE_URL", "https://api.emailit.com/v1")
         ).rstrip("/")
         self.from_email = from_email or os.environ.get(
-            "EMAILIT_FROM_EMAIL", "hello@bybloomlabs.com"
+            "EMAILIT_FROM_EMAIL", "support@bybloomlabs.com"
         )
         self.from_name = from_name or os.environ.get("EMAILIT_FROM_NAME", "Bloom Labs")
 

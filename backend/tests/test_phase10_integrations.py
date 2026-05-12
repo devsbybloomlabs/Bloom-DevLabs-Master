@@ -20,7 +20,7 @@ CLIENT_EMAIL = "testclient@bybloomlabs.com"
 CLIENT_PASSWORD = "clientpass123"
 TIMEOUT = 60
 
-PROVIDERS = {"openrouter", "emailit", "agencyhandy", "paypal"}
+PROVIDERS = {"openrouter", "emailit", "paypal"}
 
 
 # ---------- fixtures ----------
@@ -152,7 +152,7 @@ class TestProvidersGrid:
         )
         assert r.status_code == 200, r.text
         data = r.json()
-        assert isinstance(data, list) and len(data) == 4
+        assert isinstance(data, list) and len(data) == 3
         seen = {x["provider"] for x in data}
         assert seen == PROVIDERS
         for p in data:
@@ -212,15 +212,6 @@ class TestProviderConnections:
             timeout=TIMEOUT,
         )
         # 200 (ok) or 502/503 if upstream auth issue — but never 500
-        assert r.status_code != 500, r.text
-        assert r.status_code in (200, 502, 503), r.text
-
-    def test_agencyhandy_ping_no_crash(self, session, admin_token):
-        r = session.post(
-            f"{BASE_URL}/api/admin/integrations/agencyhandy/test",
-            headers=admin_headers(admin_token),
-            timeout=TIMEOUT,
-        )
         assert r.status_code != 500, r.text
         assert r.status_code in (200, 502, 503), r.text
 

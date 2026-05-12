@@ -422,34 +422,12 @@ async def my_orders(
     current=Depends(get_current_client),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Combines PayPal transactions + AgencyHandy orders for this client."""
+    """PayPal transactions for this client (in-house only since Phase A)."""
     email = current["email"]
-    # PayPal transactions
     pp_orders = await db.paypal_transactions.find(
         {"customer_email": email}, {"_id": 0}
     ).sort("created_at", -1).to_list(200)
-    # Agency Handy orders (best-effort, server-side filter when possible)
-    ah_orders: List[Dict[str, Any]] = []
-    try:
-        ah = request.app.state.agencyhandy
-        if ah.is_configured:
-            # Try server-side filter first — drops payload size from O(all orders) to O(this client's orders)
-            res = await ah.list_orders_for_client_email(email)
-            if res.get("success") and res.get("client_resolved") is not False:
-                ah_orders = (res.get("data") or {}).get("data") or []
-            else:
-                # Fallback: pull-all then locally filter (preserves prior behavior when company_id missing)
-                fallback = await ah.list_orders()
-                if fallback.get("success"):
-                    ah_orders = _filter_by_client_email(
-                        (fallback.get("data") or {}).get("data") or [], email
-                    )
-    except Exception as exc:
-        log.warning("AH orders fetch failed: %s", exc)
-    return {
-        "paypal": pp_orders,
-        "agencyhandy": [serialize_doc(o) for o in ah_orders],
-    }
+    return {"paypal": pp_orders}
 
 
 @client_portal_router.get("/subscriptions")
@@ -462,21 +440,7 @@ async def my_subscriptions(
     pp_subs = await db.paypal_subscriptions.find(
         {"customer_email": email}, {"_id": 0}
     ).sort("created_at", -1).to_list(200)
-    ah_subs: List[Dict[str, Any]] = []
-    try:
-        ah = request.app.state.agencyhandy
-        if ah.is_configured:
-            res = await ah.list_subscriptions()
-            if res.get("success"):
-                ah_subs = _filter_by_client_email(
-                    (res.get("data") or {}).get("data") or [], email
-                )
-    except Exception as exc:
-        log.warning("AH subscriptions fetch failed: %s", exc)
-    return {
-        "paypal": pp_subs,
-        "agencyhandy": [serialize_doc(s) for s in ah_subs],
-    }
+    return {"paypal": pp_subs}
 
 
 @client_portal_router.get("/invoices")
@@ -484,19 +448,8 @@ async def my_invoices(
     request: Request,
     current=Depends(get_current_client),
 ) -> Dict[str, Any]:
-    email = current["email"]
-    ah_invoices: List[Dict[str, Any]] = []
-    try:
-        ah = request.app.state.agencyhandy
-        if ah.is_configured:
-            res = await ah.list_invoices()
-            if res.get("success"):
-                ah_invoices = _filter_by_client_email(
-                    (res.get("data") or {}).get("data") or [], email
-                )
-    except Exception as exc:
-        log.warning("AH invoices fetch failed: %s", exc)
-    return {"agencyhandy": [serialize_doc(i) for i in ah_invoices]}
+    """Deprecated — in-house invoices live at /clients/invoices (invoice_routes)."""
+    return {"paypal": []}
 
 
 @client_portal_router.get("/proposals")
@@ -504,19 +457,8 @@ async def my_proposals(
     request: Request,
     current=Depends(get_current_client),
 ) -> Dict[str, Any]:
-    email = current["email"]
-    ah_props: List[Dict[str, Any]] = []
-    try:
-        ah = request.app.state.agencyhandy
-        if ah.is_configured:
-            res = await ah.list_quotations()
-            if res.get("success"):
-                ah_props = _filter_by_client_email(
-                    (res.get("data") or {}).get("data") or [], email
-                )
-    except Exception as exc:
-        log.warning("AH proposals fetch failed: %s", exc)
-    return {"agencyhandy": [serialize_doc(p) for p in ah_props]}
+    """Deprecated — proposals now live at /clients/me/breezedocs-proposals."""
+    return {"proposals": []}
 
 
 # =============================================================================

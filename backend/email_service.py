@@ -11,13 +11,20 @@ milestones, support, subscriptions. Each `send_*` function:
 Callers should `await email_service.send_X(...)` — no need to interact
 with EmailitClient directly. Templates live here next to the senders so
 copy/colors stay in lockstep.
+
+Phase A enhancement: the brand logo is fetched ONCE at module import time
+and embedded as a `data:` URI inside every email. This guarantees the logo
+renders even when Gmail/Outlook strip remote images for security.
 """
 from __future__ import annotations
 
+import base64
 import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+import httpx
 
 log = logging.getLogger("emails")
 
@@ -29,12 +36,43 @@ BRAND_MUTED = "#475569"
 BRAND_BG = "#F8FAFC"
 BRAND_BG_CARD = "#FFFFFF"
 BRAND_BORDER = "#E2E8F0"
+
+# Remote URL used to seed the inline `data:` URI on cold start.
 LOGO_URL = (
-    # Dark-text "MASTER" variant — readable on the white email card.
-    # (The "Light" variant is for dark backgrounds and renders as white-on-white here.)
     "https://customer-assets.emergentagent.com/job_6ae936eb-6f62-4e1a-8f50-8423b436560b/"
     "artifacts/xayvxy1s_Logo%20-%20Full%20-%20MASTER.png"
 )
+
+# Cached `data:image/png;base64,...` of the logo — populated lazily on first
+# email send so we never block module import on a network call.
+_LOGO_DATA_URI: Optional[str] = None
+
+
+def _resolve_logo_src() -> str:
+    """Return a usable `<img src=>` for the logo.
+
+    On first call, downloads the LOGO_URL and caches it as a base64 data URI
+    so subsequent emails embed the logo inline (zero network dependency for
+    the recipient). Falls back to the remote URL if the fetch fails.
+    """
+    global _LOGO_DATA_URI
+    if _LOGO_DATA_URI:
+        return _LOGO_DATA_URI
+    try:
+        with httpx.Client(timeout=8.0, follow_redirects=True) as c:
+            r = c.get(LOGO_URL)
+            if r.status_code == 200 and r.content:
+                mime = r.headers.get("content-type") or "image/png"
+                mime = mime.split(";")[0].strip() or "image/png"
+                _LOGO_DATA_URI = (
+                    f"data:{mime};base64,{base64.b64encode(r.content).decode('ascii')}"
+                )
+                return _LOGO_DATA_URI
+    except Exception as exc:  # pragma: no cover
+        log.warning("Logo data URI prefetch failed (%s) — using remote URL", exc)
+    return LOGO_URL
+
+
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://bybloomlabs.com").rstrip("/")
 
 
@@ -42,6 +80,7 @@ def _frame(*, preheader: str, body_html: str, footer_html: Optional[str] = None)
     """Wrap message HTML in the Bloom Labs brand shell."""
     safe_pre = preheader.replace("<", "&lt;")[:140]
     footer = footer_html or _default_footer()
+    logo_src = _resolve_logo_src()
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -55,7 +94,7 @@ def _frame(*, preheader: str, body_html: str, footer_html: Optional[str] = None)
     <tr><td align="center">
       <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:{BRAND_BG_CARD};border-radius:14px;box-shadow:0 4px 14px rgba(15,23,42,0.06);overflow:hidden;">
         <tr><td style="padding:28px 32px 12px;text-align:left;">
-          <img src="{LOGO_URL}" alt="{BRAND_NAME}" width="120" style="display:block;height:auto;border:0;outline:none;"/>
+          <img src="{logo_src}" alt="{BRAND_NAME}" width="120" style="display:block;height:auto;border:0;outline:none;"/>
         </td></tr>
         <tr><td style="padding:8px 32px 28px;">{body_html}</td></tr>
         <tr><td style="padding:24px 32px;border-top:1px solid {BRAND_BORDER};background:{BRAND_BG};color:#94A3B8;font-size:12px;line-height:1.6;">{footer}</td></tr>
@@ -70,7 +109,7 @@ def _default_footer() -> str:
       Sent by <strong style="color:{BRAND_TEXT}">{BRAND_NAME}</strong> · Bloom Development Labs Corp.<br/>
       <a href="{APP_BASE_URL}" style="color:#94A3B8;text-decoration:underline;">{APP_BASE_URL.replace("https://", "")}</a>
       &nbsp;·&nbsp;
-      <a href="mailto:founder@thesalvador.group" style="color:#94A3B8;text-decoration:underline;">support</a>
+      <a href="mailto:support@bybloomlabs.com" style="color:#94A3B8;text-decoration:underline;">support@bybloomlabs.com</a>
     """
 
 

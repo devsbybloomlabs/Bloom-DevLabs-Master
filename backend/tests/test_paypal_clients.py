@@ -225,12 +225,14 @@ class TestClientPortal:
     def test_invoices_shape(self, client_token):
         r = self._get("/clients/me/invoices", client_token)
         assert r.status_code == 200
-        assert "agencyhandy" in r.json()
+        # AgencyHandy removed in Phase A — in-house invoices live at /clients/invoices
+        assert "paypal" in r.json() or r.json() == {"paypal": []}
 
     def test_proposals_shape(self, client_token):
         r = self._get("/clients/me/proposals", client_token)
         assert r.status_code == 200
-        assert "agencyhandy" in r.json()
+        # AgencyHandy removed in Phase A — proposals now via BreezeDocs
+        assert "proposals" in r.json() or r.json() == {"proposals": []}
 
 
 # ---------- Forgot/reset password ----------

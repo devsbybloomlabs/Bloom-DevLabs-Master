@@ -5,7 +5,7 @@
  *   • Connect/disconnect Nifty (OAuth + manual-token fallback)
  *   • Sync Nifty projects & members ONCE (cached in DB; click Sync to refresh)
  *   • Pick the default Nifty project + per-team assignees via dropdowns
- *   • See status + test ping for OpenRouter, Emailit, AgencyHandy, PayPal
+ *   • See status + test ping for OpenRouter, Emailit, PayPal, BreezeDocs
  */
 import { useEffect, useState, useCallback } from "react";
 import { useAdminApi } from "@/lib/auth";
@@ -54,7 +54,6 @@ import {
 const PROVIDER_META = {
   openrouter: { label: "OpenRouter", icon: Sparkles, color: "#8B5CF6", desc: "AI text generation (routine, content, blog drafts)" },
   emailit: { label: "Emailit", icon: Mail, color: "#3B82F6", desc: "Transactional email (testimonials, onboarding, drip)" },
-  agencyhandy: { label: "AgencyHandy", icon: Users, color: "#0EA5E9", desc: "Revenue + invoices + proposals sync" },
   paypal: { label: "PayPal", icon: CreditCard, color: "#1E3A8A", desc: "Payment processing (one-time + subscriptions)" },
 };
 

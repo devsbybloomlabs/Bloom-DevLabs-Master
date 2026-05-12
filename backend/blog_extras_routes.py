@@ -44,7 +44,7 @@ async def blog_rss(request: Request) -> Response:
       <guid isPermaLink="true">{link}</guid>
       <description>{_esc(p.get('excerpt', ''))}</description>
       <pubDate>{rfc}</pubDate>
-      <author>hello@bybloomlabs.com ({_esc(p.get('author_name', 'Bloom Labs'))})</author>
+      <author>support@bybloomlabs.com ({_esc(p.get('author_name', 'Bloom Labs'))})</author>
     </item>"""
         )
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>

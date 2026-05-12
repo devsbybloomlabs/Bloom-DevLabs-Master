@@ -26,7 +26,7 @@ const ORG_JSONLD = {
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "Sales",
-    email: "hello@bybloomlabs.com",
+    email: "support@bybloomlabs.com",
     areaServed: "Global",
     availableLanguage: ["English"],
   },

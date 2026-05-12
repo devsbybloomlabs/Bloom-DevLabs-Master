@@ -34,7 +34,14 @@ def mock_emailit():
 
 
 def _aio(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("loop closed")
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
 
 
 def test_logo_url_uses_master_variant_visible_on_white():
@@ -113,7 +120,12 @@ def test_every_email_includes_branded_logo(mock_emailit):
         m = MockEmailit()
         _aio(sender(m))
         html = m.sent[0]["html"]
-        assert email_service.LOGO_URL in html, (
+        # Logo is either the remote URL OR (after Phase A) an inlined data: URI.
+        has_logo = (
+            email_service.LOGO_URL in html
+            or 'src="data:image/' in html
+        )
+        assert has_logo, (
             f"Logo missing from email (subject: {m.sent[0].get('subject')})"
         )
         assert 'alt="Bloom Labs"' in html, "Logo alt text missing"

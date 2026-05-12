@@ -22,53 +22,24 @@ import {
   Save,
   RefreshCw,
   ExternalLink,
-  ImagePlus,
-  LifeBuoy,
   MessageSquare,
   Eye,
   EyeOff,
   CalendarDays,
   PlugZap,
+  FileSignature,
 } from "lucide-react";
 
 const PROVIDER_SPECS = [
   {
-    key: "approval_studio",
-    label: "Approval Studio",
-    icon: ImagePlus,
-    color: "#8B5CF6",
-    helpUrl: "https://approval.studio/api/",
-    description: "Username + password for /token/login. Leaves MOCK mode once both are set.",
-    fields: [
-      { name: "username", label: "Username", placeholder: "you@studio.com" },
-      { name: "password", label: "Password", secret: true },
-      {
-        name: "webhook_secret",
-        label: "Webhook signing secret (optional)",
-        secret: true,
-        placeholder: "Used to verify x-aps-signature on incoming webhooks",
-      },
-    ],
-  },
-  {
-    key: "thrivedesk",
-    label: "ThriveDesk",
-    icon: LifeBuoy,
+    key: "breezedocs",
+    label: "BreezeDocs",
+    icon: FileSignature,
     color: "#0EA5E9",
-    helpUrl: "https://help.thrivedesk.com/en/webhooks",
-    description: "Bearer API key + (optional) webhook secret. Required on ThriveDesk Plus+.",
+    helpUrl: "https://breezedoc.com/developer/docs/",
+    description: "Personal access token (JWT bearer). Powers proposals + contracts (Sales → Proposals tab).",
     fields: [
-      { name: "api_key", label: "API key (Bearer token)", secret: true },
-      {
-        name: "webhook_secret",
-        label: "Webhook signing secret (HMAC-SHA1 base64)",
-        secret: true,
-      },
-      {
-        name: "workspace_url",
-        label: "Workspace URL",
-        placeholder: "https://your-team.thrivedesk.com",
-      },
+      { name: "api_key", label: "Personal access token", secret: true, placeholder: "eyJ0eXAiOiJKV1Qi…" },
     ],
   },
   {
@@ -159,7 +130,6 @@ export default function IntegrationCredentialsForm() {
     try {
       // Backend test endpoints follow the `-` separator
       const SLUG_OVERRIDES = {
-        approval_studio: "approval-studio",
         google_calendar: "calendar",
       };
       const slug = SLUG_OVERRIDES[providerKey] || providerKey;
@@ -202,10 +172,9 @@ export default function IntegrationCredentialsForm() {
           Credentials
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Paste keys here to flip Approval Studio, ThriveDesk, and Slack from
-          <code className="mx-1 px-1 py-0.5 rounded bg-secondary text-xs">MOCK</code>
-          → live mode. Env vars on the server always take precedence; this is
-          the fast path so you don&apos;t need to redeploy.
+          Paste keys here to flip BreezeDocs, Slack, and Google Calendar
+          credentials live. Env vars on the server always take precedence; this
+          is the fast path so you don&apos;t need to redeploy.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">

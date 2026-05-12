@@ -4,7 +4,7 @@ export const BRAND = {
   legalName: "Bloom Development Labs Corp.",
   tagline: "AI-Native Web Apps. Built for Growth.",
   domain: "bybloomlabs.com",
-  email: "hello@bybloomlabs.com",
+  email: "support@bybloomlabs.com",
   phone: "+1 (951) 899-5314",
   phoneHref: "+19518995314",
   social: {

@@ -21,12 +21,6 @@ load_dotenv(ROOT_DIR / ".env")
 
 from emailit_client import EmailitClient  # noqa: E402
 from openrouter_client import OpenRouterClient  # noqa: E402
-from agencyhandy_client import AgencyHandyClient  # noqa: E402
-from agencyhandy_routes import agencyhandy_router  # noqa: E402
-from agencyhandy_webhooks import (  # noqa: E402
-    ah_webhook_admin_router,
-    ah_webhook_router,
-)
 from paypal_client import PayPalClient  # noqa: E402
 from paypal_routes import paypal_admin_router, paypal_router  # noqa: E402
 from paypal_webhooks import paypal_webhook_router  # noqa: E402
@@ -50,29 +44,22 @@ from milestone_routes import (  # noqa: E402
     nifty_timeline_refresh,
     nifty_webhook_router,
 )
-from approval_studio_client import ApprovalStudioClient  # noqa: E402
-from approval_studio_routes import (  # noqa: E402
-    approvals_admin_router,
-    approvals_webhook_router,
-    designer_reminder_cron,
-)
-from thrivedesk_client import ThriveDeskClient  # noqa: E402
-from thrivedesk_routes import (  # noqa: E402
-    support_admin_router,
-    thrivedesk_webhook_router,
-)
 from breezedocs_client import BreezeDocsClient  # noqa: E402
 from breezedocs_routes import (  # noqa: E402
     breezedocs_admin_router,
     breezedocs_client_router,
     breezedocs_sync_cron,
 )
+from companies_routes import (  # noqa: E402
+    companies_admin_router,
+    contacts_admin_router,
+    migrate_clients_to_companies,
+)
 from demo_routes import demo_router  # noqa: E402
 from public_tour_routes import public_tour_router  # noqa: E402
 from contact_routes import (  # noqa: E402
     client_contact_router,
     contact_admin_router,
-    thrivedesk_retry_cron,
 )
 from ab_test_routes import public_ab_router, ab_admin_router  # noqa: E402
 from nifty_workspaces_routes import nifty_workspaces_router  # noqa: E402
@@ -149,14 +136,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize integration clients
     app.state.openrouter = OpenRouterClient()
     app.state.emailit = EmailitClient()
-    app.state.agencyhandy = AgencyHandyClient()
     app.state.paypal = PayPalClient()
     app.state.nifty = NiftyClient()
     app.state.nifty.bind_db(db)
-    app.state.approval_studio = ApprovalStudioClient()
-    app.state.approval_studio.bind_db(db)
-    app.state.thrivedesk = ThriveDeskClient()
-    app.state.thrivedesk.bind_db(db)
     app.state.breezedocs = BreezeDocsClient()
     app.state.breezedocs.bind_db(db)
     app.state.google_calendar = GoogleCalendarClient()
@@ -204,22 +186,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("Nifty timeline cron failed: %s", exc)
 
-    async def approval_reminder_cron_wrapper() -> None:
-        try:
-            res = await designer_reminder_cron(app)
-            if res.get("reminders_sent", 0) > 0:
-                log.info("Designer reminders: %s", res)
-        except Exception as exc:
-            log.exception("Designer reminder cron failed: %s", exc)
-
-    async def thrivedesk_retry_cron_wrapper() -> None:
-        try:
-            res = await thrivedesk_retry_cron(app)
-            if (res.get("sent", 0) + res.get("failed", 0)) > 0:
-                log.info("Portal contact retries: %s", res)
-        except Exception as exc:
-            log.exception("ThriveDesk retry cron failed: %s", exc)
-
     async def breezedocs_sync_cron_wrapper() -> None:
         try:
             res = await breezedocs_sync_cron(app.state.db, app.state.breezedocs)
@@ -234,10 +200,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.add_job(nifty_comment_cron, CronTrigger(minute="*/5"))
     # Daily 8am Nifty timeline refresh
     scheduler.add_job(nifty_timeline_cron, CronTrigger(hour=8, minute=0))
-    # Hourly designer reminder check for stale approvals
-    scheduler.add_job(approval_reminder_cron_wrapper, CronTrigger(minute=30))
-    # Hourly retry of queued portal contact submissions
-    scheduler.add_job(thrivedesk_retry_cron_wrapper, CronTrigger(minute=45))
     # Every 10 min BreezeDocs status sync (no webhooks in their API)
     scheduler.add_job(breezedocs_sync_cron_wrapper, CronTrigger(minute="*/10"))
 
@@ -253,6 +215,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await ensure_seed_user(db)
             await ensure_settings(db)
             await ensure_authority_metric(db)
+            # Phase B: seed companies + contacts from legacy clients (idempotent)
+            mig_res = await migrate_clients_to_companies(db)
+            if mig_res.get("created", 0) > 0:
+                log.info("Companies migration: %s", mig_res)
         except Exception as exc:
             log.exception("Startup seed failed: %s", exc)
         try:
@@ -322,9 +288,6 @@ api.include_router(dashboard_router)
 api.include_router(webhook_router)
 api.include_router(notification_router)
 api.include_router(sync_router)
-api.include_router(agencyhandy_router)
-api.include_router(ah_webhook_router)
-api.include_router(ah_webhook_admin_router)
 api.include_router(paypal_router)
 api.include_router(paypal_admin_router)
 api.include_router(paypal_webhook_router)
@@ -349,12 +312,10 @@ api.include_router(leads_admin_router)
 api.include_router(nifty_webhook_router)
 api.include_router(milestone_client_router)
 api.include_router(milestone_admin_router)
-api.include_router(approvals_admin_router)
-api.include_router(approvals_webhook_router)
-api.include_router(support_admin_router)
-api.include_router(thrivedesk_webhook_router)
 api.include_router(breezedocs_admin_router)
 api.include_router(breezedocs_client_router)
+api.include_router(companies_admin_router)
+api.include_router(contacts_admin_router)
 api.include_router(demo_router)
 api.include_router(public_tour_router)
 api.include_router(client_contact_router)

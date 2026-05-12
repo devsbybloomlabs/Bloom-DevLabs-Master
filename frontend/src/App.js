@@ -27,8 +27,7 @@ import LeadMagnetsAdmin from "@/pages/admin/LeadMagnetsAdmin";
 import MilestonesAdmin from "@/pages/admin/MilestonesAdmin";
 import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
-import ApprovalsAdmin from "@/pages/admin/ApprovalsAdmin";
-import SupportTriageAdmin from "@/pages/admin/SupportTriageAdmin";
+import CompaniesAdmin from "@/pages/admin/CompaniesAdmin";
 import ProposalsAdmin from "@/pages/admin/ProposalsAdmin";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
 import { ClientAuthProvider, RequireClient } from "@/lib/clientAuth";
@@ -126,9 +125,8 @@ function App() {
                 <Route path="subscriptions" element={<SubscriptionsAdmin />} />
                 <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
                 <Route path="milestones" element={<MilestonesAdmin />} />
-                <Route path="approvals" element={<ApprovalsAdmin />} />
-                <Route path="support-triage" element={<SupportTriageAdmin />} />
                 <Route path="clients" element={<ClientsAdmin />} />
+                <Route path="companies" element={<CompaniesAdmin />} />
                 <Route path="integrations" element={<IntegrationsAdmin />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
