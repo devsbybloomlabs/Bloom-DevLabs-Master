@@ -276,6 +276,7 @@ async def create_proposal(
 @breezedocs_admin_router.post("/proposals/{proposal_id}/sync")
 async def sync_proposal(
     proposal_id: str,
+    request: Request,
     db: AsyncIOMotorDatabase = Depends(get_db),
     bd: BreezeDocsClient = Depends(get_bd),
 ) -> Dict[str, Any]:
@@ -283,13 +284,19 @@ async def sync_proposal(
     local = await db.breezedocs_proposals.find_one({"id": proposal_id}, {"_id": 0})
     if not local:
         raise HTTPException(404, "Proposal not found")
+    prev_status = local.get("status")
     bd_id = local["breezedocs_id"]
     doc_res = await bd.get_document(bd_id)
     if not doc_res.get("success"):
         raise HTTPException(502, doc_res.get("error") or "BreezeDocs fetch failed")
     saved = await _upsert_local(db, doc_res.get("data") or {})
+    invoice_id: Optional[str] = None
+    if prev_status != "completed" and saved.get("status") == "completed":
+        invoice_id = await _maybe_auto_invoice_on_completion(db, request, saved)
+        if invoice_id:
+            saved["linked_invoice_id"] = invoice_id
     saved.pop("raw", None)
-    return {"ok": True, "proposal": saved}
+    return {"ok": True, "proposal": saved, "invoice_created": invoice_id}
 
 
 @breezedocs_admin_router.post("/proposals/{proposal_id}/resend")
@@ -389,6 +396,100 @@ async def _email_proposal_sent(
     )
 
 
+async def _maybe_auto_invoice_on_completion(
+    db: AsyncIOMotorDatabase,
+    request: Optional[Any],
+    proposal: Dict[str, Any],
+) -> Optional[str]:
+    """When a proposal hits `completed`, auto-issue the linked invoice + email.
+
+    Skips if:
+      • amount is missing or ≤ 0 (e.g. NDAs)
+      • an invoice was already linked (idempotent)
+      • client_email is missing
+    Returns the new invoice id (or None when skipped).
+    """
+    if proposal.get("status") != "completed":
+        return None
+    if proposal.get("linked_invoice_id"):
+        return None
+    amount_raw = proposal.get("amount")
+    if amount_raw in (None, "", "0", "0.00", 0):
+        return None
+    try:
+        amount = float(amount_raw)
+    except (TypeError, ValueError):
+        return None
+    if amount <= 0:
+        return None
+    client_email = proposal.get("client_email")
+    if not client_email:
+        return None
+
+    import invoice_service
+    from models import InvoiceCreateRequest, InvoiceLineItem
+
+    title = proposal.get("title") or "Signed proposal"
+    req = InvoiceCreateRequest(
+        client_email=client_email,
+        client_name=proposal.get("client_name") or client_email.split("@")[0],
+        currency=proposal.get("currency") or "USD",
+        line_items=[
+            InvoiceLineItem(
+                description=f"{title} (BreezeDocs proposal #{proposal.get('breezedocs_id')})",
+                quantity=1.0,
+                unit_price=amount,
+                amount=amount,
+            )
+        ],
+        notes=(
+            f"Auto-generated from signed proposal '{title}'.\n"
+            f"Reference: BreezeDocs document #{proposal.get('breezedocs_id')}."
+        ),
+    )
+    inv = await invoice_service.create_manual_invoice(db, req)
+    await db.breezedocs_proposals.update_one(
+        {"id": proposal["id"]},
+        {"$set": {"linked_invoice_id": inv["id"], "updated_at": _now_iso()}},
+    )
+    # Render PDF + email (best-effort)
+    try:
+        await invoice_service.cache_invoice_pdf(db, inv)
+    except Exception as exc:  # pragma: no cover
+        log.warning("Auto-invoice PDF render failed: %s", exc)
+
+    # Send the branded "invoice issued" email with the public pay link.
+    # If we have a `request` we get the emailit client + app base URL;
+    # otherwise fall back to env defaults (still works).
+    import os
+
+    emailit = getattr(getattr(request, "app", None), "state", None)
+    emailit = getattr(emailit, "emailit", None) if emailit else None
+    base = os.environ.get("APP_BASE_URL", "https://bybloomlabs.com").rstrip("/")
+    try:
+        await email_service.send_invoice_issued(
+            emailit,
+            to=inv["client_email"],
+            name=inv.get("client_name") or inv["client_email"].split("@")[0],
+            invoice_number=inv["number"],
+            amount=f"{inv['total']:.2f}",
+            currency=inv["currency"],
+            due_date=inv.get("due_at"),
+            invoice_url=f"{base}/pay/invoice/{inv['id']}",
+            pdf_url=f"{base}/api/clients/invoices/{inv['id']}/pdf",
+        )
+    except Exception as exc:  # pragma: no cover
+        log.warning("Auto-invoice email failed: %s", exc)
+    log.info(
+        "BreezeDocs proposal %s completed → auto-invoice %s (%s %s)",
+        proposal["id"],
+        inv["id"],
+        inv["currency"],
+        amount,
+    )
+    return inv["id"]
+
+
 # ============================================================
 # Periodic sync helper (called from APScheduler in server.py)
 # ============================================================
@@ -396,8 +497,8 @@ async def breezedocs_sync_cron(db: AsyncIOMotorDatabase, bd: BreezeDocsClient) -
     """Refresh status for all non-completed proposals.
 
     Runs every 10 min in production. Safe to call repeatedly — uses
-    `_upsert_local` which is idempotent. Sends a one-time "completed"
-    email to the client when status transitions to `completed`.
+    `_upsert_local` which is idempotent. When a proposal transitions to
+    `completed`, auto-issues the linked invoice with a 1-click pay link.
     """
     await bd._resolve_creds()
     if not bd.is_configured:
@@ -408,7 +509,7 @@ async def breezedocs_sync_cron(db: AsyncIOMotorDatabase, bd: BreezeDocsClient) -
     )
     open_props = await cursor.to_list(200)
     synced = 0
-    completed_transitions: List[Dict[str, Any]] = []
+    invoices_created: List[str] = []
     for prop in open_props:
         res = await bd.get_document(prop["breezedocs_id"])
         if not res.get("success"):
@@ -417,9 +518,11 @@ async def breezedocs_sync_cron(db: AsyncIOMotorDatabase, bd: BreezeDocsClient) -
         new_local = await _upsert_local(db, res.get("data") or {})
         synced += 1
         if prev_status != "completed" and new_local.get("status") == "completed":
-            completed_transitions.append(new_local)
+            inv_id = await _maybe_auto_invoice_on_completion(db, None, new_local)
+            if inv_id:
+                invoices_created.append(inv_id)
     return {
         "ok": True,
         "synced": synced,
-        "completed_transitions": len(completed_transitions),
+        "invoices_created": invoices_created,
     }

@@ -193,6 +193,15 @@ async def _create_nifty_task_safe(
         due_date=due_date,
         custom_fields=custom_fields,
     )
+    # Detect & rewrite the most common cause so the admin sees something actionable
+    if (
+        not res.get("success")
+        and (res.get("error") or "").lower().startswith("nifty not connected")
+    ):
+        res["error"] = (
+            "Nifty isn't connected. Open /admin/integrations → Nifty → "
+            "Connect, then click 'Retry pending tasks' on the onboarding page."
+        )
     if res.get("success"):
         task = res.get("data") or {}
         task_id = task.get("id") or task.get("_id") or ""
@@ -687,3 +696,95 @@ async def admin_replay_phase(
     processor = PHASE_PROCESSORS[phase]
     result = await processor(db, request, doc)
     return {"ok": True, "phase": phase, "result": result}
+
+
+
+@onboarding_admin_router.get("/health")
+async def admin_onboarding_health(
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Returns a fast snapshot the admin UI can render at the top:
+    Nifty connection status + count of onboardings with failed automation.
+
+    Powers the "Nifty isn't connected — phase tasks aren't syncing" banner.
+    """
+    nifty: NiftyClient = request.app.state.nifty
+    try:
+        connected = await nifty.is_connected()
+    except Exception:
+        connected = False
+    failed_count = await db.onboardings.count_documents(
+        {"nifty_errors.0": {"$exists": True}}
+    )
+    # How many of those errors were specifically caused by missing connection?
+    pipeline = [
+        {"$match": {"nifty_errors.0": {"$exists": True}}},
+        {"$project": {"_id": 0, "id": 1, "nifty_errors": 1}},
+    ]
+    affected_obs: List[Dict[str, Any]] = []
+    async for doc in db.onboardings.aggregate(pipeline):
+        for err in doc.get("nifty_errors") or []:
+            if (err.get("error") or "").lower().startswith(("nifty not connected", "nifty isn't connected")):
+                affected_obs.append({"id": doc["id"], "phase": err.get("phase")})
+                break
+    return {
+        "nifty_connected": connected,
+        "onboardings_with_errors": failed_count,
+        "blocked_by_disconnect": affected_obs,
+    }
+
+
+@onboarding_admin_router.post("/replay-failed")
+async def admin_replay_failed_tasks(
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Replay every phase that previously failed because Nifty was disconnected.
+
+    Idempotent — uses the same processors as a fresh submission. Clears
+    `nifty_errors` per phase as it goes so the badges disappear once the
+    backfill succeeds. Returns a per-onboarding result map.
+    """
+    nifty: NiftyClient = request.app.state.nifty
+    if not await nifty.is_connected():
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Nifty still isn't connected. Connect it in /admin/integrations first, then retry.",
+        )
+    results: List[Dict[str, Any]] = []
+    async for doc in db.onboardings.find(
+        {"nifty_errors.0": {"$exists": True}}, {"_id": 0}
+    ):
+        phases_to_replay: List[int] = []
+        for err in doc.get("nifty_errors") or []:
+            phase = err.get("phase")
+            if isinstance(phase, str) and phase.startswith("phase"):
+                try:
+                    n = int(phase.replace("phase", ""))
+                    if n in (1, 2, 3) and n not in phases_to_replay:
+                        phases_to_replay.append(n)
+                except ValueError:
+                    continue
+        if not phases_to_replay:
+            continue
+        ob_result: Dict[str, Any] = {"id": doc["id"], "client_email": doc.get("client_email"), "phases": {}}
+        for phase in phases_to_replay:
+            try:
+                # Reset the errors for this phase so failures don't double-up
+                await db.onboardings.update_one(
+                    {"id": doc["id"]},
+                    {"$pull": {"nifty_errors": {"phase": f"phase{phase}"}}},
+                )
+                fresh_doc = await db.onboardings.find_one({"id": doc["id"]}, {"_id": 0})
+                res = await PHASE_PROCESSORS[phase](db, request, fresh_doc) or {}
+                ob_result["phases"][phase] = {
+                    "ok": True,
+                    "task_id": res.get("task_id"),
+                    "task_ids": res.get("task_ids"),
+                }
+            except Exception as exc:
+                log.exception("Replay failed for %s phase %s: %s", doc["id"], phase, exc)
+                ob_result["phases"][phase] = {"ok": False, "error": str(exc)}
+        results.append(ob_result)
+    return {"ok": True, "replayed_count": len(results), "results": results}

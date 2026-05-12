@@ -1,0 +1,36 @@
+{
+  "summary": "Phase 18.5 testing complete. Verified (A) BreezeDocs completed→auto-invoice flow + idempotency + skip cases, (B) Phase 1 Nifty onboarding actionable-error UX, (C) /admin/onboarding/health snapshot + /admin/onboarding/replay-failed gating, (D) admin onboarding banner UI + 'Connect Nifty →' navigation. 9 new pytests + 3 new e2e pytests + 42 regression tests = 54 PASSED, 0 FAILED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_breezedocs_auto_invoice.py",
+    "/app/backend/tests/test_onboarding_health.py",
+    "/app/backend/tests/test_phase18_5_e2e.py",
+    "/app/test_reports/pytest/iteration_19.xml",
+    "/app/test_reports/pytest/iteration_19_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "OnboardingAdmin.jsx 'Connect Nifty →' is rendered as a <button> with onClick navigate — semantically would be better as a Link/<a href> for middle-click / open-in-new-tab support, but functionally works.",
+    "test_breezedocs_auto_invoice.py uses module-level `asyncio.get_event_loop()` which is deprecated in Python 3.12+. Works on 3.11 (current env) but consider switching to `asyncio.new_event_loop()` or pytest-asyncio markers when bumping Python.",
+    "Auto-invoice helper signature `_maybe_auto_invoice_on_completion(db, request, proposal)` is solid; idempotency via linked_invoice_id is correctly persisted before the second call returns None.",
+    "Actionable error rewrite in onboarding_routes.py only triggers when error string startswith 'nifty not connected'. If NiftyClient ever returns a slightly different phrase ('not connected to nifty', 'token missing'), the rewrite is bypassed. Consider broader match (e.g., status==0 with empty token) for resilience."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase18_5_e2e.py (new — 3 e2e tests)"
+  ],
+  "success_rate": {"backend": "100% (54/54)", "frontend": "100%"},
+  "test_credentials": "founder@thesalvador.group / admin123 (admin)",
+  "seed_data_creation": "All test fixtures self-clean: synthetic proposals/invoices/onboardings are deleted in test teardown (cleanup blocks in finally clauses).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 18.5 covers BreezeDocs auto-invoice on completion + actionable Nifty disconnect UX. Nifty is intentionally disconnected; reconnecting requires OAuth handshake by the admin. Red banner verified live at /admin/onboarding with the exact wording: 'Nifty isn't connected — phase tasks aren't syncing | 1 onboarding is waiting for Nifty. Connect it once and we'll auto-backfill every queued task. | Connect Nifty →'. The amber retry banner only renders when nifty_connected==true AND onboardings_with_errors>0 — could not be reproduced in this env (Nifty disconnected). The e2e test test_manual_sync_returns_invoice_created exercises POST /api/admin/breezedocs/proposals/{id}/sync against a seeded synthetic proposal; the route exists and returns invoice_created field correctly. Phase 18.5 is production-ready.",
+  "rca_of_the_issue": "N/A — no defects found."
+}

@@ -3,6 +3,7 @@
  * regenerate resume links, replay failed phases, copy link to share.
  */
 import { useState, useEffect, useCallback } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { useAdminApi } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,18 +84,29 @@ export default function OnboardingAdmin() {
   const [newForm, setNewForm] = useState({ client_email: "", client_name: "" });
   const [viewOb, setViewOb] = useState(null); // { onboarding, focusPhase? }
   const [viewErrors, setViewErrors] = useState(null); // onboarding doc
+  const [health, setHealth] = useState(null); // {nifty_connected, onboardings_with_errors, blocked_by_disconnect}
+  const [retrying, setRetrying] = useState(false);
+
+  const loadHealth = useCallback(async () => {
+    try {
+      const r = await api.get("/admin/onboarding/health");
+      setHealth(r.data);
+    } catch {
+      /* silent — banner is optional */
+    }
+  }, [api]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await api.get("/admin/onboarding");
+      const [r] = await Promise.all([api.get("/admin/onboarding"), loadHealth()]);
       setItems(r.data);
     } catch {
       toast.error("Failed to load onboardings");
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, loadHealth]);
 
   useEffect(() => {
     load();
@@ -153,6 +165,27 @@ export default function OnboardingAdmin() {
     }
   };
 
+  const onRetryAllFailed = async () => {
+    setRetrying(true);
+    try {
+      const r = await api.post("/admin/onboarding/replay-failed");
+      const count = r.data?.replayed_count ?? 0;
+      toast.success(
+        count > 0
+          ? `Replayed ${count} onboarding${count === 1 ? "" : "s"} — Nifty tasks created.`
+          : "Nothing to retry — all phases already in sync."
+      );
+      load();
+    } catch (e) {
+      toast.error(
+        e?.response?.data?.detail ||
+          "Couldn't retry — check that Nifty is connected in /admin/integrations."
+      );
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="admin-onboarding-page">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -171,6 +204,76 @@ export default function OnboardingAdmin() {
           Start onboarding
         </Button>
       </div>
+
+      {/* Nifty connection banner — only shows when there's something to do */}
+      {health && (
+        <>
+          {!health.nifty_connected && (health.blocked_by_disconnect?.length > 0 || health.onboardings_with_errors > 0) && (
+            <div
+              className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3"
+              data-testid="onboarding-nifty-disconnect-banner"
+            >
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <AlertCircle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm text-rose-900">
+                    Nifty isn&apos;t connected — phase tasks aren&apos;t syncing
+                  </p>
+                  <p className="text-xs text-rose-800 mt-0.5">
+                    {health.blocked_by_disconnect?.length || 0} onboarding
+                    {(health.blocked_by_disconnect?.length || 0) === 1 ? " is" : "s are"} waiting for Nifty.
+                    Connect it once and we&apos;ll auto-backfill every queued task.
+                  </p>
+                </div>
+              </div>
+              <RouterLink to="/admin/integrations">
+                <Button
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-700 text-white"
+                  data-testid="onboarding-banner-connect-nifty"
+                >
+                  Connect Nifty →
+                </Button>
+              </RouterLink>
+            </div>
+          )}
+          {health.nifty_connected && health.onboardings_with_errors > 0 && (
+            <div
+              className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3"
+              data-testid="onboarding-retry-banner"
+            >
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <RefreshCw className="h-5 w-5 text-amber-700 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm text-amber-900">
+                    {health.onboardings_with_errors} onboarding
+                    {health.onboardings_with_errors === 1 ? " has" : "s have"} pending Nifty tasks
+                  </p>
+                  <p className="text-xs text-amber-800 mt-0.5">
+                    Nifty is connected — replay them all in one click to backfill the missing tasks.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={onRetryAllFailed}
+                disabled={retrying}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                data-testid="onboarding-banner-retry-all"
+              >
+                {retrying ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Retrying…
+                  </>
+                ) : (
+                  <>Retry pending tasks</>
+                )}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
 
       {loading ? (
         <Card className="border-border"><CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent></Card>
