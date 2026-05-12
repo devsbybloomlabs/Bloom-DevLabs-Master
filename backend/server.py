@@ -145,23 +145,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.google_calendar = GoogleCalendarClient()
     app.state.google_calendar.bind_db(db)
 
-    # Seed founder + settings + authority metric — bounded so a slow Mongo
-    # cannot stall the K8s readiness probe.
-    async def _bootstrap() -> None:
-        await ensure_seed_user(db)
-        await ensure_settings(db)
-        await ensure_authority_metric(db)
-
-    try:
-        await asyncio.wait_for(_bootstrap(), timeout=15.0)
-    except asyncio.TimeoutError:
-        log.error(
-            "Startup seed timed out after 15s — server will still come up; "
-            "first request may re-trigger seeding."
-        )
-    except Exception as e:  # pragma: no cover
-        log.exception("Startup seed failed: %s", e)
-
     # Background scheduler — daily 5am routine generation
     scheduler = AsyncIOScheduler(timezone="UTC")
 
@@ -231,15 +214,37 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Hourly retry of queued portal contact submissions
     scheduler.add_job(thrivedesk_retry_cron_wrapper, CronTrigger(minute=45))
 
-    scheduler.start()
     app.state.scheduler = scheduler
+
+    # Defer slow work (DB seeding + scheduler.start) to a background task so
+    # uvicorn can bind the port and answer /health immediately. The deployer's
+    # supervisor wrapper kills the container if the port isn't bound within 60s,
+    # so the lifespan must yield as quickly as possible. Seeding and scheduler
+    # init are best-effort and can complete after the app is already serving.
+    async def _warmup() -> None:
+        try:
+            await ensure_seed_user(db)
+            await ensure_settings(db)
+            await ensure_authority_metric(db)
+        except Exception as exc:
+            log.exception("Startup seed failed: %s", exc)
+        try:
+            scheduler.start()
+        except Exception as exc:
+            log.exception("Scheduler start failed: %s", exc)
+        log.info("Bloom Labs API warmup complete")
+
+    warmup_task = asyncio.create_task(_warmup())
     log.info("Bloom Labs API ready at /api")
 
     try:
         yield
     finally:
+        if not warmup_task.done():
+            warmup_task.cancel()
         try:
-            scheduler.shutdown(wait=False)
+            if scheduler.running:
+                scheduler.shutdown(wait=False)
         except Exception:
             pass
         client.close()

@@ -221,10 +221,26 @@ async def nifty_sync(
 ) -> Dict[str, Any]:
     """Re-fetch projects + members from Nifty and cache them."""
     if not await nifty.is_connected():
-        raise HTTPException(503, "Nifty not connected")
+        raise HTTPException(
+            503,
+            "Nifty isn't connected — click Reconnect on the Nifty card to grant access.",
+        )
     proj_res = await nifty.list_projects()
     if not proj_res.get("success"):
-        raise HTTPException(502, proj_res.get("error") or "Projects fetch failed")
+        status = proj_res.get("status") or 0
+        err = proj_res.get("error") or "Unknown error"
+        # 401 → token revoked / expired and refresh failed. Tell the user exactly
+        # what to do instead of leaving them with a generic "Sync failed" toast.
+        if status in (401, 403):
+            raise HTTPException(
+                401,
+                "Nifty token rejected (401). Click Disconnect → Reconnect to re-grant access.",
+            )
+        if status == 429:
+            raise HTTPException(429, "Nifty rate-limit hit. Try again in a few minutes.")
+        if status >= 500:
+            raise HTTPException(502, f"Nifty server error ({status}). Try again shortly.")
+        raise HTTPException(502, f"Nifty projects fetch failed: {err}")
     mem_res = await nifty.list_members()
     if not mem_res.get("success"):
         # Members across whole workspace can fail; non-blocking

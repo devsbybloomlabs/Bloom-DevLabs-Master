@@ -43,16 +43,22 @@ class AgencyHandyClient:
             "AGENCYHANDY_DEFAULT_CURRENCY", "USD"
         )
         self.timeout = timeout
+        # In-process cache for the agency's "client" role id, fetched lazily.
+        self._client_role_id: Optional[str] = None
         if not self.api_key:
             log.warning("AGENCYHANDY_API_KEY is not set — Agency Handy calls will fail.")
 
     @property
     def headers(self) -> Dict[str, str]:
-        return {
+        h = {
             "x-api-key": self.api_key,
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+        # Member endpoints (create client, roles) require companyId header alongside the path id.
+        if self.company_id:
+            h["companyId"] = self.company_id
+        return h
 
     @property
     def is_configured(self) -> bool:
@@ -216,6 +222,77 @@ class AgencyHandyClient:
             "GET",
             f"/company/{self.company_id}/members",
             params={**params, "role": params.pop("role", "client")} if params else {"role": "client"},
+        )
+
+    async def _get_client_role_id(self) -> Optional[str]:
+        """Fetch and cache the agency's `client` role id.
+
+        AgencyHandy's create-client endpoint requires the top-level role id of
+        the 'client' role within this workspace. We look it up once and reuse
+        for the process lifetime.
+        """
+        if self._client_role_id:
+            return self._client_role_id
+        if not self.company_id:
+            return None
+        res = await self._request("GET", "/roles", params={"type": "company"})
+        if not res.get("success"):
+            return None
+        roles = (res.get("data") or {}).get("roles") or []
+        for entry in roles:
+            inner = entry.get("role") or {}
+            if str(inner.get("name", "")).lower() == "client":
+                rid = entry.get("_id") or entry.get("id")
+                if rid:
+                    self._client_role_id = rid
+                    return rid
+        return None
+
+    async def create_client(
+        self,
+        *,
+        email: str,
+        first_name: str,
+        last_name: str = "",
+        source: str = "paypal_checkout",
+        status: str = "Active",
+    ) -> Dict[str, Any]:
+        """Create (invite) a new client/lead in AgencyHandy.
+
+        Used after a PayPal capture to mirror the payer as a client record
+        inside AgencyHandy. Idempotent at the AH side — repeating the call
+        with the same email returns a 4xx that callers should swallow.
+        """
+        if not self.is_configured:
+            return {"success": False, "status": 0, "data": None, "error": "Agency Handy not configured"}
+        if not self.company_id:
+            return {
+                "success": False,
+                "status": 0,
+                "data": None,
+                "error": "AGENCYHANDY_COMPANY_ID not configured",
+            }
+        role_id = await self._get_client_role_id()
+        if not role_id:
+            return {
+                "success": False,
+                "status": 0,
+                "data": None,
+                "error": "Could not resolve Agency Handy 'client' role id",
+            }
+        body = {
+            "firstName": first_name or (email.split("@")[0] if email else "Client"),
+            "lastName": last_name or "",
+            "email": email,
+            "role": role_id,
+            "isConvertedClient": False,
+            "status": status,
+            "source": source,
+        }
+        return await self._request(
+            "POST",
+            f"/company/{self.company_id}/members/bulk-client",
+            json=body,
         )
 
     async def list_notifications(self, **params: Any) -> Dict[str, Any]:
