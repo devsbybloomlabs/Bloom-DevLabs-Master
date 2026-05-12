@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 import email_service
@@ -30,6 +31,12 @@ from db_utils import prepare_for_mongo
 from models import INVOICE_STATUSES, InvoiceCreateRequest, InvoiceUpdateRequest
 
 log = logging.getLogger("invoices.routes")
+
+
+# Public-facing pay-this-invoice endpoint (no auth) — invoice ID is a UUID so
+# only someone with the link can pay. Tagged on the order so the capture webhook
+# can mark the invoice paid automatically.
+invoice_public_router = APIRouter(prefix="/public/invoices", tags=["invoices-public"])
 
 
 def _now() -> datetime:
@@ -288,3 +295,118 @@ async def client_invoice_pdf(
             "Cache-Control": "private, max-age=60",
         },
     )
+
+
+
+# ============================================================
+# Public pay-this-invoice flow (1-click email-to-PayPal)
+# ============================================================
+
+
+@invoice_public_router.get("/{invoice_id}/summary")
+async def public_invoice_summary(
+    invoice_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Lightweight, no-auth summary for the public pay page.
+
+    Returns enough info to render the landing page before the client clicks
+    Pay (number, client name, total, balance_due, currency, status). The
+    invoice ID is a UUID so enumeration is impractical.
+    """
+    inv = await db.invoices.find_one(
+        {"id": invoice_id},
+        {
+            "_id": 0,
+            "id": 1,
+            "number": 1,
+            "client_name": 1,
+            "client_email": 1,
+            "currency": 1,
+            "total": 1,
+            "balance_due": 1,
+            "amount_paid": 1,
+            "status": 1,
+            "issued_at": 1,
+            "due_at": 1,
+            "paid_at": 1,
+            "line_items": 1,
+            "notes": 1,
+        },
+    )
+    if not inv:
+        raise HTTPException(404, "Invoice not found")
+    return inv
+
+
+@invoice_public_router.get("/{invoice_id}/pay")
+async def public_pay_invoice(
+    invoice_id: str,
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> RedirectResponse:
+    """Generate a fresh PayPal order for the invoice's balance + 302 to PayPal.
+
+    Each visit creates a new order so the link never expires (PayPal orders
+    auto-expire after ~21 days). The PayPal `custom_id` carries the invoice
+    ID so the capture webhook can mark the invoice paid automatically.
+    """
+    inv = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not inv:
+        raise HTTPException(404, "Invoice not found")
+    if inv["status"] == "paid":
+        raise HTTPException(409, "Invoice already paid")
+    if inv["status"] == "void":
+        raise HTTPException(410, "Invoice has been voided")
+    balance = float(inv.get("balance_due") or inv.get("total") or 0)
+    if balance <= 0:
+        raise HTTPException(400, "Nothing owed on this invoice")
+
+    pp = getattr(request.app.state, "paypal", None)
+    if not pp or not pp.is_configured:
+        raise HTTPException(503, "PayPal not configured")
+
+    import os
+    base = os.environ.get("APP_BASE_URL", "https://bybloomlabs.com").rstrip("/")
+    res = await pp.create_order(
+        amount=f"{balance:.2f}",
+        currency=inv["currency"],
+        reference_id=f"invoice-{inv['number']}",
+        description=f"Payment for {inv['number']}",
+        custom_id=f"invoice:{invoice_id}",
+        return_url=f"{base}/checkout/success?invoice={invoice_id}",
+        cancel_url=f"{base}/portal/invoices/{invoice_id}?cancelled=1",
+    )
+    if not res.get("success"):
+        raise HTTPException(502, res.get("error") or "PayPal order create failed")
+    order = res["data"]
+    approval_url = next(
+        (lk["href"] for lk in (order.get("links") or []) if lk.get("rel") == "approve"),
+        None,
+    )
+    if not approval_url:
+        raise HTTPException(502, "PayPal did not return an approval URL")
+
+    # Persist the order with invoice linkage so the webhook can join them on capture
+    doc = {
+        "id": order["id"],
+        "kind": "order",
+        "status": order.get("status", "CREATED"),
+        "tier": None,
+        "amount": f"{balance:.2f}",
+        "currency": inv["currency"],
+        "customer_email": inv["client_email"],
+        "customer_name": inv.get("client_name"),
+        "description": f"Payment for {inv['number']}",
+        "metadata": {"invoice_id": invoice_id, "invoice_number": inv["number"]},
+        "raw": order,
+        "payment_plan": None,
+        "source": "invoice_pay_link",
+        "linked_invoice_id": invoice_id,
+        "created_at": _now().isoformat(),
+        "updated_at": _now().isoformat(),
+    }
+    await db.paypal_transactions.update_one(
+        {"id": order["id"]}, {"$set": prepare_for_mongo(doc)}, upsert=True
+    )
+    return RedirectResponse(approval_url, status_code=302)

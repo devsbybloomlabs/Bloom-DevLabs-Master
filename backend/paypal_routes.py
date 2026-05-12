@@ -272,6 +272,37 @@ async def capture_order(
             }},
         )
 
+    # If this capture is paying off a manually-issued invoice (via the public
+    # pay-this-invoice link), mark that invoice as paid.
+    linked_invoice_id = existing.get("linked_invoice_id") if existing else None
+    if status_str == "COMPLETED" and linked_invoice_id:
+        try:
+            inv = await db.invoices.find_one({"id": linked_invoice_id}, {"_id": 0})
+            if inv and inv.get("status") != "paid":
+                amount_paid = float(existing.get("amount") or 0)
+                new_balance = max(0.0, float(inv.get("total") or 0) - amount_paid)
+                inv_update = {
+                    "amount_paid": amount_paid,
+                    "balance_due": new_balance,
+                    "paid_at": _now().isoformat() if new_balance == 0 else inv.get("paid_at"),
+                    "status": "paid" if new_balance == 0 else "partial",
+                    "paypal_order_id": order_id,
+                    "updated_at": _now().isoformat(),
+                }
+                await db.invoices.update_one(
+                    {"id": linked_invoice_id}, {"$set": prepare_for_mongo(inv_update)}
+                )
+                # Re-render the PDF so the cached file reflects PAID status
+                try:
+                    import invoice_service
+
+                    fresh = await db.invoices.find_one({"id": linked_invoice_id}, {"_id": 0})
+                    await invoice_service.cache_invoice_pdf(db, fresh)
+                except Exception as exc:  # pragma: no cover
+                    log.warning("Invoice PDF re-cache failed: %s", exc)
+        except Exception as exc:  # pragma: no cover
+            log.warning("Could not mark invoice %s paid: %s", linked_invoice_id, exc)
+
     await db.paypal_transactions.update_one(
         {"id": order_id}, {"$set": update}, upsert=True
     )
