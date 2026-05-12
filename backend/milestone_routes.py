@@ -11,12 +11,14 @@ APScheduler jobs:
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+import slack_notifier
 from auth import get_current_user
 from client_routes import get_current_client
 from db_utils import prepare_for_mongo, serialize_doc
@@ -348,20 +350,35 @@ async def admin_sync_history(
     return [serialize_doc(d) for d in docs]
 
 
+@milestone_admin_router.get("/blockers")
+async def admin_list_blockers(
+    db: AsyncIOMotorDatabase = Depends(get_db), limit: int = 50
+) -> List[Dict[str, Any]]:
+    """Recent Nifty blockers detected by the comment cron (Integration #5)."""
+    docs = await db.nifty_blockers.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    return docs
+
+
 # ================================================================
 # APScheduler jobs (registered from server.py)
 # ================================================================
 async def nifty_comment_poll(app) -> Dict[str, int]:
-    """Every 5 min — poll Nifty for comments on tracked tasks."""
+    """Every 5 min — poll Nifty for comments on tracked tasks.
+
+    Also scans for blocker keywords (`blocker:`, `waiting on:`, `blocked by:`)
+    and forwards them to Slack as an at-mention so unblockers act fast. We
+    de-duplicate via the comment text + task_id so a single blocker only
+    pings Slack once.
+    """
     db = app.state.db
     nifty = app.state.nifty
     if not await nifty.is_connected():
-        return {"polled": 0, "reason": "nifty_not_connected"}
-    # Find all milestones with a nifty_task_id
+        return {"polled": 0, "blockers": 0, "reason": "nifty_not_connected"}
     cursor = db.milestones.find(
         {"nifty_task_id": {"$ne": None}}, {"_id": 0, "id": 1, "nifty_task_id": 1, "client_email": 1, "title": 1}
     )
     polled = 0
+    blockers = 0
     async for m in cursor:
         try:
             res = await nifty._request(
@@ -370,7 +387,6 @@ async def nifty_comment_poll(app) -> Dict[str, int]:
             if not res.get("success"):
                 continue
             task = res.get("data") or {}
-            # Lightweight comment-only update; full handler needs request context
             comment = task.get("last_comment") or ""
             if isinstance(comment, str) and comment.lower().startswith("client notes:"):
                 note_text = comment.split(":", 1)[-1].strip()
@@ -385,10 +401,111 @@ async def nifty_comment_poll(app) -> Dict[str, int]:
                         "$set": {"last_updated": _now().isoformat()},
                     },
                 )
+            # Blocker detection (Integration #5 from master workflow doc)
+            if isinstance(comment, str) and comment.strip():
+                fired = await _maybe_fire_blocker(
+                    db,
+                    task=task,
+                    milestone=m,
+                    comment=comment,
+                )
+                if fired:
+                    blockers += 1
             polled += 1
         except Exception as exc:
             log.warning("comment poll failed: %s", exc)
-    return {"polled": polled}
+    return {"polled": polled, "blockers": blockers}
+
+
+BLOCKER_PREFIXES = ("blocker:", "waiting on:", "blocked by:")
+
+
+async def _maybe_fire_blocker(
+    db: AsyncIOMotorDatabase,
+    *,
+    task: Dict[str, Any],
+    milestone: Dict[str, Any],
+    comment: str,
+) -> bool:
+    """If the latest comment starts with a blocker prefix and we haven't
+    notified about it before, post to Slack + create an admin notification.
+
+    Returns True if we fired a notification, False otherwise.
+    """
+    text = comment.strip()
+    lower = text.lower()
+    matched = next((p for p in BLOCKER_PREFIXES if lower.startswith(p)), None)
+    if not matched:
+        return False
+
+    body = text[len(matched):].strip()
+    # Stable de-dupe key per task + comment text
+    task_id = task.get("id") or task.get("_id") or milestone.get("nifty_task_id")
+    digest_key = f"{task_id}::{lower[:160]}"
+    existing = await db.nifty_blockers.find_one({"key": digest_key}, {"_id": 0, "id": 1})
+    if existing:
+        return False
+
+    # Extract @mentions for at-the-ready unblocker callout
+    import re
+
+    mentions = re.findall(r"@([\w\-.]+)", body)
+    severity = "🚨" if matched == "blocker:" else "⚠️"
+    headline = {
+        "blocker:": "Project blocker",
+        "waiting on:": "Waiting on someone",
+        "blocked by:": "Task blocked",
+    }[matched]
+
+    task_title = task.get("title") or task.get("name") or milestone.get("title") or "(untitled task)"
+    task_url = task.get("url") or task.get("permalink") or ""
+    mention_str = ", ".join(f"@{m}" for m in mentions) if mentions else "_(no one tagged)_"
+
+    slack_text = (
+        f"{severity} *{headline}* on `{task_title}`\n"
+        f"> {body[:400]}\n"
+        f"Tagged: {mention_str}"
+    )
+    if task_url:
+        slack_text += f"\n<{task_url}|Open in Nifty>"
+    if milestone.get("client_email"):
+        slack_text += f"\nClient: {milestone['client_email']}"
+
+    slack_res = await slack_notifier.post_message(db, text=slack_text)
+
+    # Record this blocker so we don't re-notify and so admins can see history.
+    record = {
+        "id": str(uuid.uuid4()),
+        "key": digest_key,
+        "task_id": task_id,
+        "task_title": task_title,
+        "task_url": task_url,
+        "milestone_id": milestone.get("id"),
+        "client_email": milestone.get("client_email"),
+        "kind": matched.rstrip(":"),
+        "body": body,
+        "mentions": mentions,
+        "slack_ok": bool(slack_res.get("ok")),
+        "slack_status": slack_res.get("status"),
+        "slack_reason": slack_res.get("reason"),
+        "created_at": _now().isoformat(),
+    }
+    await db.nifty_blockers.insert_one(record)
+
+    # Admin notification fallback so the founder sees it even without Slack
+    try:
+        from models import NotificationItem
+
+        notif = NotificationItem(
+            kind="nifty_blocker",
+            title=f"{severity} {headline}: {task_title}",
+            body=f"{body[:300]}\nClient: {milestone.get('client_email') or '—'}",
+            link="/admin/milestones",
+        )
+        await db.notifications.insert_one(prepare_for_mongo(notif.model_dump()))
+    except Exception as exc:  # pragma: no cover
+        log.warning("Blocker admin notif failed: %s", exc)
+    return True
 
 
 async def nifty_timeline_refresh(app) -> Dict[str, int]:

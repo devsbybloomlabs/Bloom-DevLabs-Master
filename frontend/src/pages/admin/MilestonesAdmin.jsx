@@ -38,6 +38,8 @@ import {
   Loader2,
   Save,
   History,
+  AlertOctagon,
+  ExternalLink,
 } from "lucide-react";
 
 const STATUS_META = {
@@ -64,18 +66,21 @@ export default function MilestonesAdmin() {
   const api = useAdminApi();
   const [milestones, setMilestones] = useState([]);
   const [history, setHistory] = useState([]);
+  const [blockers, setBlockers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [mRes, hRes] = await Promise.allSettled([
+      const [mRes, hRes, bRes] = await Promise.allSettled([
         api.get("/admin/milestones"),
         api.get("/admin/milestones/sync-history"),
+        api.get("/admin/milestones/blockers"),
       ]);
       setMilestones(mRes.status === "fulfilled" ? mRes.value.data : []);
       setHistory(hRes.status === "fulfilled" ? hRes.value.data : []);
+      setBlockers(bRes.status === "fulfilled" ? bRes.value.data : []);
     } finally {
       setLoading(false);
     }
@@ -137,6 +142,15 @@ export default function MilestonesAdmin() {
       <Tabs defaultValue="active" className="w-full">
         <TabsList>
           <TabsTrigger value="active" data-testid="milestones-tab-active">Active</TabsTrigger>
+          <TabsTrigger value="blockers" data-testid="milestones-tab-blockers">
+            <AlertOctagon className="h-3.5 w-3.5 mr-1.5" />
+            Blockers
+            {blockers.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] rounded-full bg-rose-600 text-white">
+                {blockers.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="history" data-testid="milestones-tab-history">
             <History className="h-3.5 w-3.5 mr-1.5" />
             Sync history
@@ -201,6 +215,81 @@ export default function MilestonesAdmin() {
                 </Card>
               );
             })
+          )}
+        </TabsContent>
+        <TabsContent value="blockers" className="mt-5 space-y-3">
+          {blockers.length === 0 ? (
+            <Card className="border-border">
+              <CardContent className="py-12 text-center" data-testid="blockers-empty">
+                <p className="font-display text-base font-medium">No blockers detected</p>
+                <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
+                  Auto-detected from Nifty task comments starting with{" "}
+                  <code className="text-[11px] bg-secondary px-1 rounded">blocker:</code>,{" "}
+                  <code className="text-[11px] bg-secondary px-1 rounded">waiting on:</code> or{" "}
+                  <code className="text-[11px] bg-secondary px-1 rounded">blocked by:</code>.
+                  Each match pings Slack so the unblocker acts fast.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            blockers.map((b) => (
+              <Card
+                key={b.id}
+                className="border-rose-200"
+                data-testid={`blocker-row-${b.id}`}
+              >
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex items-start gap-3 flex-wrap">
+                    <AlertOctagon className="h-5 w-5 text-rose-600 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className="bg-rose-100 text-rose-900 border-0 text-[10px] capitalize">
+                          {b.kind}
+                        </Badge>
+                        {b.slack_ok ? (
+                          <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-700">
+                            Slack ✓
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700">
+                            Slack: {b.slack_reason || "skipped"}
+                          </Badge>
+                        )}
+                        <span className="text-[11px] text-muted-foreground">
+                          {b.created_at && new Date(b.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 font-display text-base font-medium">
+                        {b.task_title || "(untitled task)"}
+                      </p>
+                      <p className="mt-1 text-sm whitespace-pre-wrap">{b.body}</p>
+                      {Array.isArray(b.mentions) && b.mentions.length > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Tagged: {b.mentions.map((m) => `@${m}`).join(", ")}
+                        </p>
+                      )}
+                      {b.client_email && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Client: {b.client_email}
+                        </p>
+                      )}
+                      {b.task_url && (
+                        <a
+                          href={b.task_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center text-xs text-[#1E3A8A] hover:underline"
+                          data-testid={`blocker-open-nifty-${b.id}`}
+                        >
+                          Open in Nifty
+                          <ExternalLink className="h-3 w-3 ml-1" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
           )}
         </TabsContent>
         <TabsContent value="history" className="mt-5">

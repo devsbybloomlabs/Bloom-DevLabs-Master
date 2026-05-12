@@ -27,7 +27,53 @@ import {
   AlertCircle,
   Copy,
   Loader2,
+  Eye,
+  FileText,
 } from "lucide-react";
+
+const PHASE_LABEL = {
+  phase1: "Phase 1 — Design language",
+  phase2: "Phase 2 — Function references",
+  phase3: "Phase 3 — Company background",
+};
+
+function renderLinkList(links) {
+  if (!Array.isArray(links) || links.length === 0) {
+    return <p className="text-xs text-muted-foreground italic">No links submitted.</p>;
+  }
+  return (
+    <ol className="space-y-2.5 text-sm">
+      {links.map((lk, idx) => (
+        <li key={idx} className="rounded-md border border-border bg-background/50 p-2.5">
+          <a
+            href={lk?.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-[#1E3A8A] hover:underline break-all"
+          >
+            {idx + 1}. {lk?.url || "—"}
+          </a>
+          {lk?.why && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Why: </span>
+              {lk.why}
+            </p>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function renderField(label, value) {
+  if (!value || (typeof value === "string" && !value.trim())) return null;
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-sm whitespace-pre-wrap">{value}</div>
+    </div>
+  );
+}
 
 export default function OnboardingAdmin() {
   const api = useAdminApi();
@@ -35,6 +81,8 @@ export default function OnboardingAdmin() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newForm, setNewForm] = useState({ client_email: "", client_name: "" });
+  const [viewOb, setViewOb] = useState(null); // { onboarding, focusPhase? }
+  const [viewErrors, setViewErrors] = useState(null); // onboarding doc
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,10 +206,17 @@ export default function OnboardingAdmin() {
                           {phasesDone}/3 phases submitted
                         </span>
                         {(ob.nifty_errors || []).length > 0 && (
-                          <Badge variant="outline" className="border-amber-400 text-amber-700">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            {ob.nifty_errors.length} Nifty error(s)
-                          </Badge>
+                          <button
+                            type="button"
+                            onClick={() => setViewErrors(ob)}
+                            data-testid={`onboarding-view-errors-${ob.id}`}
+                            className="inline-flex items-center"
+                          >
+                            <Badge variant="outline" className="border-amber-400 text-amber-700 hover:bg-amber-50 cursor-pointer">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              {ob.nifty_errors.length} Nifty error(s) — view
+                            </Badge>
+                          </button>
                         )}
                       </div>
                       <p className="mt-2 font-display text-base font-medium">{ob.client_name || ob.client_email}</p>
@@ -225,16 +280,28 @@ export default function OnboardingAdmin() {
                             Nifty tasks: {taskIds.length}
                           </p>
                           {submittedAt && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="mt-2 h-7 text-[11px]"
-                              onClick={() => onReplay(ob.id, phase)}
-                              data-testid={`onboarding-replay-${ob.id}-${phase}`}
-                            >
-                              <RefreshCw className="h-3 w-3 mr-1" />
-                              Re-run automation
-                            </Button>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-[11px]"
+                                onClick={() => setViewOb({ onboarding: ob, focusPhase: phase })}
+                                data-testid={`onboarding-view-submission-${ob.id}-${phase}`}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-[11px]"
+                                onClick={() => onReplay(ob.id, phase)}
+                                data-testid={`onboarding-replay-${ob.id}-${phase}`}
+                              >
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Re-run
+                              </Button>
+                            </div>
                           )}
                         </div>
                       );
@@ -288,6 +355,175 @@ export default function OnboardingAdmin() {
               <LinkIcon className="h-4 w-4 mr-2" />
               Generate link
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View submission dialog */}
+      <Dialog open={Boolean(viewOb)} onOpenChange={(o) => !o && setViewOb(null)}>
+        <DialogContent
+          className="sm:max-w-2xl max-h-[85vh] overflow-y-auto"
+          data-testid="onboarding-view-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <FileText className="h-5 w-5 text-[#1E3A8A]" />
+              Client submission
+            </DialogTitle>
+            <DialogDescription>
+              Everything the client typed across the 3-step onboarding.
+            </DialogDescription>
+          </DialogHeader>
+          {viewOb?.onboarding && (
+            <div className="space-y-5">
+              <div className="rounded-lg border border-border bg-[var(--warm-50)] px-3 py-3 text-sm">
+                <div className="font-medium">{viewOb.onboarding.client_name || viewOb.onboarding.client_email}</div>
+                <div className="text-xs text-muted-foreground">{viewOb.onboarding.client_email}</div>
+              </div>
+              {[1, 2, 3].map((p) => {
+                const phaseKey = `phase${p}`;
+                const data = viewOb.onboarding[phaseKey] || {};
+                const submittedAt = viewOb.onboarding[`${phaseKey}_submitted_at`];
+                const isFocused = viewOb.focusPhase === p;
+                if (!submittedAt && Object.keys(data).length === 0) {
+                  return (
+                    <details
+                      key={p}
+                      className="rounded-lg border border-border bg-card p-3 opacity-60"
+                      data-testid={`onboarding-view-section-${phaseKey}`}
+                    >
+                      <summary className="cursor-pointer text-sm font-medium">
+                        {PHASE_LABEL[phaseKey]} — Not submitted
+                      </summary>
+                    </details>
+                  );
+                }
+                return (
+                  <details
+                    key={p}
+                    open={isFocused || p === viewOb.focusPhase}
+                    className={`rounded-lg border bg-card p-3 ${
+                      isFocused ? "border-[#1E3A8A] ring-1 ring-[#1E3A8A]/20" : "border-border"
+                    }`}
+                    data-testid={`onboarding-view-section-${phaseKey}`}
+                  >
+                    <summary className="cursor-pointer flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{PHASE_LABEL[phaseKey]}</span>
+                      {submittedAt && (
+                        <span className="text-[11px] text-muted-foreground">
+                          {new Date(submittedAt).toLocaleString()}
+                        </span>
+                      )}
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      {p === 1 && (
+                        <>
+                          <div>
+                            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
+                              Design Links
+                            </div>
+                            {renderLinkList(data.design_links)}
+                          </div>
+                          {renderField("Color Preferences", data.color_preferences)}
+                          {renderField("Mood Keywords", data.mood_keywords)}
+                        </>
+                      )}
+                      {p === 2 && (
+                        <>
+                          <div>
+                            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
+                              Function References
+                            </div>
+                            {renderLinkList(data.function_links)}
+                          </div>
+                          {renderField("Additional Requirements", data.additional_specs)}
+                        </>
+                      )}
+                      {p === 3 && (
+                        <>
+                          {renderField("Company Name", data.company_name)}
+                          {renderField("Industry", data.industry)}
+                          {renderField("Target Audience", data.target_audience)}
+                          {renderField("Unique Value Proposition", data.uvp)}
+                          {renderField("Success Metrics", data.success_metrics)}
+                          {renderField("Launch Date", data.launch_date)}
+                          {renderField("Notes for the team", data.notes)}
+                        </>
+                      )}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setViewOb(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Nifty errors dialog */}
+      <Dialog open={Boolean(viewErrors)} onOpenChange={(o) => !o && setViewErrors(null)}>
+        <DialogContent
+          className="sm:max-w-2xl max-h-[85vh] overflow-y-auto"
+          data-testid="onboarding-errors-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              Nifty automation errors
+            </DialogTitle>
+            <DialogDescription>
+              These tasks couldn&apos;t be created in Nifty. Use the description below
+              to add them manually, or click <strong>Re-run automation</strong> on the phase
+              card after fixing the root cause (usually a stale Nifty OAuth token — Disconnect → Reconnect).
+            </DialogDescription>
+          </DialogHeader>
+          {viewErrors?.nifty_errors && (
+            <div className="space-y-3">
+              {viewErrors.nifty_errors.map((err, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-lg border border-amber-200 bg-amber-50/40 p-3.5"
+                  data-testid={`onboarding-error-row-${idx}`}
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-[10px] capitalize">
+                      {err.phase}
+                    </Badge>
+                    <span className="text-[11px] text-muted-foreground">
+                      {err.at ? new Date(err.at).toLocaleString() : ""}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 font-medium text-sm">{err.task_name}</div>
+                  <div className="mt-1 text-xs">
+                    <span className="font-medium text-rose-700">Error: </span>
+                    <span className="text-rose-700">
+                      {err.error || "Unknown"} {err.status ? `(${err.status})` : ""}
+                    </span>
+                  </div>
+                  {Array.isArray(err.assignees) && err.assignees.length > 0 && (
+                    <div className="mt-1 text-xs">
+                      <span className="font-medium text-muted-foreground">Assignees: </span>
+                      {err.assignees.join(", ")}
+                    </div>
+                  )}
+                  {err.description_preview && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                        Show task description
+                      </summary>
+                      <pre className="mt-2 whitespace-pre-wrap text-[11px] bg-background border border-border rounded p-2 max-h-48 overflow-y-auto">
+                        {err.description_preview}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setViewErrors(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
