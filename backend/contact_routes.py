@@ -55,10 +55,24 @@ import slack_notifier
 log = logging.getLogger("client.contact")
 
 UPLOAD_DIR = Path(os.environ.get("UPLOADS_DIR", "/app/backend/uploads"))
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB
 ALLOWED_PRIORITIES = {"low", "medium", "high"}
 PRIORITY_TO_TD = {"low": "Low", "medium": "Normal", "high": "High"}
+
+
+def _ensure_upload_dir() -> Path:
+    """Lazily create the uploads dir on first use.
+
+    Doing this at module import time crashes the entire backend if the
+    filesystem layer is read-only (common in production containers), so
+    we defer it to actual upload time and swallow EEXIST/permission errors
+    in favour of returning the path for caller-side handling.
+    """
+    try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:  # pragma: no cover
+        log.warning("Could not create UPLOAD_DIR %s: %s", UPLOAD_DIR, exc)
+    return UPLOAD_DIR
 
 
 def _now() -> datetime:
@@ -113,7 +127,7 @@ async def submit_contact(
         else:
             ext = Path(file.filename).suffix.lower()[:10] or ".bin"
             stored_name = f"{uuid4().hex}{ext}"
-            stored_path = UPLOAD_DIR / stored_name
+            stored_path = _ensure_upload_dir() / stored_name
             async with aiofiles.open(stored_path, "wb") as f:
                 await f.write(contents)
             attachment_meta = {
