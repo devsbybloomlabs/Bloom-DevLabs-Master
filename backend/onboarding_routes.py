@@ -194,14 +194,20 @@ async def _create_nifty_task_safe(
         custom_fields=custom_fields,
     )
     # Detect & rewrite the most common cause so the admin sees something actionable
-    if (
-        not res.get("success")
-        and (res.get("error") or "").lower().startswith("nifty not connected")
-    ):
-        res["error"] = (
-            "Nifty isn't connected. Open /admin/integrations → Nifty → "
-            "Connect, then click 'Retry pending tasks' on the onboarding page."
+    if not res.get("success"):
+        err_lower = (res.get("error") or "").lower()
+        status_code = res.get("status") or 0
+        looks_disconnected = (
+            "nifty not connected" in err_lower
+            or "not connected" in err_lower
+            or (status_code == 0 and "timeout" not in err_lower)
+            or status_code == 401
         )
+        if looks_disconnected:
+            res["error"] = (
+                "Nifty isn't connected. Open /admin/integrations → Nifty → "
+                "Connect, then click 'Retry pending tasks' on the onboarding page."
+            )
     if res.get("success"):
         task = res.get("data") or {}
         task_id = task.get("id") or task.get("_id") or ""
@@ -725,7 +731,12 @@ async def admin_onboarding_health(
     affected_obs: List[Dict[str, Any]] = []
     async for doc in db.onboardings.aggregate(pipeline):
         for err in doc.get("nifty_errors") or []:
-            if (err.get("error") or "").lower().startswith(("nifty not connected", "nifty isn't connected")):
+            err_lower = (err.get("error") or "").lower()
+            if (
+                "nifty not connected" in err_lower
+                or "isn't connected" in err_lower
+                or "open /admin/integrations" in err_lower
+            ):
                 affected_obs.append({"id": doc["id"], "phase": err.get("phase")})
                 break
     return {

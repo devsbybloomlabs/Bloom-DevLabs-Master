@@ -24,6 +24,38 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase 18.5 — BreezeDocs auto-invoice + Nifty disconnect UX (Feb 2026)
+**Goal**: Wire two improvements requested by the user: (A) collapse "proposal signed → invoice received → payment" into a single click by auto-issuing the invoice the moment a BreezeDocs proposal reaches `completed`, and (B) turn the silent Phase 1 → Nifty sync failure into a visible, 1-click-fixable issue.
+
+**Part A — BreezeDocs completed → auto-invoice + 1-click pay link:**
+- New `breezedocs_routes._maybe_auto_invoice_on_completion(db, request, proposal)` helper. Fires when:
+  - `proposal.status == "completed"`
+  - `amount > 0` (NDAs and zero-priced docs skip)
+  - `linked_invoice_id` is not already set (idempotent)
+  - `client_email` is present
+- Creates the invoice via `invoice_service.create_manual_invoice` with line-item description `"{proposal_title} (BreezeDocs proposal #{breezedocs_id})"` and notes pointing back to the BreezeDoc document.
+- Caches the branded PDF, sends the **send_invoice_issued** branded email with `invoice_url={base}/pay/invoice/{id}` (the Phase-18 1-click pay link).
+- Persists `linked_invoice_id` on the proposal so the admin sees the link in `/admin/proposals`.
+- Wired into both paths:
+  - `breezedocs_sync_cron` (every 10 min) — auto-invoices on every detected `completed` transition
+  - `POST /admin/breezedocs/proposals/{id}/sync` — admin's manual refresh — response now includes `invoice_created: <id>` when applicable.
+
+**Part B — Phase 1 Onboarding Nifty disconnect UX:**
+- Diagnosed root cause: `nifty_errors[].error: "Nifty not connected"`, `status: 0` because no OAuth handshake has completed.
+- `_create_nifty_task_safe` now rewrites generic disconnect errors into an actionable string: `"Nifty isn't connected. Open /admin/integrations → Nifty → Connect, then click 'Retry pending tasks' on the onboarding page."` Pattern broadened (Phase-18.5 resilience pass) to catch `nifty not connected`, generic `not connected`, status 0 (non-timeout), and status 401.
+- New backend endpoints:
+  - `GET /admin/onboarding/health` — snapshot `{nifty_connected, onboardings_with_errors, blocked_by_disconnect: [{id, phase}]}`.
+  - `POST /admin/onboarding/replay-failed` — replays every failed phase across every onboarding in a single click. Refuses with 400 when Nifty is still disconnected. Idempotent — clears `nifty_errors` per phase as it backfills.
+- `OnboardingAdmin.jsx` updated:
+  - Red rose banner: **"Nifty isn't connected — phase tasks aren't syncing"** with prominent **Connect Nifty →** button linking to `/admin/integrations`. Renders only when `nifty_connected: false` AND there are pending tasks.
+  - Amber retry banner: **"X onboardings have pending Nifty tasks"** with **Retry pending tasks** button. Renders only when `nifty_connected: true` AND there are errors waiting.
+  - Banners disappear automatically once the queue clears.
+
+**Tests:**
+- `/app/backend/tests/test_breezedocs_auto_invoice.py` — 5 pytests: happy path + idempotency, zero-amount skip, missing-amount skip, non-completed status skip, missing-email skip.
+- `/app/backend/tests/test_onboarding_health.py` — 4 pytests: auth guards × 2, health snapshot shape, replay-failed rejection when disconnected.
+- **All 24 new + relevant-module tests pass. 54/54 across the testing-agent's full Phase-18.5 sweep.**
+
 ### ✅ Phase 18 — BreezeDocs integration + 1-click invoice pay link (Feb 2026)
 **Goal**: Round 4 of the AgencyHandy replacement — proposals + contracts handled in-house with branded sign flow. Also closes the email-to-payment loop with a single click.
 
