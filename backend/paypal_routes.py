@@ -305,6 +305,34 @@ async def capture_order(
         except Exception as exc:
             log.exception("Auto-provision client/onboarding failed: %s", exc)
 
+    # Branded payment receipt email — fires for installment 1, installment 2,
+    # and one-shot full-upfront captures.
+    if status_str == "COMPLETED" and payer_email:
+        try:
+            import email_service
+
+            emailit = getattr(request.app.state, "emailit", None)
+            fresh = await db.paypal_transactions.find_one({"id": order_id}, {"_id": 0}) or {}
+            tier = (fresh.get("tier") or "").lower()
+            plan_name = PACKAGE_TIERS.get(tier, {}).get("name") or fresh.get("description") or "Bloom Labs Service"
+            if fresh.get("installment_index") == 2:
+                plan_name = f"{plan_name} — Launch balance"
+            invoice_number = f"INV-{order_id[-8:].upper()}"
+            await email_service.send_payment_receipt(
+                emailit,
+                to=payer_email,
+                name=payer_name or payer_email.split("@")[0],
+                plan_name=plan_name,
+                amount=fresh.get("amount") or "0.00",
+                currency=fresh.get("currency") or pp.default_currency,
+                order_id=order_id,
+                invoice_number=invoice_number,
+                payment_plan_label=fresh.get("plan_label"),
+                charge_later=fresh.get("charge_later"),
+            )
+        except Exception as exc:  # pragma: no cover
+            log.warning("Receipt email failed for %s: %s", order_id, exc)
+
     return {"id": order_id, "status": status_str, "payer_email": payer_email}
 
 

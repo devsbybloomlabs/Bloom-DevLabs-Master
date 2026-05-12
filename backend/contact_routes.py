@@ -202,16 +202,18 @@ async def submit_contact(
         slack_text += f"\n<{td.ticket_url(ticket_id)}|View in ThriveDesk>"
     slack_res = await slack_notifier.post_message(db, text=slack_text)
 
-    # --- Confirmation email to the client ---
+    # --- Confirmation email to the client (branded template) ---
     try:
+        import email_service
+
         emailit = request.app.state.emailit
-        if getattr(emailit, "is_configured", False):
-            await emailit.send_email(
-                to=client_email,
-                subject="We've received your message",
-                html=_build_confirmation_html(client_name, subject, queued),
-                text=_build_confirmation_text(client_name, subject, queued),
-            )
+        await email_service.send_support_ack(
+            emailit,
+            to=client_email,
+            name=client_name,
+            subject_line=subject,
+            ticket_id=str(ticket_id or ""),
+        )
     except Exception as exc:
         log.warning("confirmation email failed for %s: %s", client_email, exc)
 

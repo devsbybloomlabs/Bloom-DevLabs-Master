@@ -1,5 +1,5 @@
 /**
- * ClientContactPanel — Client portal "Contact Us" tab.
+ * ClientContactPanel — Client portal "Contact Support" tab.
  *
  * POSTs multipart/form-data to /api/clients/me/contact:
  *   subject (required, 2-200 chars)
@@ -163,7 +163,7 @@ export default function ClientContactPanel({ token }) {
         <CardHeader>
           <CardTitle className="font-display text-lg flex items-center gap-2">
             <Mail className="h-5 w-5 text-[#1E3A8A]" />
-            Contact us
+            Contact support
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             We typically respond within 2 hours during business days. Your message

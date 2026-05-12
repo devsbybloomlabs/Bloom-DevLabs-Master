@@ -173,6 +173,8 @@ function NiftyCard() {
     }
   };
 
+  const [reconnecting, setReconnecting] = useState(false);
+
   const onSync = async () => {
     setSyncing(true);
     try {
@@ -182,9 +184,45 @@ function NiftyCard() {
       );
       setCache(r.data);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Sync failed");
+      const detail = e?.response?.data?.detail || "Sync failed";
+      const tokenIssue =
+        e?.response?.status === 401 || /reconnect|token|connect/i.test(detail);
+      if (tokenIssue) {
+        toast.error(detail, {
+          action: {
+            label: "Reconnect now",
+            onClick: () => onReconnect(),
+          },
+          duration: 8000,
+        });
+      } else {
+        toast.error(detail);
+      }
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const onReconnect = async () => {
+    setReconnecting(true);
+    try {
+      // Clear stale tokens and restart OAuth in one click.
+      try {
+        await api.post("/admin/integrations/nifty/disconnect");
+      } catch {
+        // ignore — may already be disconnected
+      }
+      const r = await api.get("/admin/integrations/nifty/authorize-url");
+      const url = r.data?.url || r.data?.authorize_url;
+      if (url) {
+        window.location.href = url;
+      } else {
+        toast.error("Could not start Nifty OAuth — check Integrations health");
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Reconnect failed");
+    } finally {
+      setReconnecting(false);
     }
   };
 

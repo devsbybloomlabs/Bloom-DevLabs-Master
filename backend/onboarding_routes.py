@@ -472,13 +472,96 @@ async def _submit_phase(
     fresh = await db.onboardings.find_one({"id": doc["id"]}, {"_id": 0})
     # Process automation (Nifty + AH + notifications)
     processor = PHASE_PROCESSORS.get(phase)
+    nifty_task_ids: List[str] = []
     if processor:
         try:
-            await processor(db, request, fresh)
+            result = await processor(db, request, fresh) or {}
+            # Phase 1 returns task_id (single), Phase 2/3 return task_ids (list)
+            if result.get("task_ids"):
+                nifty_task_ids = [t for t in result["task_ids"] if t]
+            elif result.get("task_id"):
+                nifty_task_ids = [result["task_id"]]
         except Exception as exc:
             log.exception("Phase %d processor crashed: %s", phase, exc)
+    # Auto-create matching milestones in the client portal (Issue: milestones empty)
+    try:
+        await _create_phase_milestones(db, fresh, phase, nifty_task_ids)
+    except Exception as exc:  # pragma: no cover
+        log.warning("Phase %d milestone seed failed: %s", phase, exc)
+
+    # Branded transactional emails — confirm receipt + nudge to next phase
+    try:
+        import email_service
+
+        emailit = getattr(request.app.state, "emailit", None)
+        client_name = fresh.get("client_name") or (fresh["client_email"].split("@")[0])
+        await email_service.send_phase_received(
+            emailit, to=fresh["client_email"], name=client_name, phase=phase
+        )
+        if phase == 3:
+            await email_service.send_onboarding_complete(
+                emailit,
+                to=fresh["client_email"],
+                name=client_name,
+                project_name=(fresh.get("phase3") or {}).get("project_name") or "your project",
+            )
+    except Exception as exc:  # pragma: no cover
+        log.warning("Phase %d confirmation email failed: %s", phase, exc)
+
     final_doc = await db.onboardings.find_one({"id": doc["id"]}, {"_id": 0})
     return final_doc
+
+
+async def _create_phase_milestones(
+    db: AsyncIOMotorDatabase,
+    onboarding: Dict[str, Any],
+    phase: int,
+    nifty_task_ids: List[str],
+) -> None:
+    """Create client-portal milestone rows mirroring the Nifty tasks just made.
+
+    Without this, the client portal Milestones view stays empty even though
+    Phase 1/2/3 tasks were successfully created in Nifty. We seed one
+    milestone per Nifty task so they appear immediately as "in_progress",
+    then the existing Nifty webhook/poll updates their status to complete.
+    """
+    from models import Milestone
+
+    project_name = (onboarding.get("phase3") or {}).get("project_name") or onboarding.get(
+        "client_name") or onboarding["client_email"]
+    phase_title = {
+        1: "Design Language",
+        2: "Function Specs & Mockups",
+        3: "Kickoff Brief & Success Metrics",
+    }.get(phase, f"Phase {phase}")
+
+    if not nifty_task_ids:
+        # Even if Nifty failed, create a placeholder milestone so the client portal
+        # reflects progress. The admin can re-run automation later to backfill nifty_task_id.
+        ms = Milestone(
+            client_email=onboarding["client_email"],
+            project_name=str(project_name)[:120],
+            title=f"[Phase {phase}] — {phase_title}",
+            status="in_progress",
+            description=f"Onboarding Phase {phase} submitted — team is reviewing.",
+        )
+        await db.milestones.insert_one(prepare_for_mongo(ms.model_dump()))
+        return
+
+    for task_id in nifty_task_ids:
+        # Skip if a milestone for this task already exists (idempotent re-runs)
+        existing = await db.milestones.find_one({"nifty_task_id": task_id}, {"_id": 0, "id": 1})
+        if existing:
+            continue
+        ms = Milestone(
+            client_email=onboarding["client_email"],
+            project_name=str(project_name)[:120],
+            title=f"[Phase {phase}] — {phase_title}",
+            status="in_progress",
+            description=f"Onboarding Phase {phase} — work in progress.",
+            nifty_task_id=task_id,
+        )
+        await db.milestones.insert_one(prepare_for_mongo(ms.model_dump()))
 
 
 # ============================================================

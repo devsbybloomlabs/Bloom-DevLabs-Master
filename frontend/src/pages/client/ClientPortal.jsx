@@ -566,7 +566,7 @@ export default function ClientPortal() {
               <FileText className="h-4 w-4 mr-1.5" /> Proposals
             </TabsTrigger>
             <TabsTrigger value="contact" data-testid="portal-tab-contact" className="flex-shrink-0">
-              <MessageSquare className="h-4 w-4 mr-1.5" /> Contact
+              <MessageSquare className="h-4 w-4 mr-1.5" /> Support
             </TabsTrigger>
             <TabsTrigger value="profile" data-testid="portal-tab-profile" className="flex-shrink-0">
               <UserIcon className="h-4 w-4 mr-1.5" /> Profile

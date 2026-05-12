@@ -652,3 +652,125 @@ async def admin_resend_setup(
     except Exception as exc:
         log.warning("resend-setup emailit failed: %s", exc)
     return {"ok": True, "setup_url": setup_url}
+
+
+
+# ---------- Admin CRUD ----------
+class AdminCreateClientRequest(BaseModel):
+    email: EmailStr
+    name: str = ""
+    company: Optional[str] = None
+    status: str = "active"  # noqa: F811 — Pydantic field, not the fastapi.status import
+    send_setup_email: bool = True
+
+
+class AdminUpdateClientRequest(BaseModel):
+    name: Optional[str] = None
+    company: Optional[str] = None
+    status: Optional[str] = None  # noqa: F811
+    notes: Optional[str] = None
+
+
+@client_admin_router.post("")
+async def admin_create_client(
+    req: AdminCreateClientRequest,
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Admin-side client provisioning. Mirrors the PayPal auto-provision flow
+    but triggered by the founder from /admin/clients."""
+    email_lc = req.email.lower().strip()
+    existing = await db.clients.find_one({"email": email_lc})
+    if existing:
+        raise HTTPException(409, f"Client {email_lc} already exists")
+
+    doc = _new_client_doc(
+        email_lc, req.name, password_hash=None, source="admin", source_id="admin-created"
+    )
+    if req.company:
+        doc["company"] = req.company
+    if req.status and req.status in ("active", "paused", "archived"):
+        doc["status"] = req.status
+    await db.clients.insert_one(prepare_for_mongo(doc))
+    doc.pop("password_hash", None)
+
+    setup_url = None
+    if req.send_setup_email:
+        token = secrets.token_urlsafe(32)
+        expires = _now() + timedelta(hours=PASSWORD_RESET_TTL_HOURS)
+        await db.client_reset_tokens.insert_one(
+            prepare_for_mongo({
+                "token": token, "email": email_lc, "purpose": "setup",
+                "expires_at": expires.isoformat(), "used": False,
+                "created_at": _now().isoformat(),
+            })
+        )
+        setup_url = (
+            f"{os.environ.get('APP_BASE_URL', 'https://bybloomlabs.com').rstrip('/')}"
+            f"/set-password?token={token}"
+        )
+        try:
+            emailit = request.app.state.emailit
+            if getattr(emailit, "is_configured", False):
+                await emailit.send_email(
+                    to=email_lc,
+                    subject="Welcome to Bloom Labs — set your password",
+                    html=_password_setup_html(req.name or email_lc, setup_url),
+                    text=f"Welcome! Set your client portal password: {setup_url}",
+                )
+        except Exception as exc:
+            log.warning("admin_create_client emailit failed: %s", exc)
+
+    return {"client": doc, "setup_url": setup_url}
+
+
+@client_admin_router.patch("/{email}")
+async def admin_update_client(
+    email: str,
+    req: AdminUpdateClientRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    email_lc = email.lower().strip()
+    existing = await db.clients.find_one({"email": email_lc}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Client not found")
+    patch: Dict[str, Any] = {"updated_at": _now().isoformat()}
+    if req.name is not None:
+        patch["name"] = req.name.strip()
+    if req.company is not None:
+        patch["company"] = req.company.strip()
+    if req.notes is not None:
+        patch["notes"] = req.notes.strip()
+    if req.status is not None:
+        if req.status not in ("active", "paused", "archived"):
+            raise HTTPException(400, "status must be active|paused|archived")
+        patch["status"] = req.status
+    await db.clients.update_one({"email": email_lc}, {"$set": patch})
+    fresh = await db.clients.find_one({"email": email_lc}, {"_id": 0, "password_hash": 0})
+    return fresh
+
+
+@client_admin_router.delete("/{email}")
+async def admin_delete_client(
+    email: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Soft delete — keeps payments/onboardings/milestones intact but
+    removes login + portal access by archiving the record."""
+    email_lc = email.lower().strip()
+    existing = await db.clients.find_one({"email": email_lc}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Client not found")
+    await db.clients.update_one(
+        {"email": email_lc},
+        {"$set": {
+            "status": "archived",
+            "archived_at": _now().isoformat(),
+            "updated_at": _now().isoformat(),
+        }},
+    )
+    # Invalidate any active reset/setup tokens
+    await db.client_reset_tokens.update_many(
+        {"email": email_lc, "used": False}, {"$set": {"used": True}}
+    )
+    return {"ok": True, "email": email_lc, "archived": True}

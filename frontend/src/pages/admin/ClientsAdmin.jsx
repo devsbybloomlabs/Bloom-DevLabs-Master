@@ -12,7 +12,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Users,
@@ -24,6 +41,10 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 
 function formatDate(iso) {
@@ -58,6 +79,13 @@ export default function ClientsAdmin() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [busyEmail, setBusyEmail] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    email: "", name: "", company: "", status: "active", send_setup_email: true,
+  });
+  const [editClient, setEditClient] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", company: "", status: "active", notes: "" });
+  const [deleteClient, setDeleteClient] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -125,6 +153,86 @@ export default function ClientsAdmin() {
     }
   };
 
+  const onCreate = async () => {
+    const email = createForm.email.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toast.error("Valid email required");
+      return;
+    }
+    setBusyEmail("__create__");
+    try {
+      const r = await api.post("/admin/clients", {
+        email,
+        name: createForm.name.trim(),
+        company: createForm.company.trim() || null,
+        status: createForm.status,
+        send_setup_email: createForm.send_setup_email,
+      });
+      if (r.data?.setup_url) {
+        try {
+          await navigator.clipboard.writeText(r.data.setup_url);
+        } catch {
+          // ignore
+        }
+        toast.success("Client created — setup link emailed + copied to clipboard");
+      } else {
+        toast.success("Client created");
+      }
+      setCreateOpen(false);
+      setCreateForm({ email: "", name: "", company: "", status: "active", send_setup_email: true });
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not create client");
+    } finally {
+      setBusyEmail(null);
+    }
+  };
+
+  const openEdit = (c) => {
+    setEditClient(c);
+    setEditForm({
+      name: c.name || "",
+      company: c.company || "",
+      status: c.status || "active",
+      notes: c.notes || "",
+    });
+  };
+
+  const onSaveEdit = async () => {
+    if (!editClient) return;
+    setBusyEmail(editClient.email);
+    try {
+      await api.patch(`/admin/clients/${encodeURIComponent(editClient.email)}`, {
+        name: editForm.name.trim(),
+        company: editForm.company.trim() || null,
+        status: editForm.status,
+        notes: editForm.notes.trim() || null,
+      });
+      toast.success("Client updated");
+      setEditClient(null);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not update client");
+    } finally {
+      setBusyEmail(null);
+    }
+  };
+
+  const onConfirmDelete = async () => {
+    if (!deleteClient) return;
+    setBusyEmail(deleteClient.email);
+    try {
+      await api.delete(`/admin/clients/${encodeURIComponent(deleteClient.email)}`);
+      toast.success("Client archived");
+      setDeleteClient(null);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not archive client");
+    } finally {
+      setBusyEmail(null);
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="admin-clients-page">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
@@ -138,16 +246,27 @@ export default function ClientsAdmin() {
             from PayPal captures and AgencyHandy webhooks.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={load}
-          disabled={loading}
-          data-testid="admin-clients-refresh"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={load}
+            disabled={loading}
+            data-testid="admin-clients-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setCreateOpen(true)}
+            className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+            data-testid="admin-clients-new-button"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New client
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -278,6 +397,25 @@ export default function ClientsAdmin() {
                               Email
                             </a>
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEdit(c)}
+                            data-testid={`admin-client-edit-${c.email}`}
+                            title="Edit details"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDeleteClient(c)}
+                            className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            data-testid={`admin-client-delete-${c.email}`}
+                            title="Archive client"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -288,6 +426,215 @@ export default function ClientsAdmin() {
           )}
         </CardContent>
       </Card>
+
+      {/* New client dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent data-testid="admin-clients-create-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <Plus className="h-5 w-5 text-[#1E3A8A]" />
+              New client
+            </DialogTitle>
+            <DialogDescription>
+              Provision a client portal account. They&apos;ll get a branded password
+              setup email so they can log in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="new-client-email">Email *</Label>
+              <Input
+                id="new-client-email"
+                type="email"
+                value={createForm.email}
+                onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="client@company.com"
+                data-testid="admin-clients-create-email"
+                className="mt-1.5"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="new-client-name">Name</Label>
+                <Input
+                  id="new-client-name"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Jane Doe"
+                  data-testid="admin-clients-create-name"
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-client-company">Company</Label>
+                <Input
+                  id="new-client-company"
+                  value={createForm.company}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, company: e.target.value }))}
+                  placeholder="Acme Inc."
+                  data-testid="admin-clients-create-company"
+                  className="mt-1.5"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={createForm.status}
+                onValueChange={(v) => setCreateForm((f) => ({ ...f, status: v }))}
+              >
+                <SelectTrigger className="mt-1.5" data-testid="admin-clients-create-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="paused">Paused</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-sm pt-1.5">
+              <input
+                type="checkbox"
+                checked={createForm.send_setup_email}
+                onChange={(e) => setCreateForm((f) => ({ ...f, send_setup_email: e.target.checked }))}
+                data-testid="admin-clients-create-send-email"
+              />
+              Send password setup email + copy link to clipboard
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button
+              onClick={onCreate}
+              disabled={busyEmail === "__create__"}
+              className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+              data-testid="admin-clients-create-submit"
+            >
+              {busyEmail === "__create__" ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Create client
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit dialog */}
+      <Dialog open={Boolean(editClient)} onOpenChange={(o) => !o && setEditClient(null)}>
+        <DialogContent data-testid="admin-clients-edit-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-[#1E3A8A]" />
+              Edit {editClient?.email}
+            </DialogTitle>
+          </DialogHeader>
+          {editClient && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="edit-name">Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    data-testid="admin-clients-edit-name"
+                    className="mt-1.5"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-company">Company</Label>
+                  <Input
+                    id="edit-company"
+                    value={editForm.company}
+                    onChange={(e) => setEditForm((f) => ({ ...f, company: e.target.value }))}
+                    data-testid="admin-clients-edit-company"
+                    className="mt-1.5"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}
+                >
+                  <SelectTrigger className="mt-1.5" data-testid="admin-clients-edit-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-notes">Internal notes</Label>
+                <Textarea
+                  id="edit-notes"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="Anything the team should know about this client…"
+                  rows={3}
+                  data-testid="admin-clients-edit-notes"
+                  className="mt-1.5"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditClient(null)}>Cancel</Button>
+            <Button
+              onClick={onSaveEdit}
+              disabled={busyEmail === editClient?.email}
+              className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+              data-testid="admin-clients-edit-submit"
+            >
+              {busyEmail === editClient?.email ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : null}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <Dialog open={Boolean(deleteClient)} onOpenChange={(o) => !o && setDeleteClient(null)}>
+        <DialogContent data-testid="admin-clients-delete-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+              Archive client
+            </DialogTitle>
+            <DialogDescription>
+              This archives <strong>{deleteClient?.email}</strong>. Their login + portal
+              access is revoked, but their payments, onboarding, milestones, and support
+              history are preserved. You can restore by editing them and switching status
+              back to Active.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteClient(null)}>Cancel</Button>
+            <Button
+              onClick={onConfirmDelete}
+              disabled={busyEmail === deleteClient?.email}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              data-testid="admin-clients-delete-confirm"
+            >
+              {busyEmail === deleteClient?.email ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
