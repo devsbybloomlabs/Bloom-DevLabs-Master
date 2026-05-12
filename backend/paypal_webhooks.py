@@ -168,6 +168,12 @@ async def _process_paypal_event(
         sub_id = resource.get("id")
         subscriber = resource.get("subscriber") or {}
         sub_email = subscriber.get("email_address")
+        # Look up plan info for the email
+        sub_record = await db.paypal_subscriptions.find_one({"id": sub_id}, {"_id": 0}) or {}
+        plan_name = sub_record.get("plan_name") or "Subscription"
+        plan_price = sub_record.get("plan_price") or "0.00"
+        plan_currency = sub_record.get("plan_currency") or "USD"
+        plan_interval = (sub_record.get("plan_interval") or "month").split(" ")[-1]
         if sub_id:
             await db.paypal_subscriptions.update_one(
                 {"id": sub_id},
@@ -184,7 +190,7 @@ async def _process_paypal_event(
         await notify(
             "Subscription activated",
             f"New subscription {sub_id}" + (f" — {sub_email}" if sub_email else ""),
-            link="/admin/revenue",
+            link="/admin/subscriptions",
         )
         if sub_email:
             from client_routes import auto_provision_client_from_payment
@@ -193,6 +199,90 @@ async def _process_paypal_event(
                 db, request, email=sub_email, name=sub_email.split("@")[0],
                 source="paypal_subscription", source_id=sub_id or "",
             )
+            # Branded "subscription activated" email
+            try:
+                import email_service
+
+                emailit = getattr(request.app.state, "emailit", None)
+                await email_service.send_subscription_activated(
+                    emailit,
+                    to=sub_email,
+                    name=(sub_record.get("customer_name") or sub_email.split("@")[0]),
+                    plan_name=plan_name,
+                    amount=str(plan_price),
+                    currency=plan_currency,
+                    period=plan_interval,
+                )
+            except Exception as exc:  # pragma: no cover
+                log.warning("Subscription activation email failed: %s", exc)
+        return
+
+    if event_type == "PAYMENT.SALE.COMPLETED" and resource.get("billing_agreement_id"):
+        # Recurring subscription renewal payment — auto-invoice.
+        sub_id = resource.get("billing_agreement_id")
+        amount_info = resource.get("amount") or {}
+        gross = amount_info.get("total") or "0.00"
+        currency = amount_info.get("currency") or "USD"
+        sub_record = await db.paypal_subscriptions.find_one({"id": sub_id}, {"_id": 0}) or {}
+        sub_email = sub_record.get("customer_email")
+        plan_name = sub_record.get("plan_name") or "Subscription cycle"
+        if sub_email:
+            try:
+                import invoice_service
+                from models import InvoiceLineItem, Invoice
+
+                inv = Invoice(
+                    number=await invoice_service.next_invoice_number(db),
+                    client_email=sub_email,
+                    client_name=sub_record.get("customer_name") or sub_email.split("@")[0],
+                    issued_at=_now(),
+                    paid_at=_now(),
+                    status="paid",
+                    currency=currency,
+                    subtotal=float(gross),
+                    total=float(gross),
+                    amount_paid=float(gross),
+                    balance_due=0.0,
+                    line_items=[
+                        InvoiceLineItem(
+                            description=f"{plan_name} — recurring",
+                            quantity=1,
+                            unit_price=float(gross),
+                            amount=float(gross),
+                        )
+                    ],
+                    notes="Recurring subscription cycle.",
+                    source="subscription_cycle",
+                    subscription_id=sub_id,
+                )
+                await db.invoices.insert_one(prepare_for_mongo(inv.model_dump()))
+                inv_dict = inv.model_dump()
+                try:
+                    await invoice_service.cache_invoice_pdf(db, inv_dict)
+                except Exception as exc:  # pragma: no cover
+                    log.warning("Renewal invoice PDF cache failed: %s", exc)
+
+                # Email a receipt
+                import email_service
+
+                emailit = getattr(request.app.state, "emailit", None)
+                await email_service.send_payment_receipt(
+                    emailit,
+                    to=sub_email,
+                    name=sub_record.get("customer_name") or sub_email.split("@")[0],
+                    plan_name=plan_name,
+                    amount=f"{float(gross):.2f}",
+                    currency=currency,
+                    order_id=sub_id,
+                    invoice_number=inv.number,
+                )
+            except Exception as exc:  # pragma: no cover
+                log.warning("Renewal invoice generation failed for %s: %s", sub_id, exc)
+        await notify(
+            "Subscription renewal received",
+            f"{plan_name} — {currency} {gross}",
+            link="/admin/invoices",
+        )
         return
 
     if event_type in ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED"):

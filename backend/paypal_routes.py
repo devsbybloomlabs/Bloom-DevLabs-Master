@@ -809,6 +809,7 @@ async def register_webhook(
         "BILLING.SUBSCRIPTION.EXPIRED",
         "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
         "BILLING.SUBSCRIPTION.SUSPENDED",
+        "PAYMENT.SALE.COMPLETED",
     ]
     res = await pp.create_webhook(target, events)
     if not res.get("success"):

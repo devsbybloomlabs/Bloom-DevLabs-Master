@@ -44,6 +44,7 @@ const NAV = [
   { to: "/admin/paypal-plans", label: "PayPal Plans", icon: Repeat, group: "Sales" },
   { to: "/admin/paypal-orders", label: "PayPal Orders", icon: Receipt, group: "Sales" },
   { to: "/admin/invoices", label: "Invoices", icon: FileText, group: "Sales" },
+  { to: "/admin/subscriptions", label: "Subscriptions", icon: Repeat, group: "Sales" },
   { to: "/admin/onboarding", label: "Onboarding", icon: ClipboardList, group: "Sales" },
   { to: "/admin/milestones", label: "Milestones", icon: Target, group: "Sales" },
   { to: "/admin/approvals", label: "Design Approvals", icon: ImagePlus, group: "Sales" },

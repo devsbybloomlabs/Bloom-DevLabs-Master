@@ -82,6 +82,10 @@ from invoice_routes import (  # noqa: E402
     invoice_admin_router,
     invoice_client_router,
 )
+from subscription_routes import (  # noqa: E402
+    subscription_admin_router,
+    subscription_client_router,
+)
 from client_routes import (  # noqa: E402
     client_admin_router,
     client_auth_router,
@@ -313,6 +317,8 @@ api.include_router(blog_extras_router)
 api.include_router(integrations_admin_router)
 api.include_router(invoice_admin_router)
 api.include_router(invoice_client_router)
+api.include_router(subscription_admin_router)
+api.include_router(subscription_client_router)
 api.include_router(blog_public_router)
 api.include_router(blog_admin_router)
 api.include_router(onboarding_public_router)

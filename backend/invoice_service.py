@@ -11,13 +11,16 @@ Public API:
 """
 from __future__ import annotations
 
+import base64
 import io
 import logging
 import os
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import httpx
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from db_utils import prepare_for_mongo
@@ -28,6 +31,34 @@ log = logging.getLogger("invoices")
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+LOGO_REMOTE_URL = (
+    "https://customer-assets.emergentagent.com/job_6ae936eb-6f62-4e1a-8f50-8423b436560b/"
+    "artifacts/blmz5br3_Logo%20-%20Full%20-%20Light.png"
+)
+
+
+@lru_cache(maxsize=1)
+def _logo_data_uri() -> str:
+    """Fetch the brand logo once + cache as a base64 data: URI.
+
+    WeasyPrint can't always reach remote URLs from a sandboxed K8s pod
+    (egress filters, DNS quirks). Inlining the image as a data: URI
+    guarantees branded PDFs in every environment with zero per-render
+    network calls. Falls back to the remote URL if fetch fails so we
+    still try — better than no logo.
+    """
+    try:
+        with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+            r = client.get(LOGO_REMOTE_URL)
+            r.raise_for_status()
+        mime = r.headers.get("content-type", "image/png").split(";")[0].strip()
+        b64 = base64.b64encode(r.content).decode("ascii")
+        return f"data:{mime};base64,{b64}"
+    except Exception as exc:  # pragma: no cover
+        log.warning("Could not inline logo at startup, falling back to remote URL: %s", exc)
+        return LOGO_REMOTE_URL
 
 
 BUSINESS_DEFAULTS: Dict[str, Any] = {
@@ -41,10 +72,6 @@ BUSINESS_DEFAULTS: Dict[str, Any] = {
     "email": "billing@bybloomlabs.com",
     "website": "bybloomlabs.com",
     "tax_id": "EIN 33-4218790",
-    "logo_url": (
-        "https://customer-assets.emergentagent.com/job_6ae936eb-6f62-4e1a-8f50-8423b436560b/"
-        "artifacts/blmz5br3_Logo%20-%20Full%20-%20Light.png"
-    ),
     "primary_color": "#1E3A8A",
     "muted_color": "#475569",
     "border_color": "#E2E8F0",
@@ -208,6 +235,7 @@ def _build_invoice_html(invoice: Dict[str, Any], business: Dict[str, Any]) -> st
         for li in invoice.get("line_items", [])
     )
     address_html = "<br/>".join(business["address_lines"])
+    logo_src = business.get("logo_url") or _logo_data_uri()
     status_label = {
         "paid": "PAID",
         "issued": "DUE",
@@ -240,9 +268,10 @@ def _build_invoice_html(invoice: Dict[str, Any], business: Dict[str, Any]) -> st
   h1 {{ font-family: "Bricolage Grotesque", "Inter", sans-serif; font-size: 28pt; font-weight: 700; color: {business['primary_color']}; margin: 0 0 4px; letter-spacing: -0.02em; }}
   .muted-label {{ text-transform: uppercase; font-size: 8pt; letter-spacing: 0.14em; color: {business['muted_color']}; margin-bottom: 4px; }}
   .header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 2px solid {business['border_color']}; }}
-  .header-left img {{ height: 36px; margin-bottom: 12px; }}
-  .header-left .biz-name {{ font-weight: 700; font-size: 12pt; color: #0F172A; }}
-  .header-left .biz-meta {{ color: {business['muted_color']}; font-size: 9pt; line-height: 1.6; margin-top: 4px; }}
+  .header-left {{ background: {business['primary_color']}; padding: 14px 18px; border-radius: 10px; min-width: 200px; }}
+  .header-left img {{ height: 36px; width: auto; max-width: 200px; margin-bottom: 10px; display: block; filter: brightness(0) invert(1); }}
+  .header-left .biz-name {{ font-weight: 700; font-size: 12pt; color: #FFFFFF; }}
+  .header-left .biz-meta {{ color: rgba(255,255,255,0.85); font-size: 8.5pt; line-height: 1.55; margin-top: 4px; }}
   .header-right {{ text-align: right; }}
   .invoice-number {{ font-family: "Bricolage Grotesque", monospace; font-size: 14pt; font-weight: 600; color: {business['primary_color']}; margin-bottom: 8px; }}
   .status-pill {{ display: inline-block; padding: 5px 12px; border-radius: 6px; background: {status_color}; color: white; font-weight: 700; font-size: 9pt; letter-spacing: 0.08em; }}
@@ -264,7 +293,7 @@ def _build_invoice_html(invoice: Dict[str, Any], business: Dict[str, Any]) -> st
 <body>
   <div class="header">
     <div class="header-left">
-      <img src="{business['logo_url']}" alt="{business['trading_name']}"/>
+      <img src="{logo_src}" alt="{business['trading_name']}"/>
       <div class="biz-name">{business['trading_name']}</div>
       <div class="biz-meta">{business['legal_name']}<br/>{address_html}<br/>{business['email']} · {business['website']}<br/>{business['tax_id']}</div>
     </div>
@@ -323,12 +352,27 @@ def _build_invoice_html(invoice: Dict[str, Any], business: Dict[str, Any]) -> st
 async def render_invoice_pdf(
     invoice: Dict[str, Any], business: Optional[Dict[str, Any]] = None
 ) -> bytes:
-    """Render the branded invoice HTML to a PDF byte string via WeasyPrint."""
-    from weasyprint import HTML  # local import keeps cold-start fast
+    """Render the branded invoice HTML to a PDF byte string via WeasyPrint.
+
+    Uses a custom url_fetcher so `data:` URIs (the inlined logo) actually
+    render — WeasyPrint's default fetcher silently drops them.
+    """
+    from weasyprint import HTML, default_url_fetcher
+
+    def _fetcher(url: str):
+        if url.startswith("data:"):
+            header, payload = url.split(",", 1)
+            mime = header.split(";")[0].replace("data:", "") or "image/png"
+            if "base64" in header:
+                content = base64.b64decode(payload)
+            else:
+                content = payload.encode()
+            return {"mime_type": mime, "string": content}
+        return default_url_fetcher(url)
 
     html = _build_invoice_html(invoice, business or BUSINESS_DEFAULTS)
     buf = io.BytesIO()
-    HTML(string=html, base_url="https://bybloomlabs.com").write_pdf(buf)
+    HTML(string=html, base_url="https://bybloomlabs.com", url_fetcher=_fetcher).write_pdf(buf)
     return buf.getvalue()
 
 

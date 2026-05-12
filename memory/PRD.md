@@ -24,6 +24,33 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase 17.7 — PayPal Subscriptions + invoice on every renewal (Feb 2026)
+**Goal**: Round 3 of the AgencyHandy replacement — recurring add-on revenue managed in-house.
+
+**Backend additions:**
+- `/app/backend/subscription_routes.py` (new):
+  - **Client-facing** (token auth via `get_current_client`):
+    - `GET /api/clients/subscriptions/plans` — public catalogue of active plan templates
+    - `POST /api/clients/subscriptions/subscribe` — start subscription, returns PayPal `approval_url`
+    - `GET /api/clients/subscriptions` — list own subscriptions
+    - `POST /api/clients/subscriptions/{id}/cancel` — self-service cancel (with PayPal API call)
+  - **Admin-facing** (founder JWT):
+    - `GET /api/admin/subscriptions` — list all subs, optional `?client_email=` filter
+    - `POST /api/admin/subscriptions/assign` — one-click "give a client an add-on" flow. Creates the PayPal sub in `APPROVAL_PENDING`, fires a branded email with the activation link, and surfaces the link in a dialog.
+- **Webhook upgrades** (`paypal_webhooks.py`):
+  - `BILLING.SUBSCRIPTION.ACTIVATED` now also fires `send_subscription_activated()` branded email + auto-provisions a client.
+  - `PAYMENT.SALE.COMPLETED` (recurring renewal) now auto-creates an `Invoice` (source=`subscription_cycle`, status=`paid`), caches the PDF, and sends a branded receipt — every cycle.
+- **Logo embedded as data URI** in invoice PDFs via a custom WeasyPrint `url_fetcher` (WeasyPrint silently drops `data:` URIs by default). Logo now appears in a dark-blue header band → high contrast, visually polished. Confirmed via PDF render → image analysis.
+
+**Frontend additions:**
+- `/app/frontend/src/pages/admin/SubscriptionsAdmin.jsx` (new) — admin overview: 4 stat tiles (Total / Active / Pending / Estimated MRR), search, list view with status + plan badges, "Manage plans" + "Assign add-on" buttons. Assign dialog: plan picker, client email, email-now checkbox. Result dialog with copy/open approval link.
+- Client portal **Subscriptions tab** rewritten to consume the new endpoints. Shows active subs with cancel button + "Add-ons & retainers" catalog with subscribe buttons. Subscribe → redirects to PayPal approval URL.
+- Admin sidebar adds "Subscriptions" entry (`/admin/subscriptions`) under "Sales".
+
+**Tests:**
+- `/app/backend/tests/test_subscriptions.py` — 7 new pytests (auth guards × 6 endpoints, list/filter, unknown-plan/unknown-client guardrails, logo data-URI sanity check).
+- Regression: **85/85 backend tests green** across all suites.
+
 ### ✅ Phase 17.6 — In-house Invoices + AgencyHandy removal (Feb 2026)
 **Decision**: User confirmed "replace AgencyHandy completely" to consolidate ownership of invoices/proposals/subscriptions in-house and gain full branding control.
 

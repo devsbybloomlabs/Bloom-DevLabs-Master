@@ -22,6 +22,7 @@ import OnboardingAdmin from "@/pages/admin/OnboardingAdmin";
 import PayPalPlansPage from "@/pages/admin/PayPalPlansPage";
 import PayPalOrdersPage from "@/pages/admin/PayPalOrdersPage";
 import InvoicesAdmin from "@/pages/admin/InvoicesAdmin";
+import SubscriptionsAdmin from "@/pages/admin/SubscriptionsAdmin";
 import LeadMagnetsAdmin from "@/pages/admin/LeadMagnetsAdmin";
 import MilestonesAdmin from "@/pages/admin/MilestonesAdmin";
 import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
@@ -107,6 +108,7 @@ function App() {
                 <Route path="paypal-plans" element={<PayPalPlansPage />} />
                 <Route path="paypal-orders" element={<PayPalOrdersPage />} />
                 <Route path="invoices" element={<InvoicesAdmin />} />
+                <Route path="subscriptions" element={<SubscriptionsAdmin />} />
                 <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
                 <Route path="milestones" element={<MilestonesAdmin />} />
                 <Route path="approvals" element={<ApprovalsAdmin />} />

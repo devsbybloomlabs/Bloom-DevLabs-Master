@@ -141,54 +141,148 @@ function OrdersList({ data, loading }) {
   );
 }
 
-function SubscriptionsList({ data, loading }) {
+function SubscriptionsList({ activeSubs, plans, loading, api, reload }) {
+  const [busyId, setBusyId] = useState(null);
+  const [subscribing, setSubscribing] = useState(null);
   if (loading) return <Skeleton className="h-32 w-full" />;
-  const pp = data?.paypal || [];
-  const ah = data?.agencyhandy || [];
-  if (!pp.length && !ah.length) {
-    return (
-      <EmptyState
-        title="No active subscriptions"
-        message="Active recurring services will appear here."
-      />
-    );
-  }
+  const subs = Array.isArray(activeSubs) ? activeSubs : [];
+  const catalog = Array.isArray(plans) ? plans : [];
+
+  const onSubscribe = async (plan) => {
+    setSubscribing(plan.plan_key);
+    try {
+      const r = await api.post("/clients/subscriptions/subscribe", {
+        plan_key: plan.plan_key,
+      });
+      if (r.data?.approval_url) {
+        window.location.href = r.data.approval_url;
+      }
+    } catch (e) {
+      window.alert(e?.response?.data?.detail || "Could not start subscription");
+      setSubscribing(null);
+    }
+  };
+
+  const onCancel = async (sub) => {
+    if (!window.confirm(`Cancel ${sub.plan_name || sub.plan_key}? You can re-subscribe anytime.`)) return;
+    setBusyId(sub.id);
+    try {
+      await api.post(`/clients/subscriptions/${sub.id}/cancel`);
+      reload && reload();
+    } catch (e) {
+      window.alert(e?.response?.data?.detail || "Could not cancel");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
-    <div className="space-y-3" data-testid="portal-subscriptions-list">
-      {pp.map((s) => (
-        <Card key={s.id} className="border-border">
-          <CardContent className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wider text-[#1E3A8A]">PayPal</span>
-                <StatusPill status={s.status} />
-              </div>
-              <p className="mt-1 font-display text-base font-medium truncate">{s.plan_key}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 break-anywhere">{s.id}</p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-      {ah.map((s, i) => (
-        <Card key={`ah-${s._id || i}`} className="border-border">
-          <CardContent className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  AgencyHandy
-                </span>
-                <StatusPill status={s.status} />
-              </div>
-              <p className="mt-1 font-display text-base font-medium truncate">
-                {s.title || s.service?.name || "Recurring service"}
-              </p>
-            </div>
-            <p className="font-display text-lg font-semibold tabular-nums">
-              {fmt(s.totalAmount || s.amount, s.currency)}
-            </p>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-6" data-testid="portal-subscriptions-list">
+      <div>
+        <h3 className="font-display text-lg font-medium mb-2.5">Active subscriptions</h3>
+        {subs.length === 0 ? (
+          <Card className="border-border">
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              You don&apos;t have any active subscriptions yet.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {subs.map((s) => (
+              <Card
+                key={s.id}
+                className="border-border"
+                data-testid={`portal-subscription-${s.id}`}
+              >
+                <CardContent className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <StatusPill status={s.status} />
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {s.source?.replace("_", " ") || "self"}
+                      </span>
+                    </div>
+                    <p className="mt-1 font-display text-base font-medium">
+                      {s.plan_name || s.plan_key}
+                    </p>
+                    {s.plan_interval && (
+                      <p className="text-xs text-muted-foreground">
+                        Renews every {s.plan_interval}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-display text-lg font-semibold tabular-nums">
+                      {fmt(s.plan_price, s.plan_currency)}
+                    </p>
+                    {["ACTIVE", "APPROVAL_PENDING"].includes(s.status) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onCancel(s)}
+                        disabled={busyId === s.id}
+                        className="text-rose-600 hover:bg-rose-50"
+                        data-testid={`portal-sub-cancel-${s.id}`}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                    {s.status === "APPROVAL_PENDING" && s.approval_url && (
+                      <Button
+                        size="sm"
+                        asChild
+                        className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+                        data-testid={`portal-sub-activate-${s.id}`}
+                      >
+                        <a href={s.approval_url}>Activate</a>
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {catalog.length > 0 && (
+        <div>
+          <h3 className="font-display text-lg font-medium mb-2.5">Add-ons & retainers</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {catalog.map((plan) => (
+              <Card
+                key={plan.plan_key}
+                className="border-border hover:border-[#1E3A8A]/40 transition-colors"
+                data-testid={`portal-plan-${plan.plan_key}`}
+              >
+                <CardContent className="p-5">
+                  <p className="font-display text-base font-semibold">{plan.name}</p>
+                  {plan.description && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-3">
+                      {plan.description}
+                    </p>
+                  )}
+                  <p className="mt-3 font-display text-2xl font-semibold tabular-nums">
+                    {fmt(plan.price, plan.currency)}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {" "}/ {plan.interval_count || 1} {(plan.interval_unit || "MONTH").toLowerCase()}
+                    </span>
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => onSubscribe(plan)}
+                    disabled={subscribing === plan.plan_key}
+                    className="mt-4 w-full bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+                    data-testid={`portal-subscribe-${plan.plan_key}`}
+                  >
+                    {subscribing === plan.plan_key ? "Redirecting…" : "Subscribe"}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -499,6 +593,7 @@ export default function ClientPortal() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState(null);
   const [subs, setSubs] = useState(null);
+  const [plans, setPlans] = useState(null);
   const [invoices, setInvoices] = useState(null);
   const [proposals, setProposals] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
@@ -514,9 +609,10 @@ export default function ClientPortal() {
     setLoading(true);
     const api = clientApi(token);
     try {
-      const [o, s, i, p, ob, ms] = await Promise.allSettled([
+      const [o, s, pl, i, p, ob, ms] = await Promise.allSettled([
         api.get("/clients/me/orders"),
-        api.get("/clients/me/subscriptions"),
+        api.get("/clients/subscriptions"),
+        api.get("/clients/subscriptions/plans"),
         api.get("/clients/invoices"),
         api.get("/clients/me/proposals"),
         api.get("/clients/me/onboarding"),
@@ -524,6 +620,7 @@ export default function ClientPortal() {
       ]);
       setOrders(o.status === "fulfilled" ? o.value.data : null);
       setSubs(s.status === "fulfilled" ? s.value.data : null);
+      setPlans(pl.status === "fulfilled" ? pl.value.data : null);
       setInvoices(i.status === "fulfilled" ? i.value.data : null);
       setProposals(p.status === "fulfilled" ? p.value.data : null);
       setOnboarding(ob.status === "fulfilled" ? ob.value.data : null);
@@ -642,7 +739,13 @@ export default function ClientPortal() {
             <OrdersList data={orders} loading={loading} />
           </TabsContent>
           <TabsContent value="subscriptions" className="mt-6">
-            <SubscriptionsList data={subs} loading={loading} />
+            <SubscriptionsList
+              activeSubs={subs}
+              plans={plans}
+              loading={loading}
+              api={clientApi(token)}
+              reload={loadAll}
+            />
           </TabsContent>
           <TabsContent value="invoices" className="mt-6">
             <InvoicesList data={invoices} loading={loading} token={token} />
