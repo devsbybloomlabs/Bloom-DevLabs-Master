@@ -24,6 +24,36 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase 18 — BreezeDocs integration + 1-click invoice pay link (Feb 2026)
+**Goal**: Round 4 of the AgencyHandy replacement — proposals + contracts handled in-house with branded sign flow. Also closes the email-to-payment loop with a single click.
+
+**Part 1 — BreezeDocs (proposals & contracts):**
+- `/app/backend/breezedocs_client.py` (new) — async wrapper around https://breezedoc.com/api with mock-mode fallback. Mirrors the `approval_studio_client.py` / `thrivedesk_client.py` patterns. JWT bearer auth (Personal Access Token).
+- `/app/backend/breezedocs_routes.py` (new):
+  - Admin: `GET /admin/breezedocs/templates`, `GET/POST /admin/breezedocs/proposals`, `POST /admin/breezedocs/proposals/{id}/sync`, `POST /admin/breezedocs/proposals/{id}/resend`, `DELETE /admin/breezedocs/proposals/{id}` (soft archive), `GET /admin/breezedocs/mock-log`.
+  - Client: `GET /clients/me/breezedocs-proposals` — scoped to caller's email + filters archived.
+  - APScheduler `breezedocs_sync_cron` runs every 10 min to refresh open proposals (BreezeDoc has no webhooks).
+- `/app/frontend/src/pages/admin/ProposalsAdmin.jsx` (new) — admin overview: 3 stat tiles (total / awaiting / completed), status filter, search by client, **New Proposal** dialog (template picker, client name+email, optional title/amount, send-now checkbox). Per-row actions: Copy sign link, Open, Resend email, Sync status, Archive.
+- Client portal **Proposals tab** rewritten to consume the new endpoint. Renders status pills + a **Review & sign** CTA that opens the BreezeDoc-hosted signing page.
+- Admin sidebar gained "Proposals" entry (`/admin/proposals`) in the Sales group.
+- Credentials wiring: `breezedocs` added to `ALLOWED_CRED_PROVIDERS`, integration health endpoint, and the credentials form. `POST /admin/integrations/breezedocs/test` hits `/me` to verify auth.
+
+**Part 2 — 1-click "Pay this invoice" public link:**
+- `invoice_public_router` wired into `server.py` (was created but never mounted in Phase 17.6).
+- New `GET /api/public/invoices/{id}/summary` (no auth) returns invoice metadata for the landing page.
+- New `GET /api/public/invoices/{id}/pay` (no auth) creates a fresh PayPal order tagged with `custom_id=invoice:{id}` and 302-redirects to the PayPal approval URL.
+- `paypal_routes.capture_order` now joins captures back to the invoice via `linked_invoice_id` and marks the invoice paid + re-renders the PDF + sends the receipt.
+- New public route `/pay/invoice/:invoiceId` (frontend) — clean unauthenticated landing page: summary, line items, balance, "Pay with PayPal" CTA, paid/voided banners.
+- Invoice email template's "Pay invoice" button now points to the public pay link instead of the portal route — clients pay in 1 click without logging in.
+- Admin **InvoicesAdmin** gained a per-row **Pay link** button that copies the public link to clipboard.
+- Client portal **Invoices** tab gained a **Pay now** button on unpaid invoices.
+
+**Tests:**
+- `/app/backend/tests/test_breezedocs.py` (new) — 10 pytests covering auth guards × 4 admin + 1 client, live templates list, proposals list shape, validation guard, 404 paths × 2, mock-log shape, /breezedocs/test endpoint.
+- `/app/backend/tests/test_pay_invoice_link.py` (new) — 5 pytests covering summary (no auth), 404 paths × 2, 302 → PayPal redirect, paid-invoice 409 guard.
+- Fixed pre-existing string-match assertion in `test_phase10_integrations.py` (Nifty wording changed from "not connected" to "isn't connected").
+- **All 248 backend tests green** across 22 test files.
+
 ### ✅ Phase 17.7 — PayPal Subscriptions + invoice on every renewal (Feb 2026)
 **Goal**: Round 3 of the AgencyHandy replacement — recurring add-on revenue managed in-house.
 

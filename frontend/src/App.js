@@ -29,6 +29,7 @@ import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
 import ApprovalsAdmin from "@/pages/admin/ApprovalsAdmin";
 import SupportTriageAdmin from "@/pages/admin/SupportTriageAdmin";
+import ProposalsAdmin from "@/pages/admin/ProposalsAdmin";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
 import { ClientAuthProvider, RequireClient } from "@/lib/clientAuth";
 import ClientLogin from "@/pages/client/ClientLogin";
@@ -42,6 +43,7 @@ import PublicCaseStudies from "@/pages/PublicCaseStudies";
 import PublicBlog from "@/pages/PublicBlog";
 import PublicBlogPost from "@/pages/PublicBlogPost";
 import PublicSandboxTour from "@/pages/PublicSandboxTour";
+import PayInvoice from "@/pages/PayInvoice";
 import AnalyticsTracker from "@/components/Analytics";
 import AuthCallback from "@/pages/AuthCallback";
 
@@ -58,6 +60,7 @@ function App() {
               <Route path="/blog" element={<PublicBlog />} />
               <Route path="/blog/:slug" element={<PublicBlogPost />} />
               <Route path="/tour" element={<PublicSandboxTour />} />
+              <Route path="/pay/invoice/:invoiceId" element={<PayInvoice />} />
 
               {/* Client (public-facing) auth + portal */}
               <Route path="/login" element={<ClientLogin />} />
@@ -108,6 +111,7 @@ function App() {
                 <Route path="paypal-plans" element={<PayPalPlansPage />} />
                 <Route path="paypal-orders" element={<PayPalOrdersPage />} />
                 <Route path="invoices" element={<InvoicesAdmin />} />
+                <Route path="proposals" element={<ProposalsAdmin />} />
                 <Route path="subscriptions" element={<SubscriptionsAdmin />} />
                 <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
                 <Route path="milestones" element={<MilestonesAdmin />} />

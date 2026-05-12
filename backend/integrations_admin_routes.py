@@ -551,10 +551,35 @@ async def test_approval_studio(
     return {"ok": True, "mode": "live"}
 
 
+@integrations_admin_router.post("/breezedocs/test")
+async def test_breezedocs(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
+    """Verify BreezeDocs auth via `/me`."""
+    bd = request.app.state.breezedocs
+    await bd._resolve_creds()
+    if not bd.is_configured:
+        await _record_ping(db, "breezedocs", ok=False, detail="mock mode")
+        return {"ok": False, "mode": "mock", "reason": "not configured"}
+    res = await bd.get_me()
+    ok = bool(res.get("success"))
+    detail = None if ok else str(res.get("error"))[:80]
+    await _record_ping(db, "breezedocs", ok=ok, detail=detail)
+    user_email = None
+    if ok:
+        user_email = (res.get("data") or {}).get("email")
+    return {
+        "ok": ok,
+        "mode": "live",
+        "status": res.get("status"),
+        "email": user_email,
+    }
+
+
 # ============================================================
 # DB-stored credentials (admin UI alternative to .env edits)
 # ============================================================
-ALLOWED_CRED_PROVIDERS = {"approval_studio", "thrivedesk", "slack", "google_calendar"}
+ALLOWED_CRED_PROVIDERS = {"approval_studio", "thrivedesk", "slack", "google_calendar", "breezedocs"}
 
 
 class CredentialsUpdate(BaseModel):
@@ -601,6 +626,10 @@ async def update_provider_credentials(
         cal.client_secret = ""
         cal.redirect_uri = ""
         await cal._resolve_creds()
+    elif provider == "breezedocs":
+        bd = request.app.state.breezedocs
+        bd.api_key = ""
+        await bd._resolve_creds()
     masked = await list_masked_credentials(db)
     return {"ok": True, "provider": provider, "fields": masked.get(provider, {})}
 
@@ -783,6 +812,31 @@ async def integrations_health(
                 "configured": False,
                 "last_ping": cal_last,
                 "detail": "client id/secret missing",
+            })
+
+    # BreezeDocs
+    bd = getattr(request.app.state, "breezedocs", None)
+    if bd is not None:
+        try:
+            await bd._resolve_creds()
+        except Exception:
+            pass
+        configured = getattr(bd, "is_configured", False)
+        bd_last = pings.get("breezedocs")
+        if configured:
+            items.append({
+                "provider": "breezedocs",
+                "status": "green" if (bd_last and bd_last.get("ok")) else "yellow",
+                "configured": True,
+                "last_ping": bd_last,
+            })
+        else:
+            items.append({
+                "provider": "breezedocs",
+                "status": "yellow",
+                "configured": False,
+                "last_ping": bd_last,
+                "detail": "running in MOCK mode",
             })
 
     return {"providers": items, "checked_at": _now()}

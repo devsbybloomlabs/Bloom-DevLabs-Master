@@ -61,6 +61,12 @@ from thrivedesk_routes import (  # noqa: E402
     support_admin_router,
     thrivedesk_webhook_router,
 )
+from breezedocs_client import BreezeDocsClient  # noqa: E402
+from breezedocs_routes import (  # noqa: E402
+    breezedocs_admin_router,
+    breezedocs_client_router,
+    breezedocs_sync_cron,
+)
 from demo_routes import demo_router  # noqa: E402
 from public_tour_routes import public_tour_router  # noqa: E402
 from contact_routes import (  # noqa: E402
@@ -81,6 +87,7 @@ from integrations_admin_routes import integrations_admin_router  # noqa: E402
 from invoice_routes import (  # noqa: E402
     invoice_admin_router,
     invoice_client_router,
+    invoice_public_router,
 )
 from subscription_routes import (  # noqa: E402
     subscription_admin_router,
@@ -150,6 +157,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.approval_studio.bind_db(db)
     app.state.thrivedesk = ThriveDeskClient()
     app.state.thrivedesk.bind_db(db)
+    app.state.breezedocs = BreezeDocsClient()
+    app.state.breezedocs.bind_db(db)
     app.state.google_calendar = GoogleCalendarClient()
     app.state.google_calendar.bind_db(db)
 
@@ -211,6 +220,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("ThriveDesk retry cron failed: %s", exc)
 
+    async def breezedocs_sync_cron_wrapper() -> None:
+        try:
+            res = await breezedocs_sync_cron(app.state.db, app.state.breezedocs)
+            if res.get("synced", 0) > 0:
+                log.info("BreezeDocs sync: %s", res)
+        except Exception as exc:
+            log.exception("BreezeDocs sync cron failed: %s", exc)
+
     # Hourly drip ticks
     scheduler.add_job(drip_cron, CronTrigger(minute=15))
     # Every 5 min Nifty comment poll
@@ -221,6 +238,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.add_job(approval_reminder_cron_wrapper, CronTrigger(minute=30))
     # Hourly retry of queued portal contact submissions
     scheduler.add_job(thrivedesk_retry_cron_wrapper, CronTrigger(minute=45))
+    # Every 10 min BreezeDocs status sync (no webhooks in their API)
+    scheduler.add_job(breezedocs_sync_cron_wrapper, CronTrigger(minute="*/10"))
 
     app.state.scheduler = scheduler
 
@@ -317,6 +336,7 @@ api.include_router(blog_extras_router)
 api.include_router(integrations_admin_router)
 api.include_router(invoice_admin_router)
 api.include_router(invoice_client_router)
+api.include_router(invoice_public_router)
 api.include_router(subscription_admin_router)
 api.include_router(subscription_client_router)
 api.include_router(blog_public_router)
@@ -333,6 +353,8 @@ api.include_router(approvals_admin_router)
 api.include_router(approvals_webhook_router)
 api.include_router(support_admin_router)
 api.include_router(thrivedesk_webhook_router)
+api.include_router(breezedocs_admin_router)
+api.include_router(breezedocs_client_router)
 api.include_router(demo_router)
 api.include_router(public_tour_router)
 api.include_router(client_contact_router)

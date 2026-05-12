@@ -95,10 +95,10 @@ async def admin_create_invoice(
             invoice_url = (
                 f"{invoice_service.BUSINESS_DEFAULTS['website']}/portal/invoices/{inv['id']}"
             )
-            # Use APP_BASE_URL for the actual link
+            # Use APP_BASE_URL for the actual link; route to the public 1-click pay page
             import os
             base = os.environ.get("APP_BASE_URL", "https://bybloomlabs.com").rstrip("/")
-            invoice_url = f"{base}/portal/invoices/{inv['id']}"
+            invoice_url = f"{base}/pay/invoice/{inv['id']}"
             pdf_url = f"{base}/api/clients/invoices/{inv['id']}/pdf"
             await email_service.send_invoice_issued(
                 emailit,
@@ -192,7 +192,7 @@ async def admin_resend_invoice_email(
         amount=f"{inv['total']:.2f}",
         currency=inv["currency"],
         due_date=(inv["due_at"][:10] if isinstance(inv.get("due_at"), str) and inv.get("due_at") else None),
-        invoice_url=f"{base}/portal/invoices/{inv['id']}",
+        invoice_url=f"{base}/pay/invoice/{inv['id']}",
         pdf_url=f"{base}/api/clients/invoices/{inv['id']}/pdf",
         line_items=[
             {"description": li["description"], "amount": f"{li['amount']:.2f}"}

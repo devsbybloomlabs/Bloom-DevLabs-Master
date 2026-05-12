@@ -260,7 +260,7 @@ class TestNiftyCacheAndPrefs:
             timeout=TIMEOUT,
         )
         assert r.status_code == 503, r.text
-        assert "not connected" in (r.json().get("detail") or "").lower()
+        assert "isn't connected" in (r.json().get("detail") or "").lower()
 
     def test_preferences_initial_empty(self, session, admin_token):
         r = session.get(

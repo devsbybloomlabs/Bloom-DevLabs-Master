@@ -375,6 +375,17 @@ function InvoicesList({ data, loading, token }) {
                 <Download className="h-3.5 w-3.5 mr-1.5" />
                 PDF
               </Button>
+              {inv.status !== "paid" && inv.status !== "void" && Number(inv.balance_due || 0) > 0 && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    window.location.href = `/pay/invoice/${inv.id}`;
+                  }}
+                  data-testid={`portal-invoice-pay-${inv.id}`}
+                >
+                  Pay now
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -385,37 +396,66 @@ function InvoicesList({ data, loading, token }) {
 
 function ProposalsList({ data, loading }) {
   if (loading) return <Skeleton className="h-32 w-full" />;
-  const items = data?.agencyhandy || [];
+  const items = Array.isArray(data) ? data : [];
   if (!items.length) {
     return (
       <EmptyState
         title="No proposals waiting"
-        message="Active quotations sent your way will appear here."
+        message="Active proposals & contracts will appear here once your team sends one your way."
       />
     );
   }
+  const statusMeta = {
+    draft: { label: "Drafting", cls: "bg-secondary text-foreground" },
+    sent: { label: "Awaiting your signature", cls: "bg-blue-100 text-blue-900" },
+    opened: { label: "Opened", cls: "bg-amber-100 text-amber-900" },
+    signed: { label: "Partially signed", cls: "bg-amber-100 text-amber-900" },
+    completed: { label: "Signed", cls: "bg-emerald-100 text-emerald-900" },
+    declined: { label: "Declined", cls: "bg-rose-100 text-rose-900" },
+    expired: { label: "Expired", cls: "bg-rose-100 text-rose-900" },
+  };
   return (
     <div className="space-y-3" data-testid="portal-proposals-list">
-      {items.map((p, i) => (
-        <Card key={p._id || i} className="border-border">
-          <CardContent className="p-4 sm:p-5 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <StatusPill status={p.status} />
+      {items.map((p) => {
+        const meta = statusMeta[p.status] || statusMeta.draft;
+        const showAction = p.sign_url && !["completed", "declined", "expired"].includes(p.status);
+        return (
+          <Card key={p.id} className="border-border" data-testid={`portal-proposal-${p.id}`}>
+            <CardContent className="p-4 sm:p-5 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.08em] ${meta.cls}`}>
+                    {meta.label}
+                  </span>
+                  {p.completed_at && (
+                    <span className="text-xs text-emerald-700">
+                      · Signed {new Date(p.completed_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 font-display text-base font-medium truncate">
+                  {p.title || "Proposal"}
+                </p>
+                {p.amount && Number(p.amount) > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {p.currency || "USD"} {Number(p.amount).toFixed(2)}
+                  </p>
+                )}
               </div>
-              <p className="mt-1 font-display text-base font-medium truncate">
-                {p.title || p.subject || "Proposal"}
-              </p>
-              {p.description && (
-                <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{p.description}</p>
+              {showAction && (
+                <Button
+                  size="sm"
+                  onClick={() => window.open(p.sign_url, "_blank", "noreferrer")}
+                  data-testid={`portal-proposal-sign-${p.id}`}
+                >
+                  Review & sign
+                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                </Button>
               )}
-            </div>
-            <p className="font-display text-lg font-semibold tabular-nums">
-              {fmt(p.totalAmount || p.budget || p.amount, p.currency)}
-            </p>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
@@ -614,7 +654,7 @@ export default function ClientPortal() {
         api.get("/clients/subscriptions"),
         api.get("/clients/subscriptions/plans"),
         api.get("/clients/invoices"),
-        api.get("/clients/me/proposals"),
+        api.get("/clients/me/breezedocs-proposals"),
         api.get("/clients/me/onboarding"),
         api.get("/clients/me/milestones"),
       ]);

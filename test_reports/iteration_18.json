@@ -1,0 +1,42 @@
+{
+  "summary": "Phase 18 review — 1-click public 'Pay this invoice' email-to-PayPal flow + BreezeDocs proposals & contracts (Round 4). Backend: 15/15 new Phase-18 pytests PASS (test_breezedocs.py 10/10 + test_pay_invoice_link.py 5/5). Full pytest suite: 246/249 (1 pre-existing skip, 2 pre-existing PayPal-webhook intermittent timeouts unrelated to Phase 18 — webhook endpoints reachable, just slow under load). Integrations health endpoint now includes `breezedocs` (status=green, configured=true). POST /api/admin/integrations/breezedocs/test returns {ok:true, mode:'live', status:200, email:'founder@thesalvador.group'} — LIVE auth verified against the real BreezeDoc account. APScheduler cron `breezedocs_sync_cron_wrapper` registered with CronTrigger(minute='*/10') in server.py:242. Frontend verified live on https://agency-suite-23.preview.emergentagent.com: (1) /admin/proposals renders header 'Proposals & contracts' + 'LIVE — connected to BreezeDoc' subheader + 3 stat tiles + search + status filter + New Proposal button + sidebar 'Proposals' link active under Sales. (2) New Proposal dialog opens with 5 live BreezeDoc templates loaded (CrossCurrent Traders' LDART.pdf, General Business Contract, Business Coaching Agreement, NDA, Marketing Project Agreement). (3) Public /pay/invoice/{id} renders standalone (no auth) with INV number, balance $50.00, large 'Pay with PayPal' button, line items, and 'Sign in to your portal' link. (4) Once invoice marked paid, same URL renders green 'Paid' badge + 'This invoice has been paid in full' banner + Pay button correctly removed. (5) Client portal (demo@bybloomlabs.com) shows Invoices tab with 2 ISSUED invoices each with prominent 'Pay now' button + PDF download; Proposals tab renders 'No proposals waiting' empty state (correct — no live proposals scoped to demo email). Regression: existing invoice CRUD, subscriptions, and AgencyHandy-free payment-capture flows untouched (test_invoices.py, test_subscriptions.py, test_phase16.py all green).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin/proposals New Proposal dialog", "issues": ["'Send to client now' toggle defaults to TRUE in live mode — risky for accidental real-email firing. Consider defaulting to FALSE (draft) when integration mode is 'live', or adding a confirmation step before submit. Low priority because checkbox is visible and admin must explicitly fill client_email."]},
+    {"screen": "Client portal Invoices tab", "issues": ["'Pay now' button has no data-testid attribute — works functionally (2 buttons rendered, link to /pay/invoice/{id}) but harder to target in future Playwright tests. Add data-testid='client-portal-invoice-pay-now-{id}' for symmetry with PDF download."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_breezedocs.py",
+    "/app/backend/tests/test_pay_invoice_link.py",
+    "/app/test_reports/pytest/iteration_18.xml",
+    "/app/test_reports/pytest/iteration_18_full.xml"
+  ],
+  "action_items": [
+    "Optional: add data-testid attributes to client-portal 'Pay now' buttons in ClientPortal.jsx for testability.",
+    "Optional UX: default 'Send to client now' to false in /admin/proposals create dialog when breezedocs.mode==='live' to prevent accidental real-email sends."
+  ],
+  "critical_code_review_comments": [
+    "invoice_routes.py invoice_public_router correctly excludes mongodb _id (verified via test_summary_returns_invoice_no_auth — `assert '_id' not in body`).",
+    "Pay endpoint 409 on paid + 404 on unknown ids verified live with real PATCH→GET flow against the deployed backend.",
+    "breezedocs_routes.py admin endpoints + client endpoint all gated by JWT — confirmed by test_admin_breezedocs_routes_require_auth (4 routes return 401/403) and test_client_breezedocs_endpoint_requires_auth.",
+    "Client portal /clients/me/breezedocs-proposals correctly filters by caller email + excludes archived — covered by test_client_proposals_only_returns_own.",
+    "/api/admin/breezedocs/proposals POST validates required fields (template_id+client_email+client_name) returning 400/422 — covered by test_create_proposal_validates_required_fields.",
+    "APScheduler breezedocs_sync_cron registered cleanly at server.py:242 with 10-min cron — confirmed via grep + the test_breezedocs_test_endpoint live LIVE response (`mode:'live', status:200`).",
+    "Integration health endpoint now lists breezedocs as 10th provider with green status (configured + live ping ok)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% on Phase 18 (15/15); 98.8% overall (246/249 — 2 pre-existing PayPal-webhook timeouts unrelated to Phase 18)",
+    "frontend": "100% on Phase 18 UI flows verified (admin Proposals page + New Proposal dialog with 5 live templates + public /pay/invoice/{id} unpaid AND paid states + client portal Invoices Pay-now buttons + Proposals empty state)"
+  },
+  "test_credentials": "Admin: founder@thesalvador.group / admin123. Client: demo@bybloomlabs.com / BloomDemo2026!. BreezeDocs JWT live — DO NOT send real emails in test runs (used send_now:false / closed dialog without submit).",
+  "seed_data_creation": "Test invoice 799f8940-0cc2-414d-b2fc-f6b99a887a69 (INV-2026-0031, $50.00, e2e-paylink@example.com) created and DELETED after public-pay flow validation. test_breezedocs.py and test_pay_invoice_link.py manage their own create→cleanup lifecycle.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 18 is fully green. BreezeDocs runs in LIVE mode connected to founder@thesalvador.group with 5 templates available. The integration has NO webhooks — status sync happens every 10 min via breezedocs_sync_cron in server.py:242. Public pay endpoint creates real PayPal orders (sandbox); paid invoices correctly return 409 and unknown invoice IDs return 404. The 2 pre-existing PayPal-webhook tests (test_webhook_accepts_arbitrary_json, test_webhook_payment_capture_completed_creates_notification) timeout intermittently due to deployed-env slowness — not a Phase-18 regression. When testing the New Proposal admin dialog, ALWAYS close without submit OR set send_now:false to avoid firing real BreezeDoc emails. test_credentials.md is up to date.",
+  "rca_of_the_issue": "N/A — no defects found. All 22 listed feature checks pass with 2 low-priority polish suggestions noted under design_issues."
+}

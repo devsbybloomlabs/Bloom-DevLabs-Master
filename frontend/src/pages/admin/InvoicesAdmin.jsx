@@ -46,6 +46,7 @@ import {
   Pencil,
   Receipt,
   Loader2,
+  Link as LinkIcon,
 } from "lucide-react";
 
 const STATUS_STYLES = {
@@ -217,6 +218,19 @@ export default function InvoicesAdmin() {
       toast.error(e?.response?.data?.detail || "Could not send");
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const copyPayLink = async (inv) => {
+    const origin =
+      (typeof window !== "undefined" && window.location.origin) ||
+      BACKEND.replace("/api", "");
+    const url = `${origin}/pay/invoice/${inv.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Pay link copied — paste into chat/email");
+    } catch {
+      window.prompt("Copy this pay link:", url);
     }
   };
 
@@ -418,6 +432,16 @@ export default function InvoicesAdmin() {
                     >
                       <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                       View
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyPayLink(inv)}
+                      disabled={inv.status === "paid" || inv.status === "void"}
+                      data-testid={`admin-invoice-copy-pay-link-${inv.id}`}
+                    >
+                      <LinkIcon className="h-3.5 w-3.5 mr-1.5" />
+                      Pay link
                     </Button>
                     <Button
                       size="sm"
