@@ -389,6 +389,7 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - Wire real Approval Studio creds (paste in /admin/integrations → Credentials → Approval Studio).
 - Upgrade ThriveDesk JWT scope from `public` → `admin` so write endpoints (replies, status) work live (currently scope-limited fallback queues for hourly retry).
 - Re-issue Slack webhook URL — the current one started returning `no_team` (likely revoked by Slack after many tests).
+- **Fix Phase 1 Onboarding → Nifty sync** — `_process_phase1` in `/app/backend/onboarding_routes.py` still emits "1 Nifty error(s)" badge in the admin onboarding panel. Likely root cause is missing default-project setting or expired OAuth token (the UI surfaces the error but doesn't auto-retry). Should be diagnosable via the Phase 9 `is_connected()` + `list_projects()` ping path.
 
 ### P2
 - ~~HMAC signature verification on AgencyHandy webhooks.~~ ✅ Done (Phase 11).
