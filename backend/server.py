@@ -1,6 +1,7 @@
 """Bloom Labs FastAPI server."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -118,7 +119,14 @@ log = logging.getLogger("server")
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     mongo_url = os.environ["MONGO_URL"]
     db_name = os.environ.get("DB_NAME", "bloom_labs")
-    client = AsyncIOMotorClient(mongo_url)
+    # Aggressive timeouts so a slow/unreachable Mongo doesn't hang K8s readiness.
+    # Motor defaults serverSelectionTimeoutMS to 30s which exceeds the readiness probe budget.
+    client = AsyncIOMotorClient(
+        mongo_url,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=10000,
+    )
     db = client[db_name]
     app.state.mongo = client
     app.state.db = db
@@ -137,11 +145,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.google_calendar = GoogleCalendarClient()
     app.state.google_calendar.bind_db(db)
 
-    # Seed founder + settings + authority metric
-    try:
+    # Seed founder + settings + authority metric — bounded so a slow Mongo
+    # cannot stall the K8s readiness probe.
+    async def _bootstrap() -> None:
         await ensure_seed_user(db)
         await ensure_settings(db)
         await ensure_authority_metric(db)
+
+    try:
+        await asyncio.wait_for(_bootstrap(), timeout=15.0)
+    except asyncio.TimeoutError:
+        log.error(
+            "Startup seed timed out after 15s — server will still come up; "
+            "first request may re-trigger seeding."
+        )
     except Exception as e:  # pragma: no cover
         log.exception("Startup seed failed: %s", e)
 
@@ -230,6 +247,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title="Bloom Labs API", version="1.0.0", lifespan=lifespan)
+
+
+# Root-level health endpoint outside /api — production K8s readiness probes and
+# deployer-managed health checks tend to hit /health without the /api prefix.
+@app.get("/health", include_in_schema=False)
+async def root_health() -> dict:
+    return {"status": "healthy"}
+
 
 # Top-level /api router
 api = APIRouter(prefix="/api")
