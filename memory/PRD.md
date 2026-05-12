@@ -24,8 +24,36 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
-### ✅ Phase 1-5 (prior sessions)
-POC → V1 MVP → Credibility Builder → Integration Layer → AgencyHandy.
+### ✅ Phase 17.6 — In-house Invoices + AgencyHandy removal (Feb 2026)
+**Decision**: User confirmed "replace AgencyHandy completely" to consolidate ownership of invoices/proposals/subscriptions in-house and gain full branding control.
+
+**Backend additions:**
+- `/app/backend/invoice_service.py` — invoice number generator (`INV-YYYY-NNNN` atomic counter via `app_settings`), branded HTML→PDF rendering via WeasyPrint, idempotent `get_or_create_invoice_for_capture()` linked by `paypal_order_id`, manual create + PDF caching.
+- `/app/backend/invoice_routes.py` — full admin CRUD (`/api/admin/invoices` GET/POST + `/admin/invoices/{id}` GET/PATCH/DELETE + `/admin/invoices/{id}/pdf` + `/admin/invoices/{id}/send-email`) and client portal endpoints (`/api/clients/invoices` + `/clients/invoices/{id}` + `/clients/invoices/{id}/pdf` — scoped to caller via `get_current_client`).
+- `models.Invoice` + `InvoiceLineItem` + `InvoiceCreateRequest` + `InvoiceUpdateRequest` Pydantic types.
+- `capture_order` now auto-generates an Invoice + caches PDF on every COMPLETED PayPal capture.
+- AgencyHandy mirror code path removed from `auto_provision_client_from_payment`. The `agencyhandy_client.create_client` method remains in code (in case it's needed elsewhere) but is no longer called from any production path.
+
+**Frontend additions:**
+- `/app/frontend/src/pages/admin/InvoicesAdmin.jsx` (new) — list with status filter + email search, four stat tiles (total/outstanding/collected/drafts), per-row actions: PDF download, View, Resend, Edit (status + notes), Void. Plus a full **New Invoice** dialog: client info, multi-line items (add/remove), currency, discount, tax, due date, live subtotal/discount/tax/total summary, notes textarea, "send email now" checkbox.
+- Client portal `InvoicesList` rewritten to consume `/api/clients/invoices` (new Invoice shape) + branded **PDF download** button per row + `Status` pill + balance-due hint.
+- Admin sidebar gained "Invoices" entry (`/admin/invoices`).
+- WeasyPrint installed (with libpango/libcairo backing) + frozen into requirements.txt.
+
+**PDF branding template** (`invoice_service._build_invoice_html`):
+- A4 page, 24mm margins
+- Header: Bloom Labs logo + legal name + address + tax ID, balanced against `INVOICE` title + number + status pill
+- Bill-To block, dates block (Issued/Due/Paid)
+- Line items table (Description / Qty / Unit / Amount) with tabular alignment
+- Totals rail (subtotal → discount → tax → total → amount paid → balance due) — only renders rows with non-zero values
+- Notes block (left blue accent bar)
+- Footer with billing email + website
+- Status pill color-coded: paid (emerald), issued (blue), draft (grey), overdue/void (rose), partial (amber)
+
+**Tests:**
+- `/app/backend/tests/test_invoices.py` — 7 new pytests (counter atomicity, idempotent capture-to-invoice, PDF byte signature, end-to-end CRUD flow, auth guards, empty-line-item validation, client isolation).
+- Existing master-workflow tests updated to assert AH mirror is **not** called (Phase 17.6 contract).
+- Regression: **78/78 backend tests green** across invoices/email-CRUD/blockers/master-workflow/payment-plans/paypal-clients.
 
 ### ✅ Phase 6 — PayPal + Client Portal (Feb 2026)
 PayPal Smart Buttons (one-time + subscriptions), Client auth (JWT, role separation), Portal (Orders/Subs/Invoices/Proposals/Profile), Hidden admin gate.

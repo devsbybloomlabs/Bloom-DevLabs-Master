@@ -54,79 +54,34 @@ def _fake_request_with_ah(fake_ah, fake_emailit=None):
 
 
 @pytest.mark.asyncio
-async def test_auto_provision_mirrors_to_agencyhandy():
-    """Issue #1 fix: when a new payer is provisioned, AgencyHandy.create_client
-    must be invoked and the returned member id stored on the client doc."""
+async def test_auto_provision_creates_local_client_only():
+    """Phase 17.6: AgencyHandy removed — auto_provision creates only the local
+    client doc + admin notification + welcome email. No external mirror call."""
     from client_routes import auto_provision_client_from_payment
 
     db = _db()
-    email = f"test-mirror-{uuid.uuid4().hex[:8]}@bybloomlabs.com"
+    email = f"test-local-{uuid.uuid4().hex[:8]}@bybloomlabs.com"
     try:
-        # Wire a fake AgencyHandy client that returns a successful create
         fake_ah = AsyncMock()
         fake_ah.is_configured = True
-        fake_ah.create_client = AsyncMock(return_value={
-            "success": True, "status": 201, "error": None,
-            "data": {"createdMembers": [{"_id": "ah-mock-123", "name": "Test Mirror"}]},
-        })
+        fake_ah.create_client = AsyncMock()
         request = _fake_request_with_ah(fake_ah)
 
         doc = await auto_provision_client_from_payment(
             db, request,
-            email=email, name="Test Mirror",
+            email=email, name="Local Only",
             source="paypal_test", source_id=f"ORDER-{uuid.uuid4().hex[:6]}",
         )
-
-        # 1. AgencyHandy.create_client was called with correct payload
-        fake_ah.create_client.assert_awaited_once()
-        call_kwargs = fake_ah.create_client.call_args.kwargs
-        assert call_kwargs["email"] == email
-        assert call_kwargs["first_name"] == "Test"
-        assert call_kwargs["last_name"] == "Mirror"
-        assert call_kwargs["source"] == "paypal_test"
-
-        # 2. client doc has the agency_handy_id stored
-        fresh = await db.clients.find_one({"email": email}, {"_id": 0})
-        assert fresh is not None
-        assert fresh.get("agency_handy_id") == "ah-mock-123"
-        assert doc.get("agency_handy_id") == "ah-mock-123"
-    finally:
-        await db.clients.delete_many({"email": email})
-        await db.client_reset_tokens.delete_many({"email": email})
-        await db.notifications.delete_many({"title": {"$regex": email}})
-
-
-@pytest.mark.asyncio
-async def test_auto_provision_logs_admin_notification_on_ah_failure():
-    """If AgencyHandy returns an error, the client is still created locally
-    AND an admin notification is emitted so the founder can add manually."""
-    from client_routes import auto_provision_client_from_payment
-
-    db = _db()
-    email = f"test-ah-fail-{uuid.uuid4().hex[:8]}@bybloomlabs.com"
-    try:
-        fake_ah = AsyncMock()
-        fake_ah.is_configured = True
-        fake_ah.create_client = AsyncMock(return_value={
-            "success": False, "status": 409, "data": None,
-            "error": "Email already exists in workspace",
-        })
-        request = _fake_request_with_ah(fake_ah)
-
-        doc = await auto_provision_client_from_payment(
-            db, request,
-            email=email, name="Test Failure",
-            source="paypal_test", source_id="ORDER-FAIL-001",
-        )
-
-        # Local client still created
-        assert doc.get("email") == email
+        assert doc["email"] == email
         # Admin notification emitted
         notif = await db.notifications.find_one(
-            {"kind": "integration_error", "title": {"$regex": email}}, {"_id": 0}
+            {"kind": "client", "title": {"$regex": email}}, {"_id": 0}
         )
-        assert notif is not None, "Expected integration_error notification when AgencyHandy fails"
-        assert "Agency Handy returned" in notif["body"]
+        assert notif is not None
+        # AgencyHandy mirror is intentionally NOT called anymore.
+        fake_ah.create_client.assert_not_awaited()
+        # No agency_handy_id on the doc
+        assert "agency_handy_id" not in doc
     finally:
         await db.clients.delete_many({"email": email})
         await db.client_reset_tokens.delete_many({"email": email})
@@ -162,37 +117,30 @@ async def test_auto_provision_skips_ah_call_when_unconfigured():
 
 
 @pytest.mark.asyncio
-async def test_existing_client_retries_ah_mirror_when_not_yet_mirrored():
-    """Existing client whose first payment didn't mirror should retry on subsequent capture."""
+async def test_existing_client_no_longer_retries_ah():
+    """Phase 17.6: even existing clients without agency_handy_id should NOT trigger AH."""
     from client_routes import auto_provision_client_from_payment
 
     db = _db()
-    email = f"test-retry-{uuid.uuid4().hex[:8]}@bybloomlabs.com"
+    email = f"test-no-retry-{uuid.uuid4().hex[:8]}@bybloomlabs.com"
     try:
-        # Seed an existing client WITHOUT agency_handy_id
         await db.clients.insert_one({
-            "email": email, "name": "Existing Client",
+            "email": email, "name": "Existing No-Retry",
             "source_ids": ["ORDER-OLD-001"], "status": "active",
             "created_at": "2026-01-01T00:00:00+00:00",
         })
-
         fake_ah = AsyncMock()
         fake_ah.is_configured = True
-        fake_ah.create_client = AsyncMock(return_value={
-            "success": True, "status": 201,
-            "data": {"createdMembers": [{"_id": "ah-retry-999"}]},
-        })
+        fake_ah.create_client = AsyncMock()
         request = _fake_request_with_ah(fake_ah)
 
         await auto_provision_client_from_payment(
             db, request,
-            email=email, name="Existing Client",
+            email=email, name="Existing No-Retry",
             source="paypal_test", source_id="ORDER-NEW-002",
         )
-
-        fake_ah.create_client.assert_awaited_once()
-        fresh = await db.clients.find_one({"email": email}, {"_id": 0})
-        assert fresh.get("agency_handy_id") == "ah-retry-999"
+        # No AH call any more
+        fake_ah.create_client.assert_not_awaited()
     finally:
         await db.clients.delete_many({"email": email})
 

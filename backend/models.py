@@ -729,3 +729,65 @@ class MilestoneUpdate(BaseModel):
     completion_date: Optional[datetime] = None
     blocked_reason: Optional[str] = None
     blocked_eta: Optional[datetime] = None
+
+
+
+# ---------- Invoices ----------
+INVOICE_STATUSES = ("draft", "issued", "paid", "void", "overdue", "partial")
+
+
+class InvoiceLineItem(BaseModel):
+    description: str
+    quantity: float = 1.0
+    unit_price: float
+    amount: float  # quantity * unit_price (computed)
+
+
+class Invoice(BaseModel):
+    """Invoice generated from a PayPal capture, subscription cycle, or manual admin entry."""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_id)
+    number: str  # human-readable e.g. INV-2026-0042
+    client_email: EmailStr
+    client_name: str = ""
+    client_company: Optional[str] = None
+    issued_at: datetime = Field(default_factory=_now)
+    due_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    status: str = "issued"  # see INVOICE_STATUSES
+    currency: str = "USD"
+    subtotal: float
+    discount: float = 0.0
+    tax: float = 0.0
+    total: float
+    amount_paid: float = 0.0
+    balance_due: float = 0.0
+    line_items: List[InvoiceLineItem] = Field(default_factory=list)
+    notes: Optional[str] = None  # e.g. payment terms, thank-you copy
+    # Source linkage (audit trail):
+    source: str = "manual"  # paypal_order | subscription_cycle | manual
+    paypal_order_id: Optional[str] = None
+    subscription_id: Optional[str] = None
+    pdf_path: Optional[str] = None  # local relative path to cached PDF
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class InvoiceCreateRequest(BaseModel):
+    client_email: EmailStr
+    client_name: str = ""
+    client_company: Optional[str] = None
+    line_items: List[InvoiceLineItem]
+    currency: str = "USD"
+    discount: float = 0.0
+    tax: float = 0.0
+    due_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    send_email: bool = True
+
+
+class InvoiceUpdateRequest(BaseModel):
+    status: Optional[str] = None
+    notes: Optional[str] = None
+    due_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None

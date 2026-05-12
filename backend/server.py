@@ -78,6 +78,10 @@ from google_calendar_routes import (  # noqa: E402
 )
 from blog_extras_routes import blog_extras_router  # noqa: E402
 from integrations_admin_routes import integrations_admin_router  # noqa: E402
+from invoice_routes import (  # noqa: E402
+    invoice_admin_router,
+    invoice_client_router,
+)
 from client_routes import (  # noqa: E402
     client_admin_router,
     client_auth_router,
@@ -307,6 +311,8 @@ api.include_router(client_admin_router)
 api.include_router(public_router)
 api.include_router(blog_extras_router)
 api.include_router(integrations_admin_router)
+api.include_router(invoice_admin_router)
+api.include_router(invoice_client_router)
 api.include_router(blog_public_router)
 api.include_router(blog_admin_router)
 api.include_router(onboarding_public_router)

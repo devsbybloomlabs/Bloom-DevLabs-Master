@@ -26,6 +26,7 @@ import {
   Circle,
   PartyPopper,
   MessageSquare,
+  Download,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import ClientContactPanel from "@/pages/client/ClientContactPanel";
@@ -192,33 +193,95 @@ function SubscriptionsList({ data, loading }) {
   );
 }
 
-function InvoicesList({ data, loading }) {
+function InvoicesList({ data, loading, token }) {
   if (loading) return <Skeleton className="h-32 w-full" />;
-  const items = data?.agencyhandy || [];
+  const items = Array.isArray(data) ? data : [];
   if (!items.length) {
     return (
       <EmptyState
-        title="No invoices"
-        message="When invoices are issued, they'll show up here for download."
+        title="No invoices yet"
+        message="Invoices appear here automatically once a payment is captured. You'll also receive a branded PDF receipt by email."
       />
     );
   }
+  const statusColor = {
+    paid: "bg-emerald-100 text-emerald-900",
+    issued: "bg-blue-100 text-blue-900",
+    draft: "bg-secondary text-foreground",
+    void: "bg-rose-100 text-rose-900",
+    overdue: "bg-rose-100 text-rose-900",
+    partial: "bg-amber-100 text-amber-900",
+  };
+  const downloadPdf = async (inv) => {
+    try {
+      const API = process.env.REACT_APP_BACKEND_URL;
+      const res = await fetch(
+        `${API}/api/clients/invoices/${inv.id}/pdf`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${inv.number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      // Surface failure as toast in real UI; portal Toaster picks it up
+      window.alert("Could not download invoice — please try again.");
+    }
+  };
   return (
     <div className="space-y-3" data-testid="portal-invoices-list">
-      {items.map((inv, i) => (
-        <Card key={inv._id || i} className="border-border">
+      {items.map((inv) => (
+        <Card key={inv.id} className="border-border" data-testid={`portal-invoice-${inv.id}`}>
           <CardContent className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <StatusPill status={inv.status || "PENDING"} />
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.08em] ${statusColor[inv.status] || "bg-secondary text-foreground"}`}>
+                  {inv.status}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Issued {inv.issued_at ? new Date(inv.issued_at).toLocaleDateString() : "—"}
+                </span>
+                {inv.paid_at && (
+                  <span className="text-xs text-emerald-700">
+                    · Paid {new Date(inv.paid_at).toLocaleDateString()}
+                  </span>
+                )}
               </div>
-              <p className="mt-1 font-display text-base font-medium truncate">
-                {inv.invoiceNumber || inv.number || `Invoice ${i + 1}`}
-              </p>
+              <p className="mt-1 font-display text-base font-medium">{inv.number}</p>
+              {inv.line_items && inv.line_items.length > 0 && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {inv.line_items[0].description}
+                  {inv.line_items.length > 1 && ` +${inv.line_items.length - 1} more`}
+                </p>
+              )}
             </div>
-            <p className="font-display text-lg font-semibold tabular-nums">
-              {fmt(inv.totalAmount || inv.amount, inv.currency)}
-            </p>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="font-display text-lg font-semibold tabular-nums">
+                  {fmt(inv.total, inv.currency)}
+                </p>
+                {inv.balance_due > 0 && inv.status !== "paid" && (
+                  <p className="text-[11px] text-rose-700">
+                    {fmt(inv.balance_due, inv.currency)} due
+                  </p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => downloadPdf(inv)}
+                data-testid={`portal-invoice-download-${inv.id}`}
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                PDF
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ))}
@@ -454,7 +517,7 @@ export default function ClientPortal() {
       const [o, s, i, p, ob, ms] = await Promise.allSettled([
         api.get("/clients/me/orders"),
         api.get("/clients/me/subscriptions"),
-        api.get("/clients/me/invoices"),
+        api.get("/clients/invoices"),
         api.get("/clients/me/proposals"),
         api.get("/clients/me/onboarding"),
         api.get("/clients/me/milestones"),
@@ -582,7 +645,7 @@ export default function ClientPortal() {
             <SubscriptionsList data={subs} loading={loading} />
           </TabsContent>
           <TabsContent value="invoices" className="mt-6">
-            <InvoicesList data={invoices} loading={loading} />
+            <InvoicesList data={invoices} loading={loading} token={token} />
           </TabsContent>
           <TabsContent value="proposals" className="mt-6">
             <ProposalsList data={proposals} loading={loading} />

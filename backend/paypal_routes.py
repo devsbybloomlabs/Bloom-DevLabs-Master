@@ -310,6 +310,7 @@ async def capture_order(
     if status_str == "COMPLETED" and payer_email:
         try:
             import email_service
+            import invoice_service
 
             emailit = getattr(request.app.state, "emailit", None)
             fresh = await db.paypal_transactions.find_one({"id": order_id}, {"_id": 0}) or {}
@@ -317,7 +318,27 @@ async def capture_order(
             plan_name = PACKAGE_TIERS.get(tier, {}).get("name") or fresh.get("description") or "Bloom Labs Service"
             if fresh.get("installment_index") == 2:
                 plan_name = f"{plan_name} — Launch balance"
-            invoice_number = f"INV-{order_id[-8:].upper()}"
+
+            # Generate internal invoice (replaces AgencyHandy invoice flow)
+            invoice_doc = None
+            try:
+                invoice_doc = await invoice_service.get_or_create_invoice_for_capture(
+                    db, {**fresh, "description": plan_name}
+                )
+                # Cache PDF in background (don't block receipt email)
+                try:
+                    await invoice_service.cache_invoice_pdf(db, invoice_doc)
+                except Exception as exc:  # pragma: no cover
+                    log.warning("Invoice PDF cache failed: %s", exc)
+            except Exception as exc:  # pragma: no cover
+                log.warning("Invoice generation failed for %s: %s", order_id, exc)
+
+            invoice_number = (
+                invoice_doc["number"]
+                if invoice_doc
+                else f"INV-{order_id[-8:].upper()}"
+            )
+
             await email_service.send_payment_receipt(
                 emailit,
                 to=payer_email,

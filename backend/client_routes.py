@@ -149,33 +149,6 @@ async def auto_provision_client_from_payment(
                 }
             },
         )
-        # If we never mirrored this client to AgencyHandy (older account or prior
-        # AH failure), retry the mirror best-effort.
-        if not existing.get("agency_handy_id"):
-            try:
-                agencyhandy = getattr(request.app.state, "agencyhandy", None)
-                if agencyhandy and getattr(agencyhandy, "is_configured", False):
-                    parts = (existing.get("name") or name or "").strip().split(" ", 1)
-                    first = parts[0] or email_lc.split("@")[0]
-                    last = parts[1] if len(parts) > 1 else ""
-                    ah_res = await agencyhandy.create_client(
-                        email=email_lc, first_name=first, last_name=last, source=source,
-                    )
-                    if ah_res.get("success"):
-                        data = ah_res.get("data") or {}
-                        created = data.get("createdMembers") or []
-                        member_id = (
-                            created[0].get("_id") or created[0].get("id")
-                            if created and isinstance(created, list)
-                            else None
-                        )
-                        if member_id:
-                            await db.clients.update_one(
-                                {"email": email_lc},
-                                {"$set": {"agency_handy_id": member_id}},
-                            )
-            except Exception as exc:  # pragma: no cover
-                log.warning("AgencyHandy retry-mirror for existing client failed: %s", exc)
         return existing
     # New client — no password
     doc = _new_client_doc(
@@ -214,62 +187,16 @@ async def auto_provision_client_from_payment(
     except Exception as exc:  # pragma: no cover
         log.warning("Emailit send failed during client provision: %s", exc)
 
-    # Best-effort: mirror the new client into AgencyHandy so revenue ops sees
-    # the lead immediately. Failures are logged + surfaced to admin notifications
-    # so the founder can manually add the client if AH is unreachable.
-    ah_member_id: Optional[str] = None
-    try:
-        agencyhandy = getattr(request.app.state, "agencyhandy", None)
-        if agencyhandy and getattr(agencyhandy, "is_configured", False):
-            parts = (name or "").strip().split(" ", 1)
-            first = parts[0] or email_lc.split("@")[0]
-            last = parts[1] if len(parts) > 1 else ""
-            ah_res = await agencyhandy.create_client(
-                email=email_lc,
-                first_name=first,
-                last_name=last,
-                source=source,
-            )
-            if ah_res.get("success"):
-                data = ah_res.get("data") or {}
-                created = data.get("createdMembers") or []
-                if created and isinstance(created, list):
-                    ah_member_id = created[0].get("_id") or created[0].get("id")
-                if ah_member_id:
-                    await db.clients.update_one(
-                        {"email": email_lc},
-                        {"$set": {"agency_handy_id": ah_member_id, "updated_at": _now().isoformat()}},
-                    )
-                log.info("AgencyHandy client mirrored for %s (id=%s)", email_lc, ah_member_id)
-            else:
-                err_msg = ah_res.get("error") or "unknown"
-                log.warning("AgencyHandy create_client failed for %s: %s", email_lc, err_msg)
-                # Notify admin so founder knows to add the client manually
-                err_notif = NotificationItem(
-                    kind="integration_error",
-                    title=f"⚠️ AgencyHandy sync skipped: {email_lc}",
-                    body=(
-                        f"Client was created locally but Agency Handy returned: {err_msg}. "
-                        f"Please add them manually so invoices and project records line up."
-                    ),
-                    link="/admin/integrations",
-                )
-                await db.notifications.insert_one(prepare_for_mongo(err_notif.model_dump()))
-    except Exception as exc:  # pragma: no cover
-        log.exception("AgencyHandy mirror failed for %s: %s", email_lc, exc)
-
     # Admin notification with the link (so founder can share manually if email fails)
     notif = NotificationItem(
         kind="client",
         title=f"🎉 New client: {email_lc}",
         body=f"Auto-provisioned from {source}. Password-setup link: {setup_url}",
-        link="/admin/revenue",
+        link="/admin/clients",
     )
     await db.notifications.insert_one(prepare_for_mongo(notif.model_dump()))
     log.info("Auto-provisioned client %s from %s", email_lc, source)
     doc.pop("password_hash", None)
-    if ah_member_id:
-        doc["agency_handy_id"] = ah_member_id
     return doc
 
 
