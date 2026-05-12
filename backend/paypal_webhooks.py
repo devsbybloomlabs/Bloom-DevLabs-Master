@@ -215,6 +215,24 @@ async def _process_paypal_event(
                 )
             except Exception as exc:  # pragma: no cover
                 log.warning("Subscription activation email failed: %s", exc)
+            # Phase C: auto-upgrade support tier if this plan is a support plan
+            try:
+                from support_clearance_routes import apply_support_subscription_upgrade
+
+                upgrade_res = await apply_support_subscription_upgrade(
+                    db,
+                    client_email=sub_email,
+                    plan_id=sub_record.get("plan_id") or "",
+                    plan_name=plan_name,
+                )
+                if upgrade_res.get("changed"):
+                    log.info(
+                        "Support tier auto-upgraded for %s → %s",
+                        sub_email,
+                        upgrade_res.get("tier"),
+                    )
+            except Exception as exc:  # pragma: no cover
+                log.warning("Support tier auto-upgrade failed: %s", exc)
         return
 
     if event_type == "PAYMENT.SALE.COMPLETED" and resource.get("billing_agreement_id"):

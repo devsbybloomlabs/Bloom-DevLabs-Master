@@ -382,3 +382,58 @@ async def send_subscription_activated(
         html=html,
         text=f"Subscription activated: {plan_name} — {currency} {amount}/{period}. Manage: {portal_url}",
     )
+
+
+
+async def send_refund_issued(
+    emailit,
+    *,
+    to: str,
+    name: str,
+    order_id: str,
+    amount: str,
+    currency: str = "USD",
+    is_partial: bool = False,
+    reason: Optional[str] = None,
+    paypal_refund_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Branded confirmation that a refund has been issued to the client."""
+    portal_url = f"{APP_BASE_URL}/portal?tab=orders"
+    reason_label = (reason or "client request").replace("_", " ").title()
+    rows = [
+        {"label": "Order", "value": order_id},
+        {"label": "Refund amount", "value": f"{currency} {amount}"},
+        {"label": "Refund type", "value": "Partial refund" if is_partial else "Full refund"},
+        {"label": "Reason", "value": reason_label},
+    ]
+    if paypal_refund_id:
+        rows.append({"label": "PayPal refund ID", "value": paypal_refund_id})
+    body = (
+        _h1(f"Refund issued — {currency} {amount}")
+        + _p(
+            f"Hi {name}, we've processed your refund. PayPal typically posts "
+            f"the funds back to your original payment method within 3–5 "
+            f"business days."
+        )
+        + _kv_table(rows)
+        + f'<p style="margin:24px 0;">{_button(portal_url, "View in portal")}</p>'
+        + _p(
+            "If you have any questions about this refund, just reply to this email — "
+            "we read every response."
+        )
+    )
+    html = _frame(
+        preheader=f"Refund of {currency} {amount} processed.",
+        body_html=body,
+    )
+    return await _safe_send(
+        emailit,
+        to=to,
+        subject=f"Refund issued · {currency} {amount} · {BRAND_NAME}",
+        html=html,
+        text=(
+            f"Refund issued: {currency} {amount} ({'partial' if is_partial else 'full'}). "
+            f"Order: {order_id}. Reason: {reason_label}. "
+            f"PayPal refund id: {paypal_refund_id or '—'}."
+        ),
+    )

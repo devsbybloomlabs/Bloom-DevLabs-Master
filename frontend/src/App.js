@@ -29,6 +29,7 @@ import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
 import CompaniesAdmin from "@/pages/admin/CompaniesAdmin";
 import ProposalsAdmin from "@/pages/admin/ProposalsAdmin";
+import SupportClearanceAdmin from "@/pages/admin/SupportClearanceAdmin";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
 import { ClientAuthProvider, RequireClient } from "@/lib/clientAuth";
 import ClientLogin from "@/pages/client/ClientLogin";
@@ -122,6 +123,7 @@ function App() {
                 <Route path="paypal-orders" element={<PayPalOrdersPage />} />
                 <Route path="invoices" element={<InvoicesAdmin />} />
                 <Route path="proposals" element={<ProposalsAdmin />} />
+                <Route path="support-clearance" element={<SupportClearanceAdmin />} />
                 <Route path="subscriptions" element={<SubscriptionsAdmin />} />
                 <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
                 <Route path="milestones" element={<MilestonesAdmin />} />

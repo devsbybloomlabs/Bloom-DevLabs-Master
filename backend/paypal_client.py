@@ -189,6 +189,41 @@ class PayPalClient:
     async def capture_order(self, order_id: str) -> Dict[str, Any]:
         return await self._request("POST", f"/v2/checkout/orders/{order_id}/capture", json={})
 
+    async def get_capture(self, capture_id: str) -> Dict[str, Any]:
+        """Fetch a capture by id — needed before refunding to confirm status."""
+        return await self._request("GET", f"/v2/payments/captures/{capture_id}")
+
+    async def refund_capture(
+        self,
+        capture_id: str,
+        *,
+        amount: Optional[str] = None,
+        currency: Optional[str] = None,
+        note_to_payer: Optional[str] = None,
+        invoice_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Refund a captured payment (full or partial).
+
+        Per PayPal docs: omit `amount` to refund in full; pass a value to do
+        a partial refund. `note_to_payer` shows up in the PayPal receipt email.
+        """
+        body: Dict[str, Any] = {}
+        if amount is not None:
+            body["amount"] = {
+                "value": str(amount),
+                "currency_code": currency or self.default_currency,
+            }
+        if note_to_payer:
+            body["note_to_payer"] = note_to_payer[:255]
+        if invoice_id:
+            body["invoice_id"] = invoice_id[:127]
+        return await self._request(
+            "POST", f"/v2/payments/captures/{capture_id}/refund", json=body
+        )
+
+    async def get_refund(self, refund_id: str) -> Dict[str, Any]:
+        return await self._request("GET", f"/v2/payments/refunds/{refund_id}")
+
     # ------------------------------------------------------------------
     # Catalog Products (for subscriptions)
     # ------------------------------------------------------------------

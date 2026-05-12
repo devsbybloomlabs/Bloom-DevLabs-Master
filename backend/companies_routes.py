@@ -213,6 +213,13 @@ async def create_company(
     }
     await db.companies.insert_one(prepare_for_mongo(company_doc))
     await db.contacts.insert_one(prepare_for_mongo(contact_doc))
+    # Phase C: every new company gets a Support UID immediately
+    try:
+        from support_clearance_routes import ensure_support_uid
+
+        company_doc = await ensure_support_uid(db, company_doc)
+    except Exception:  # pragma: no cover
+        pass
     await log_activity(
         db,
         company_id=company_id,

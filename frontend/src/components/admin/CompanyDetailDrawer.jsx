@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import MilestoneTimeline from "@/components/MilestoneTimeline";
 import { toast } from "sonner";
 import {
   Building2,
@@ -666,42 +667,7 @@ function TransactionsTab({ detail }) {
 
 function MilestonesTab({ detail }) {
   const ms = detail.milestones || [];
-  if (ms.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-center text-sm text-muted-foreground">
-          No milestones yet — the team will add these as the project moves forward.
-          <p className="text-xs mt-2">Phase E will turn this into an animated timeline.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-  return (
-    <div className="space-y-2">
-      {ms.map((m, idx) => (
-        <Card key={m.id || idx}>
-          <CardContent className="p-3 flex items-center gap-3">
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                m.status === "completed"
-                  ? "bg-emerald-500"
-                  : m.status === "in_progress"
-                  ? "bg-blue-500"
-                  : "bg-slate-300"
-              }`}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{m.title}</p>
-              <p className="text-xs text-muted-foreground capitalize">{m.status?.replace("_", " ")}</p>
-            </div>
-            {m.completed_at && (
-              <span className="text-xs text-emerald-700">✓ {fmtDate(m.completed_at)}</span>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+  return <MilestoneTimeline milestones={ms} />;
 }
 
 function DocumentsTab({ detail }) {

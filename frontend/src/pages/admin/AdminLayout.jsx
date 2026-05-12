@@ -47,6 +47,7 @@ const NAV = [
   { to: "/admin/proposals", label: "Proposals", icon: FileText, group: "Sales" },
   { to: "/admin/subscriptions", label: "Subscriptions", icon: Repeat, group: "Sales" },
   { to: "/admin/onboarding", label: "Onboarding", icon: ClipboardList, group: "Sales" },
+  { to: "/admin/support-clearance", label: "Support Clearance", icon: ShieldCheck, group: "Sales" },
   { to: "/admin/milestones", label: "Milestones", icon: Target, group: "Sales" },
   { to: "/admin/lead-magnets", label: "Lead Magnets", icon: Sparkles, group: "Authority" },
   { to: "/admin/credibility", label: "Credibility Hub", icon: ShieldCheck, group: "Authority" },

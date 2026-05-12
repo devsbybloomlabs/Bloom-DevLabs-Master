@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from auth import get_current_user
 from db_utils import prepare_for_mongo
@@ -862,3 +862,235 @@ async def list_pp_webhooks(pp: PayPalClient = Depends(get_pp)) -> Dict[str, Any]
     if not res.get("success"):
         raise HTTPException(502, res.get("error") or "list webhooks failed")
     return res["data"]
+
+
+
+# =========================================================================
+# Phase D — PayPal Refunds (full + partial)
+# =========================================================================
+class RefundRequest(BaseModel):
+    amount: Optional[str] = None  # Omit for full refund; pass to do partial
+    reason: str = Field(
+        default="client_request",
+        pattern="^(client_request|duplicate|mistake|quality_issue|fraud|other)$",
+    )
+    note: Optional[str] = None  # Internal note (saved on the transaction)
+    note_to_payer: Optional[str] = None  # Shown in PayPal receipt email
+    notify_client: bool = True  # Send branded refund email
+
+
+def _find_capture_id(transaction: Dict[str, Any]) -> Optional[str]:
+    """Dig into the PayPal Order's payload to find the capture id.
+
+    Capture data is added by PayPal after `capture_order` is called.
+    Stored at `raw.purchase_units[*].payments.captures[*].id`.
+    """
+    raw = transaction.get("raw") or {}
+    for unit in raw.get("purchase_units") or []:
+        captures = ((unit.get("payments") or {}).get("captures")) or []
+        for cap in captures:
+            cap_id = cap.get("id")
+            if cap_id:
+                return cap_id
+    # Fallback: if our local row IS a capture (kind=="capture"), id is the capture id
+    if (transaction.get("kind") or "") == "capture":
+        return transaction.get("id") or transaction.get("capture_id")
+    return transaction.get("capture_id")
+
+
+@paypal_admin_router.post("/transactions/{order_id}/refund")
+async def refund_transaction(
+    order_id: str,
+    req: RefundRequest,
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Issue a refund against a captured PayPal order.
+
+    Steps:
+      1. Look up our local transaction row.
+      2. Find the underlying capture id (returned by PayPal after capture).
+      3. Call PayPal `POST /v2/payments/captures/{cap_id}/refund`.
+      4. Persist the refund_id + status + reason + amount on the txn.
+      5. If linked to an invoice, mark it refunded (or partially_refunded).
+      6. activity_log → refund.issued. Slack alert + branded email.
+    """
+    pp: PayPalClient = request.app.state.paypal
+    if not pp.is_configured:
+        raise HTTPException(503, "PayPal not configured")
+
+    txn = await db.paypal_transactions.find_one({"id": order_id}, {"_id": 0})
+    if not txn:
+        raise HTTPException(404, "Transaction not found")
+
+    if txn.get("refund_id"):
+        raise HTTPException(409, "This order has already been refunded")
+
+    capture_id = _find_capture_id(txn)
+    if not capture_id:
+        raise HTTPException(
+            400,
+            "Could not find a capture id — the order may not have been captured yet.",
+        )
+
+    # Optional: pre-validate the capture is in a refundable state via PayPal
+    cap_check = await pp.get_capture(capture_id)
+    if not cap_check.get("success"):
+        raise HTTPException(502, cap_check.get("error") or "PayPal lookup failed")
+    cap_status = (cap_check.get("data") or {}).get("status")
+    if cap_status and cap_status.upper() not in ("COMPLETED", "PARTIALLY_REFUNDED"):
+        raise HTTPException(
+            400,
+            f"Capture is in status {cap_status!r} — refund not allowed",
+        )
+
+    # Validate partial amount
+    full_amount = float(txn.get("amount") or 0)
+    refund_amount: Optional[float] = None
+    is_partial = False
+    if req.amount is not None:
+        try:
+            refund_amount = float(req.amount)
+        except (TypeError, ValueError):
+            raise HTTPException(422, "Amount must be a number")
+        if refund_amount <= 0 or refund_amount > full_amount:
+            raise HTTPException(422, "Refund amount must be between 0 and the full order total")
+        is_partial = refund_amount < full_amount
+
+    res = await pp.refund_capture(
+        capture_id,
+        amount=req.amount if req.amount is not None else None,
+        currency=txn.get("currency"),
+        note_to_payer=req.note_to_payer,
+        invoice_id=txn.get("invoice_number"),
+    )
+    if not res.get("success"):
+        raise HTTPException(502, f"PayPal refund failed: {res.get('error')}")
+    pp_refund = res.get("data") or {}
+    refund_id = pp_refund.get("id")
+    refund_status = (pp_refund.get("status") or "").upper()
+    refund_value = (pp_refund.get("amount") or {}).get("value") or str(req.amount or full_amount)
+
+    now_iso = _now().isoformat()
+    update_payload: Dict[str, Any] = {
+        "refund_id": refund_id,
+        "refund_status": refund_status,
+        "refund_amount": str(refund_value),
+        "refund_reason": req.reason,
+        "refund_note": req.note,
+        "refunded_at": now_iso,
+        "status": "PARTIALLY_REFUNDED" if is_partial else "REFUNDED",
+        "updated_at": now_iso,
+    }
+    await db.paypal_transactions.update_one({"id": order_id}, {"$set": update_payload})
+
+    # If linked to an invoice, mark it refunded
+    if txn.get("linked_invoice_id"):
+        try:
+            from invoice_service import mark_invoice_refunded
+
+            await mark_invoice_refunded(
+                db,
+                invoice_id=txn["linked_invoice_id"],
+                amount=float(refund_value),
+                refund_id=refund_id,
+                is_partial=is_partial,
+            )
+        except Exception as exc:  # pragma: no cover
+            log.warning("Invoice refund-mark failed: %s", exc)
+
+    # Activity log
+    try:
+        from activity_log import log_activity
+
+        await log_activity(
+            db,
+            company_email=txn.get("customer_email"),
+            type="refund.issued",
+            title=f"Refund issued — {txn.get('currency', 'USD')} {refund_value}",
+            description=(
+                f"Reason: {req.reason}. Note: {req.note or '—'}. "
+                f"PayPal refund_id: {refund_id}."
+            ),
+            meta={
+                "order_id": order_id,
+                "refund_id": refund_id,
+                "amount": refund_value,
+                "is_partial": is_partial,
+            },
+        )
+    except Exception:
+        pass
+
+    # Slack alert
+    try:
+        import slack_notifier
+
+        slack_text = (
+            f"💸 *Refund issued* `{txn.get('currency', 'USD')} {refund_value}` "
+            f"(reason: {req.reason})\n"
+            f"Order: `{order_id}` · refund: `{refund_id}`\n"
+            f"Client: {txn.get('customer_email', '—')}"
+        )
+        await slack_notifier.post_message(db, text=slack_text)
+    except Exception:  # pragma: no cover
+        pass
+
+    # Branded email
+    if req.notify_client and txn.get("customer_email"):
+        try:
+            from email_service import send_refund_issued
+
+            emailit = request.app.state.emailit
+            await send_refund_issued(
+                emailit,
+                to=txn["customer_email"],
+                name=txn.get("customer_name") or txn["customer_email"].split("@")[0],
+                order_id=order_id,
+                amount=f"{float(refund_value):.2f}",
+                currency=txn.get("currency", "USD"),
+                is_partial=is_partial,
+                reason=req.reason,
+                paypal_refund_id=refund_id,
+            )
+        except Exception as exc:  # pragma: no cover
+            log.warning("Refund email failed: %s", exc)
+
+    return {
+        "ok": True,
+        "order_id": order_id,
+        "refund_id": refund_id,
+        "refund_status": refund_status,
+        "amount": refund_value,
+        "is_partial": is_partial,
+        "paypal_activity_url": (
+            f"https://www.{'sandbox.' if pp.env == 'sandbox' else ''}paypal.com/"
+            f"activity/payment/{order_id}"
+        ),
+    }
+
+
+@paypal_admin_router.get("/transactions/{order_id}/refund-info")
+async def get_refund_info(
+    order_id: str,
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Inspect a transaction's refundability — used by the admin UI before
+    showing the refund button."""
+    txn = await db.paypal_transactions.find_one({"id": order_id}, {"_id": 0})
+    if not txn:
+        raise HTTPException(404, "Not found")
+    capture_id = _find_capture_id(txn)
+    already_refunded = bool(txn.get("refund_id"))
+    return {
+        "order_id": order_id,
+        "currency": txn.get("currency"),
+        "amount": txn.get("amount"),
+        "has_capture": bool(capture_id),
+        "capture_id": capture_id,
+        "already_refunded": already_refunded,
+        "refund_status": txn.get("refund_status"),
+        "refund_amount": txn.get("refund_amount"),
+        "refundable": bool(capture_id) and not already_refunded,
+    }

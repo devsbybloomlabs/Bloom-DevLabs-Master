@@ -55,6 +55,12 @@ from companies_routes import (  # noqa: E402
     contacts_admin_router,
     migrate_clients_to_companies,
 )
+from support_clearance_routes import (  # noqa: E402
+    support_admin_router,
+    support_public_router,
+    support_client_router,
+    backfill_support_uids,
+)
 from demo_routes import demo_router  # noqa: E402
 from public_tour_routes import public_tour_router  # noqa: E402
 from contact_routes import (  # noqa: E402
@@ -219,6 +225,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             mig_res = await migrate_clients_to_companies(db)
             if mig_res.get("created", 0) > 0:
                 log.info("Companies migration: %s", mig_res)
+            # Phase C: backfill support UIDs for all companies missing one.
+            await backfill_support_uids(db)
         except Exception as exc:
             log.exception("Startup seed failed: %s", exc)
         try:
@@ -316,6 +324,9 @@ api.include_router(breezedocs_admin_router)
 api.include_router(breezedocs_client_router)
 api.include_router(companies_admin_router)
 api.include_router(contacts_admin_router)
+api.include_router(support_admin_router)
+api.include_router(support_public_router)
+api.include_router(support_client_router)
 api.include_router(demo_router)
 api.include_router(public_tour_router)
 api.include_router(client_contact_router)

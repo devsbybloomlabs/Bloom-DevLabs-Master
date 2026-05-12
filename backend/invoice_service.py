@@ -405,3 +405,39 @@ async def cache_invoice_pdf(db: AsyncIOMotorDatabase, invoice: Dict[str, Any]) -
         {"$set": {"pdf_path": rel_path, "updated_at": _now().isoformat()}},
     )
     return rel_path
+
+
+
+async def mark_invoice_refunded(
+    db,
+    *,
+    invoice_id: str,
+    amount: float,
+    refund_id: Optional[str] = None,
+    is_partial: bool = False,
+) -> None:
+    """Phase D — flip an invoice to refunded / partially_refunded.
+
+    Adds a metadata block with the refund_id + amount so the PDF / UI can
+    surface it. Does NOT recompute totals — the original line items stay
+    intact (a credit-note PDF can be generated separately if needed).
+    """
+    inv = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not inv:
+        return
+    new_status = "partially_refunded" if is_partial else "refunded"
+    await db.invoices.update_one(
+        {"id": invoice_id},
+        {
+            "$set": {
+                "status": new_status,
+                "refund_id": refund_id,
+                "refund_amount": amount,
+                "refunded_at": _now().isoformat(),
+                "balance_due": 0 if not is_partial else max(
+                    0, float(inv.get("total") or 0) - amount
+                ),
+                "updated_at": _now().isoformat(),
+            }
+        },
+    )

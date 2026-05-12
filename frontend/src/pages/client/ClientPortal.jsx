@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useClientAuth, clientApi } from "@/lib/clientAuth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import MilestoneTimeline from "@/components/MilestoneTimeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -468,84 +469,8 @@ const MILESTONE_STATUS_META = {
 };
 
 function MilestonesList({ data, loading }) {
-  if (loading) return <Skeleton className="h-32 w-full" />;
-  const items = data || [];
-  if (!items.length) {
-    return (
-      <EmptyState
-        icon={Target}
-        title="No milestones yet"
-        message="Your project milestones will appear here as your build progresses."
-      />
-    );
-  }
-  return (
-    <div className="space-y-3" data-testid="portal-milestones-list">
-      {items.map((m) => {
-        const meta = MILESTONE_STATUS_META[m.status] || MILESTONE_STATUS_META.pending;
-        const StatusIcon = meta.icon;
-        const isFinalComplete = m.is_final_deliverable && m.status === "complete";
-        return (
-          <Card
-            key={m.id}
-            className={`border-border ${isFinalComplete ? "ring-2 ring-[#3B82F6]/40 shadow-[var(--shadow-md)]" : ""}`}
-            data-testid={`portal-milestone-card-${m.id}`}
-          >
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${meta.cls}`}>
-                      <StatusIcon className="h-3 w-3" />
-                      {meta.label}
-                    </span>
-                    {isFinalComplete && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#1E3A8A] text-white px-2.5 py-1 text-[11px] font-medium">
-                        <PartyPopper className="h-3 w-3" />
-                        Delivered
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 font-display text-base font-medium">{m.title}</p>
-                  {m.description && (
-                    <p className="mt-1 text-sm text-muted-foreground">{m.description}</p>
-                  )}
-                  {m.blocked_reason && (
-                    <p className="mt-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded px-3 py-1.5">
-                      On hold: {m.blocked_reason}
-                    </p>
-                  )}
-                  {m.notes && m.notes.length > 0 && (
-                    <div className="mt-3 space-y-1.5">
-                      {m.notes.slice(-3).map((n, i) => (
-                        <div key={i} className="text-xs bg-secondary rounded-md px-2.5 py-1.5">
-                          <span className="font-medium">{n.author || "Team"}:</span>{" "}
-                          <span className="text-muted-foreground">{n.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="text-right text-xs text-muted-foreground">
-                  {m.completion_date ? (
-                    <>
-                      <p>Completed</p>
-                      <p>{new Date(m.completion_date).toLocaleDateString()}</p>
-                    </>
-                  ) : m.due_date ? (
-                    <>
-                      <p>Due</p>
-                      <p>{new Date(m.due_date).toLocaleDateString()}</p>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
+  if (loading) return <Skeleton className="h-64 w-full" />;
+  return <MilestoneTimeline milestones={data || []} />;
 }
 
 function ProfilePanel({ client, refreshClient, token }) {
@@ -639,6 +564,7 @@ export default function ClientPortal() {
   const [onboarding, setOnboarding] = useState(null);
   const [milestones, setMilestones] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [supportClearance, setSupportClearance] = useState(null);
 
   // Tab state synced with `?tab=...` URL param so deep-links from emails work
   // (e.g. /portal?tab=invoices, /portal?tab=subscriptions).
@@ -673,7 +599,7 @@ export default function ClientPortal() {
     setLoading(true);
     const api = clientApi(token);
     try {
-      const [o, s, pl, i, p, ob, ms] = await Promise.allSettled([
+      const [o, s, pl, i, p, ob, ms, sc] = await Promise.allSettled([
         api.get("/clients/me/orders"),
         api.get("/clients/subscriptions"),
         api.get("/clients/subscriptions/plans"),
@@ -681,6 +607,7 @@ export default function ClientPortal() {
         api.get("/clients/me/breezedocs-proposals"),
         api.get("/clients/me/onboarding"),
         api.get("/clients/me/milestones"),
+        api.get("/clients/me/support/clearance"),
       ]);
       setOrders(o.status === "fulfilled" ? o.value.data : null);
       setSubs(s.status === "fulfilled" ? s.value.data : null);
@@ -689,6 +616,7 @@ export default function ClientPortal() {
       setProposals(p.status === "fulfilled" ? p.value.data : null);
       setOnboarding(ob.status === "fulfilled" ? ob.value.data : null);
       setMilestones(ms.status === "fulfilled" ? ms.value.data : null);
+      setSupportClearance(sc.status === "fulfilled" ? sc.value.data : null);
     } finally {
       setLoading(false);
     }
@@ -712,6 +640,29 @@ export default function ClientPortal() {
             <img src={BRAND.logos.fullDark} alt="Bloom Labs" className="h-7 sm:h-8 w-auto" />
           </Link>
           <div className="flex items-center gap-3">
+            {supportClearance?.tier && supportClearance.tier !== "none" && (
+              <button
+                onClick={() => {
+                  if (supportClearance?.support_uid) {
+                    navigator.clipboard?.writeText(supportClearance.support_uid).then(
+                      () => toast.success(`Support UID copied: ${supportClearance.support_uid}`),
+                      () => {}
+                    );
+                  }
+                }}
+                className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider border ${
+                  supportClearance.tier === "vip"
+                    ? "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200"
+                    : supportClearance.tier === "premium"
+                    ? "bg-sky-100 text-sky-900 border-sky-300 hover:bg-sky-200"
+                    : "bg-secondary text-foreground border-border hover:bg-secondary/80"
+                } transition-colors`}
+                title={`${supportClearance.sla?.label || ""} · Click to copy your Support UID`}
+                data-testid="portal-support-tier-badge"
+              >
+                {supportClearance.tier === "vip" ? "★" : "●"} {supportClearance.tier.toUpperCase()}
+              </button>
+            )}
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-medium">{client?.name}</span>
               <span className="text-[11px] text-muted-foreground">{client?.email}</span>

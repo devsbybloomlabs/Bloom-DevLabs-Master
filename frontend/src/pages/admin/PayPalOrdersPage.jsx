@@ -37,6 +37,7 @@ import {
   ExternalLink,
   XCircle,
   Pencil,
+  RotateCcw,
 } from "lucide-react";
 
 function fmtMoney(amount, currency = "USD") {
@@ -139,6 +140,14 @@ export default function PayPalOrdersPage() {
   const [reissueAmount, setReissueAmount] = useState("");
   const [cancelDialog, setCancelDialog] = useState(null); // {tx}
   const [cancelReason, setCancelReason] = useState("");
+  const [refundDialog, setRefundDialog] = useState(null); // {tx}
+  const [refundForm, setRefundForm] = useState({
+    amount: "",
+    reason: "client_request",
+    note: "",
+    note_to_payer: "",
+    notify_client: true,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -222,6 +231,29 @@ export default function PayPalOrdersPage() {
       load();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Could not cancel installment 2");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const issueRefund = async (orderId, opts) => {
+    setBusyId(orderId);
+    try {
+      const r = await api.post(`/paypal/admin/transactions/${orderId}/refund`, opts);
+      toast.success(
+        opts.amount
+          ? `Partial refund of ${opts.amount} issued`
+          : "Full refund issued"
+      );
+      setRefundDialog(null);
+      load();
+      // Open the PayPal activity URL in a new tab so the founder can see it
+      const url = r?.data?.paypal_activity_url;
+      if (url && window.confirm("Open this refund on PayPal in a new tab?")) {
+        window.open(url, "_blank", "noreferrer");
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Refund failed");
     } finally {
       setBusyId(null);
     }
@@ -441,6 +473,40 @@ export default function PayPalOrdersPage() {
                             )}
                             {alreadyBilled ? "View launch link" : "Mark Ready for Launch"}
                           </Button>
+                          {/* Phase D: Refund button (only for completed captures, not yet refunded) */}
+                          {tx.status === "COMPLETED" && !tx.refund_id && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setRefundForm({
+                                  amount: "",
+                                  reason: "client_request",
+                                  note: "",
+                                  note_to_payer: "",
+                                  notify_client: true,
+                                });
+                                setRefundDialog({ tx });
+                              }}
+                              disabled={busyId === tx.id}
+                              className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                              data-testid={`paypal-order-refund-${tx.id}`}
+                              title="Issue a full or partial refund"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                              Refund
+                            </Button>
+                          )}
+                          {tx.refund_id && (
+                            <Badge
+                              variant="outline"
+                              className="bg-rose-50 text-rose-900 border-rose-300 text-[10px] uppercase"
+                              data-testid={`paypal-order-refunded-badge-${tx.id}`}
+                            >
+                              {tx.status === "PARTIALLY_REFUNDED" ? "Partial refund" : "Refunded"}
+                              {tx.refund_amount && ` · ${tx.currency} ${tx.refund_amount}`}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     )}
@@ -684,6 +750,129 @@ export default function PayPalOrdersPage() {
             >
               <XCircle className="h-3.5 w-3.5 mr-1.5" />
               Cancel installment 2
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Phase D — Refund dialog */}
+      <Dialog
+        open={Boolean(refundDialog)}
+        onOpenChange={(o) => !o && setRefundDialog(null)}
+      >
+        <DialogContent className="sm:max-w-[520px]" data-testid="paypal-orders-refund-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-rose-600" />
+              Issue refund
+            </DialogTitle>
+            <DialogDescription>
+              {refundDialog?.tx && (
+                <>
+                  Refund up to{" "}
+                  <strong>
+                    {fmtMoney(refundDialog.tx.amount, refundDialog.tx.currency)}
+                  </strong>{" "}
+                  from PayPal to{" "}
+                  <strong>{refundDialog.tx.customer_email}</strong>. Leave the
+                  amount empty for a full refund.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="refund-amount" className="text-xs">
+                Amount (leave blank for full refund)
+              </Label>
+              <Input
+                id="refund-amount"
+                value={refundForm.amount}
+                onChange={(e) =>
+                  setRefundForm({ ...refundForm, amount: e.target.value })
+                }
+                placeholder={refundDialog?.tx?.amount || "0.00"}
+                inputMode="decimal"
+                data-testid="paypal-refund-amount"
+              />
+            </div>
+            <div>
+              <Label htmlFor="refund-reason" className="text-xs">Reason</Label>
+              <select
+                id="refund-reason"
+                value={refundForm.reason}
+                onChange={(e) =>
+                  setRefundForm({ ...refundForm, reason: e.target.value })
+                }
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                data-testid="paypal-refund-reason"
+              >
+                <option value="client_request">Client request</option>
+                <option value="duplicate">Duplicate payment</option>
+                <option value="mistake">Mistake / wrong amount</option>
+                <option value="quality_issue">Quality issue</option>
+                <option value="fraud">Fraud / chargeback risk</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="refund-note-payer" className="text-xs">
+                Note shown to client on PayPal receipt (optional)
+              </Label>
+              <Input
+                id="refund-note-payer"
+                value={refundForm.note_to_payer}
+                onChange={(e) =>
+                  setRefundForm({ ...refundForm, note_to_payer: e.target.value })
+                }
+                placeholder="Refund as agreed via email"
+                maxLength={255}
+              />
+            </div>
+            <div>
+              <Label htmlFor="refund-note" className="text-xs">
+                Internal note (saved on the transaction, not visible to client)
+              </Label>
+              <Input
+                id="refund-note"
+                value={refundForm.note}
+                onChange={(e) =>
+                  setRefundForm({ ...refundForm, note: e.target.value })
+                }
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={refundForm.notify_client}
+                onChange={(e) =>
+                  setRefundForm({ ...refundForm, notify_client: e.target.checked })
+                }
+                data-testid="paypal-refund-notify"
+              />
+              <span>Send branded refund-confirmation email</span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRefundDialog(null)}>
+              Keep
+            </Button>
+            <Button
+              onClick={() =>
+                refundDialog &&
+                issueRefund(refundDialog.tx.id, {
+                  amount: refundForm.amount.trim() || undefined,
+                  reason: refundForm.reason,
+                  note: refundForm.note.trim() || undefined,
+                  note_to_payer: refundForm.note_to_payer.trim() || undefined,
+                  notify_client: refundForm.notify_client,
+                })
+              }
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              data-testid="paypal-orders-refund-submit"
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+              Issue refund
             </Button>
           </DialogFooter>
         </DialogContent>

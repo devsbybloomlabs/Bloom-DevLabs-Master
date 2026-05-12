@@ -24,6 +24,72 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase E — Animated Milestone Timeline (Feb 2026)
+**Goal**: Turn the static milestone list into a delightful, alive timeline that pushes live updates to clients. Reused inside both the client portal AND the admin CompanyDetailDrawer.
+
+**New shared component** `/app/frontend/src/components/MilestoneTimeline.jsx`:
+- **Vertical timeline** with an animated "progress rail" whose filled height grows as phases complete (`gradient: emerald → blue → primary`).
+- **Fun status banner** that rotates on every visit. 12 pre-written messages including "Team's brewing your designs 🔮", "Code's compiling, beats are bumping 🎧", "Almost there — sneak peek incoming 👀", "The team ain't chillin', we're getting this done reaaaaal soon!".
+- **Per-node states**:
+  - `completed` → solid green node + ✓ icon + completion date
+  - `in_progress` → pulsing blue ring + spinning loader icon
+  - `blocked` → rose node + visible reason card + ETA
+  - `pending` → empty slate node
+- **One-shot confetti burst** on the most-recently-completed milestone (CSS-only, no library, gated by `localStorage` so it fires once per completion timestamp).
+- **Live ETA estimator**: averages duration of completed milestones, projects remaining work to a "Likely shipping ~Mar 12 (4 days out)" line.
+- **Expandable cards** — click to reveal recent team updates inline.
+- Mobile-friendly (stacks cleanly, no horizontal scroll).
+
+Wired into:
+- `/portal?tab=milestones` (client portal — replaces the old static `MilestonesList`)
+- `CompanyDetailDrawer` → Milestones tab (admin sees exactly what the client sees)
+
+### ✅ Phase D — PayPal Refunds (Feb 2026 — part 1 of 2)
+**Goal**: Issue full or partial refunds from the admin dashboard with a one-click link to the PayPal activity page. AI Project Brief flow (part 2) deferred to next session.
+
+**Backend:**
+- `PayPalClient.refund_capture()` + `get_capture()` + `get_refund()` added — wraps PayPal's `/v2/payments/captures/{id}/refund` endpoint.
+- Two new admin endpoints in `paypal_routes.py`:
+  - `POST /api/paypal/admin/transactions/{order_id}/refund` — full or partial refund. Validates capture is in COMPLETED state, persists `refund_id`/`refund_status`/`refund_amount`/`refund_reason`/`refunded_at`, flips the linked invoice (if any) to `refunded` or `partially_refunded`, writes `refund.issued` activity_log event, fires Slack alert + branded refund email.
+  - `GET /api/paypal/admin/transactions/{order_id}/refund-info` — inspector returns `{refundable, has_capture, capture_id, already_refunded}` for the admin UI to pre-validate before showing the button.
+- New `invoice_service.mark_invoice_refunded()` helper.
+- New `email_service.send_refund_issued()` branded template with reason, amount, partial-vs-full label, PayPal refund id.
+
+**Frontend** (PayPalOrdersPage.jsx):
+- Added a **Refund button** next to the launch button (only on COMPLETED + not-yet-refunded captures).
+- Refund dialog with: amount (blank = full), reason dropdown (Client Request / Duplicate / Mistake / Quality Issue / Fraud / Other), note-to-payer (visible on PayPal receipt), internal note, "send branded email" toggle.
+- Refunded transactions show a rose pill ("Partial refund · USD 1,000" or "Refunded").
+- Successful refund → toast offers to open the PayPal activity URL in a new tab.
+
+**Tests:** `test_paypal_refunds.py` (7 tests) — auth guards, 404s, reason validation, refund-info shape, PayPal client signature pinning, email signature pinning. **All green.**
+
+### ✅ Phase C — VIP Support Clearance (Feb 2026)
+**Goal**: A complete VIP/Premium/Standard/None support tier system. Auto-generated Support UIDs, central SLA matrix, lookup tool for support agents, subscription auto-upgrade hook, client portal badge.
+
+**Backend** (`support_clearance_routes.py`):
+- Generates `BL-SUP-XXXXXX` Support UIDs (6 alphanumeric chars, collision-checked). Every new company gets one at creation; legacy companies are backfilled at warmup.
+- 4-tier model (`vip / premium / standard / none`) with a central SLA matrix stored in `app_settings.support_sla` (admin-editable). Defaults include the response-time promise + a ready-to-paste spiel for each tier.
+- Endpoints:
+  - `GET /admin/support-clearance/lookup?uid=...|email=...` — full clearance package: company, tier, SLA spiel, contacts, recent tickets, active subscriptions.
+  - `POST /admin/support-clearance/companies/{id}/tier` — manual override + writes `support.upgraded` activity event.
+  - `POST /admin/support-clearance/companies/{id}/regenerate-uid` — rotate (with activity log).
+  - `GET/PUT /admin/support-clearance/sla` + `/sla/{tier}` — admin edits the spiel/response time inline.
+  - `GET /api/support/clearance/{uid}` — **public, no auth** — returns tier + label + SLA but ZERO PII. Used by chat widgets.
+  - `GET /api/clients/me/support/clearance` — client portal shows the badge.
+- Auto-upgrade hook in `paypal_webhooks.py`: when `BILLING.SUBSCRIPTION.ACTIVATED` fires, `apply_support_subscription_upgrade()` maps the plan name/id → tier and bumps automatically.
+
+**Frontend** (`SupportClearanceAdmin.jsx`):
+- New page `/admin/support-clearance` (in Sales sidebar group).
+- Single search box auto-detects UID vs email.
+- Result card: company name, tier badge (with crown icon for VIP), Support UID (with copy + rotate), SLA promise, spiel preview, **Copy spiel** button (1-click paste into ThriveDesk).
+- Manual override buttons (VIP / Premium / Standard / None).
+- Recent tickets + active subscriptions + contacts cards.
+- Inline SLA matrix editor at the bottom — click any tier card → edit label / response_time / spiel.
+
+**Client portal**: VIP/Premium tier badge in header (clickable → copies Support UID to clipboard). Hidden for `none` tier.
+
+**Tests:** `test_support_clearance.py` (12 pytests) covering auth guards, UID generation, public verify (PII redaction), lookup-by-email-or-UID, 404 paths, manual override + activity log, tier validation, UID rotation, SLA CRUD, client portal endpoint scoping. **All green.**
+
 ### ✅ Phase B — Companies + Contacts foundation (Feb 2026)
 **Goal**: Replace the flat `clients` model with a proper Company → Contacts relationship. Build the unified "Client Detail Drawer" — a single tabbed view showing everything we know about a company. Add an `activity_log` that every key event writes to (invoice created, paid, refunded, proposal sent/signed, brief approved, milestone completed, support upgraded, manual notes).
 
