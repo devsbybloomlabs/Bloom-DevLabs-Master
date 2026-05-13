@@ -24,6 +24,42 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase F — In-house Project Mode (Feb 2026)
+**Goal**: Replace the unreliable Nifty integration with a self-contained Kanban PM suite. Founder + team manage internal task state without depending on a third-party OAuth that keeps disconnecting.
+
+**Backend (`project_mode_routes.py`):**
+- New collections:
+  - `pm_projects`: `{id, name, slug, company_id?, client_email?, color, status: active|paused|archived, created_at, updated_at, created_by}`
+  - `pm_tasks`: `{id, project_id, title, description, status: todo|in_progress|review|blocked|done, assignee, due_date, priority: low|medium|high|urgent, milestone_id?, order_idx, created_at, updated_at}`
+  - `pm_comments`: `{id, task_id, author, body, created_at}`
+- All endpoints mounted under `/api/admin/pm/*` (admin-auth):
+  - Projects: `GET/POST /projects` · `GET/PATCH/DELETE /projects/{id}` · `GET /projects/{id}/board` (Kanban-grouped tasks)
+  - Tasks: `GET/POST /tasks` (filters: `project_id`, `status`, `assignee`) · `PATCH/DELETE /tasks/{id}`
+  - Comments: `GET/POST /tasks/{id}/comments`
+- Smart behaviours:
+  - Project create auto-resolves `company_id` from `client_email` via `companies.primary_email`.
+  - Task create auto-assigns the next `order_idx` within its column. Status transitions without a pinned `order_idx` land the card at the bottom of the destination column.
+  - **Task → done with a `milestone_id` auto-completes the linked Milestone** (status='complete' + completion_date) — keeps the client-facing animated timeline in sync without manual edits.
+  - Task delete cascades to its comments.
+
+**Frontend (`/admin/project-mode`, `ProjectModeAdmin.jsx`):**
+- Left rail: project list with accent-color dot, name, client-email prefix, `done/total` progress.
+- Main area: 5 Kanban columns (To do / In progress / Review / Blocked / Done) with `+` add buttons per column.
+- Click any card → side-by-side detail dialog with status pills (one-click move between columns), editable title/description/priority/assignee/due-date, comments thread with author + timestamp, delete button.
+- New-project dialog supports name + optional client_email + color picker.
+- Sidebar entry under "Sales" with KanbanSquare icon.
+
+**Tests:** `/app/backend/tests/test_project_mode.py` — 5 pytests (CRUD, task lifecycle with status/priority validation + reordering, task→done auto-completes linked milestone, auth guards, 404 paths). **All green.** Regression: **243/243 backend tests** (incl. the extended brief milestone auto-seed assertions).
+
+### ✅ Brief milestone auto-seed (Feb 2026 — Phase D part 2 polish)
+**Goal**: "We already started" moment — when the client approves their AI Project Brief, we seed 5 default milestones (Discovery & Brief Sign-off [in_progress] / Design Language / Build — Core flows / QA & Polish / Launch [is_final_deliverable]) on their account. Client opens the Milestones tab on their very next visit and sees the timeline already lit up.
+
+**Implementation** (`project_brief_routes.py::_seed_milestones_from_brief`):
+- Hooks into `POST /clients/me/briefs/{id}/approve` right before the activity log entry.
+- Idempotent — keyed by `(client_email, project_name)`. If the client already has milestones for this exact project name, the seed is a no-op.
+- Spaced due dates: D+3 / D+10 / D+28 / D+38 / D+45 from approval.
+- Test extended in `test_project_brief_e2e.py::test_full_brief_flow` to assert all 5 titles + statuses + is_final_deliverable flag.
+
 ### ✅ Phase D part 2 — AI Project Brief flow (Feb 2026)
 **Goal**: Compress the gap between onboarding submission and Design kickoff. We auto-translate the client's onboarding answers into 3 ready-to-paste AI prompts (Design Language, Function Language, Company Background), the admin pastes each into Claude → drops the summaries back per phase → sends for approval → client reviews + approves in their portal → brief locks + Design phase begins.
 
