@@ -13,6 +13,16 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CheckCircle2, FileText, Sparkles, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,6 +34,7 @@ const PHASE_META = {
 
 export default function ProjectBriefView({ brief, api, onApproved }) {
   const [approving, setApproving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   if (!brief) return null;
 
@@ -32,16 +43,11 @@ export default function ProjectBriefView({ brief, api, onApproved }) {
   );
 
   const approve = async () => {
-    if (
-      !window.confirm(
-        `Approve the project brief for "${brief.project_name}"? Once approved, we'll kick off the build.`
-      )
-    )
-      return;
+    setConfirmOpen(false);
     setApproving(true);
     try {
       await api.post(`/clients/me/briefs/${brief.id}/approve`);
-      toast.success("Brief approved — the team has been notified 🎉");
+      toast.success("Brief approved — the team has been notified");
       onApproved?.();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Approval failed");
@@ -120,7 +126,7 @@ export default function ProjectBriefView({ brief, api, onApproved }) {
           </p>
           <Button
             size="lg"
-            onClick={approve}
+            onClick={() => setConfirmOpen(true)}
             disabled={approving}
             className="text-base px-8 py-6"
             data-testid="portal-brief-approve-btn"
@@ -132,6 +138,31 @@ export default function ProjectBriefView({ brief, api, onApproved }) {
           </p>
         </div>
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent data-testid="portal-brief-confirm-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve this brief?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Once you approve the project brief for{" "}
+              <strong>{brief.project_name}</strong>, we'll lock it and kick off
+              the Design phase. You can still reach the team via the Support
+              tab for any tweaks during the build.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="portal-brief-confirm-cancel">
+              Not yet
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={approve}
+              data-testid="portal-brief-confirm-approve"
+            >
+              Yes, approve
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

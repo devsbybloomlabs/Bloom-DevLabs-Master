@@ -24,6 +24,32 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase D part 2 — AI Project Brief flow (Feb 2026)
+**Goal**: Compress the gap between onboarding submission and Design kickoff. We auto-translate the client's onboarding answers into 3 ready-to-paste AI prompts (Design Language, Function Language, Company Background), the admin pastes each into Claude → drops the summaries back per phase → sends for approval → client reviews + approves in their portal → brief locks + Design phase begins.
+
+**Backend (`project_brief_routes.py`):**
+- New `project_briefs` collection: `{id, company_id?, client_email, project_name, onboarding_id?, phase_summaries: {phase1|2|3: {summary, updated_at}}, status: draft|sent_for_approval|approved|archived, sent_for_approval_at, approved_at, approved_by_email, created_at, updated_at}`
+- 3 prompt generators (`generate_design_prompt`, `generate_function_prompt`, `generate_company_prompt`) embed the client's actual phase1/2/3 answers — with graceful `didn't share any references` fallback when phases aren't submitted yet.
+- Admin endpoints (auth-guarded):
+  - `GET /admin/briefs/prompts/{onboarding_id}` — 3 ready-to-paste prompts + answers + phases_submitted snapshot
+  - `GET/POST /admin/briefs` (+ `?client_email=` / `?status=` filters)
+  - `GET /admin/briefs/{id}` · `PATCH /admin/briefs/{id}/phase/{phase1|2|3}` · `POST /admin/briefs/{id}/send-for-approval` · `DELETE /admin/briefs/{id}` (archive)
+  - Approved briefs are read-only (409 on edit). Send-for-approval refuses to send empty briefs (400).
+- Client endpoints (client-auth):
+  - `GET /clients/me/briefs/pending` — single brief awaiting approval, or null
+  - `GET /clients/me/briefs/approved` — list (for the Orders accordion)
+  - `POST /clients/me/briefs/{id}/approve` — only the brief's client can approve (403 for others). Idempotent. Stamps `approved_by_email` + `approved_at` + writes activity log + fires founder email + Slack notification.
+- Branded emails: `send_brief_for_approval()` (to client) + `send_brief_approved_to_founder()` (to founder).
+
+**Frontend:**
+- `/app/frontend/src/components/admin/ProjectBriefDialog.jsx` — admin's brief composer. Triggered from a Wand2 icon on every `/admin/onboarding` row. 3 phase tabs, each with a Copy-prompt button + summary textarea + Save button. Optional note-to-client + Send-for-approval CTA. Status pill (draft / sent_for_approval / approved).
+- `/app/frontend/src/pages/client/ProjectBriefView.jsx` — client-portal Project Brief tab. Renders 3 color-coded section cards (pink/blue/emerald) + an "Awaiting your approval" hero + a big Approve button gated by a shadcn AlertDialog. After approval, the tab disappears and an `ApprovedBriefsAccordion` renders inside the Orders tab (expandable cards with project name + approved-on date + each phase summary).
+- `/app/frontend/src/pages/client/ClientPortal.jsx` — fetches `pending` + `approved` briefs alongside the other portal data; conditionally renders the brief tab with a Sparkles icon + amber pulse dot when there's pending work.
+
+**Tests** (`/app/backend/tests/test_project_brief_e2e.py`):
+- 4 pytests (full E2E flow, auth guards, send-without-content fails, missing-phase prompt fallback). All green.
+- Regression: **238/238 backend tests pass**. 100% frontend verification via testing agent (iteration_20.json).
+
 ### ✅ Phase E — Animated Milestone Timeline (Feb 2026)
 **Goal**: Turn the static milestone list into a delightful, alive timeline that pushes live updates to clients. Reused inside both the client portal AND the admin CompanyDetailDrawer.
 
