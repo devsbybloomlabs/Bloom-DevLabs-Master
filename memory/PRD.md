@@ -24,6 +24,46 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Wave 1 — Urgent cleanups & bug fixes (Feb 2026)
+**Goal**: Close out the long-tail of cleanups the founder flagged so the platform feels coherent before moving to Wave 2 (Project Mode Focus Shell). All 12 acceptance criteria PASS — backend pytest 7/7 (`test_hard_delete.py`) + 261/261 regression + Playwright sweep on companies/dashboard/invoices/onboarding/portal/drawer.
+
+**Hard delete companies & contacts:**
+- New `DELETE /api/admin/companies/{id}/hard` cascades to contacts + activity_log (returns `{ok, deleted:{company:1, contacts:N, activity:N}}`).
+- New `DELETE /api/admin/contacts/{id}/hard` — refuses primary contact with 400, deletes non-primary with 200.
+- Frontend: `CompaniesAdmin.jsx` adds hover-revealed Trash2 button per row (`data-testid=admin-company-delete-{id}`) with confirm dialog. `CompanyDetailDrawer.jsx` Contacts tab gets a Trash2 button on every NON-primary contact (`data-testid=drawer-contact-delete-{id}`).
+- Fixed a runtime crash on `/admin/companies` — `Trash2` was used but not imported.
+
+**Nifty removed from user-visible surfaces:**
+- Sidebar link gone.
+- `/admin/integrations/health` no longer returns a `nifty` provider (block + `get_nifty` dependency removed).
+- Dashboard `IntegrationsHealthStrip` no longer renders a nifty pill.
+- Backend Nifty client/routes/cron remain as dormant code (no UI entry point exists to trigger them) — kept to avoid risky breakage in the onboarding/project-brief/PM auto-task pipeline.
+
+**Revenue & Clients page removed:**
+- `/admin/revenue` route deleted, `RevenuePage` import removed from `App.js`.
+- Sidebar reorganized into 6 groups in order: Daily / Pipeline / Delivery / Money / Authority / System.
+
+**WYSIWYG markdown paste fix:**
+- `RichTextEditor.jsx` now wires `tiptap-markdown` with `transformPastedText: true`.
+- Paste from Claude (`## H2 / **bold** / - bullet`) now renders as real H2 / `<strong>` / `<ul>` instead of raw markdown text.
+
+**Support email routing fix:**
+- `contact_routes.py::_email_founder_notification` now routes primary `to=support@bybloomlabs.com` with founder cc'd.
+- Adds standard headers ThriveDesk uses to attribute the inbound: `X-Bloom-Ticket`, `X-Bloom-Client-Email`, `X-Bloom-Client-Name`, `X-Bloom-Priority`, `X-Bloom-Support-UID`, `X-Bloom-Company`.
+- Email body now carries Phone / Company / Support UID / Tier / Client-since rows pulled from the company + client DB records.
+
+**Admin invoice PDF download fix:**
+- `InvoicesAdmin.jsx` was reading `auth_token` from localStorage — the correct key is `bloom_admin_token`.
+- New `_adminToken()` helper checks both keys for backwards compat. View action now uses authenticated blob fetch + opens via blob URL in a new tab.
+
+**Milestone timeline placeholders:**
+- Client `/portal` Milestones tab now merges 5 standard build phases (Discovery & Brief Sign-off / Design Language / Build — Core flows / QA & Polish / Launch) as "Up next" placeholder cards when they haven't been seeded yet.
+- Visual: `opacity-50` + grayscale icon + `Up next` pill in the corner + `data-placeholder="true"` attribute.
+
+**Tests** (`/app/backend/tests/test_hard_delete.py`): 7 pytests — hard-delete company cascade, primary-contact refusal, non-primary delete, auth guards × 2, 404 paths, integrations-health-omits-nifty. All green.
+
+
+
 ### ✅ Emergent bridge — one-click "Send to Emergent" on every task (Feb 2026)
 **Goal**: The team's biggest friction was copying a task description into Emergent every time they wanted to start a build. Now it's one click — the prompt is auto-formatted with project context + the always-true house rules and the clipboard is loaded as Emergent opens.
 
