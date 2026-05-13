@@ -33,6 +33,7 @@ import {
 import { BRAND } from "@/lib/brand";
 import ClientContactPanel from "@/pages/client/ClientContactPanel";
 import ProjectBriefView, { ApprovedBriefsAccordion } from "@/pages/client/ProjectBriefView";
+import TeamActivityWidget from "@/components/TeamActivityWidget";
 
 function EmptyState({ icon: Icon = Inbox, title, message }) {
   return (
@@ -783,7 +784,10 @@ export default function ClientPortal() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="milestones" className="mt-6">
-            <MilestonesList data={milestones} loading={loading} />
+            <div className="space-y-4">
+              <TeamActivityWidget api={clientApi(token)} />
+              <MilestonesList data={milestones} loading={loading} />
+            </div>
           </TabsContent>
           <TabsContent value="orders" className="mt-6">
             <OrdersList data={orders} loading={loading} approvedBriefs={approvedBriefs} />

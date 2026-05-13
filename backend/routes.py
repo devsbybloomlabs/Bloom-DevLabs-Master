@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel, Field
 
 from ai_prompts import (
     fallback_routine,
@@ -479,6 +481,188 @@ async def pipeline_summary(db=Depends(get_db)) -> Dict[str, Any]:
         "target": target,
         "progress_pct": round((revenue / target) * 100, 1) if target else 0,
     }
+
+
+# ============================================================
+# Phase G — Breakcold-style Kanban board + activity stream
+# ============================================================
+PIPELINE_STAGES = ("new", "contacted", "qualified", "proposal", "won", "lost")
+
+
+@pipeline_router.get("/board")
+async def pipeline_board(db=Depends(get_db)) -> Dict[str, Any]:
+    """Kanban-grouped view of all prospects. One source of truth for the new admin UI."""
+    docs = await db.prospects.find({}, {"_id": 0}).sort("updated_at", -1).to_list(2000)
+    columns: Dict[str, List[Dict[str, Any]]] = {s: [] for s in PIPELINE_STAGES}
+    revenue = 0.0
+    open_value = 0.0
+    for d in docs:
+        s = d.get("status") if d.get("status") in PIPELINE_STAGES else "new"
+        columns[s].append(serialize_doc(d))
+        if s == "won" and d.get("deal_value"):
+            revenue += float(d["deal_value"])
+        elif s not in ("won", "lost") and d.get("deal_value"):
+            open_value += float(d["deal_value"])
+    return {
+        "stages": list(PIPELINE_STAGES),
+        "columns": columns,
+        "totals": {
+            "prospects": len(docs),
+            "closed_revenue": round(revenue, 2),
+            "open_value": round(open_value, 2),
+            "by_stage": {s: len(columns[s]) for s in PIPELINE_STAGES},
+        },
+    }
+
+
+class StageMoveRequest(BaseModel):
+    status: str
+
+
+@pipeline_router.post("/prospects/{prospect_id}/move")
+async def move_prospect(
+    prospect_id: str,
+    req: StageMoveRequest,
+    db=Depends(get_db),
+    user=Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Drag-and-drop transition. Logs an activity event."""
+    if req.status not in PIPELINE_STAGES:
+        raise HTTPException(400, f"status must be one of {PIPELINE_STAGES}")
+    prospect = await db.prospects.find_one({"id": prospect_id}, {"_id": 0})
+    if not prospect:
+        raise HTTPException(404, "Prospect not found")
+    if prospect.get("status") == req.status:
+        return serialize_doc(prospect)  # no-op
+    await db.prospects.update_one(
+        {"id": prospect_id},
+        {
+            "$set": {
+                "status": req.status,
+                "updated_at": _now().isoformat(),
+                "last_activity_at": _now().isoformat(),
+            }
+        },
+    )
+    await db.pipeline_activity.insert_one(
+        prepare_for_mongo(
+            {
+                "id": str(uuid.uuid4()),
+                "prospect_id": prospect_id,
+                "type": "stage.changed",
+                "from": prospect.get("status"),
+                "to": req.status,
+                "actor": (user.get("email") if isinstance(user, dict) else None),
+                "created_at": _now().isoformat(),
+            }
+        )
+    )
+    fresh = await db.prospects.find_one({"id": prospect_id}, {"_id": 0})
+    return serialize_doc(fresh)
+
+
+class ActivityNoteRequest(BaseModel):
+    body: str = Field(..., min_length=1, max_length=4000)
+    type: str = "note"  # note | call | email | linkedin_dm | meeting
+
+
+@pipeline_router.post("/prospects/{prospect_id}/activity")
+async def add_activity(
+    prospect_id: str,
+    req: ActivityNoteRequest,
+    db=Depends(get_db),
+    user=Depends(get_current_user),
+) -> Dict[str, Any]:
+    prospect = await db.prospects.find_one({"id": prospect_id}, {"_id": 0})
+    if not prospect:
+        raise HTTPException(404, "Prospect not found")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "prospect_id": prospect_id,
+        "type": req.type,
+        "body": req.body.strip(),
+        "actor": (user.get("email") if isinstance(user, dict) else None),
+        "created_at": _now().isoformat(),
+    }
+    await db.pipeline_activity.insert_one(prepare_for_mongo(doc))
+    await db.prospects.update_one(
+        {"id": prospect_id},
+        {"$set": {"last_activity_at": doc["created_at"], "updated_at": doc["created_at"]}},
+    )
+    return doc
+
+
+@pipeline_router.get("/prospects/{prospect_id}/activity")
+async def list_activity(
+    prospect_id: str, db=Depends(get_db)
+) -> List[Dict[str, Any]]:
+    prospect = await db.prospects.find_one({"id": prospect_id}, {"_id": 0, "id": 1})
+    if not prospect:
+        raise HTTPException(404, "Prospect not found")
+    rows = await db.pipeline_activity.find(
+        {"prospect_id": prospect_id}, {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    return rows
+
+
+@pipeline_router.get("/prospects/{prospect_id}/ai-suggestion")
+async def ai_next_action(
+    prospect_id: str,
+    request: Request,
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Single AI-suggested next action for a prospect — uses the existing
+    OpenRouter client + emergent LLM key. Falls back to a deterministic
+    suggestion when the LLM is unreachable so the UI always has something."""
+    prospect = await db.prospects.find_one({"id": prospect_id}, {"_id": 0})
+    if not prospect:
+        raise HTTPException(404, "Prospect not found")
+    recent = (
+        await db.pipeline_activity.find(
+            {"prospect_id": prospect_id}, {"_id": 0, "type": 1, "body": 1, "created_at": 1}
+        )
+        .sort("created_at", -1)
+        .limit(5)
+        .to_list(5)
+    )
+    activity_block = "\n".join(
+        f"- [{a.get('type')}] {a.get('body','')[:200]}" for a in recent
+    ) or "(no logged activity yet)"
+    prompt = (
+        "You are a B2B sales coach. Suggest ONE concrete next action (≤22 words, action verb first) "
+        "for this prospect. Output ONLY the action, no preamble.\n\n"
+        f"Name: {prospect.get('name')}\n"
+        f"Company: {prospect.get('company') or '—'}\n"
+        f"Stage: {prospect.get('status')}\n"
+        f"Deal value: ${prospect.get('deal_value') or 'unknown'}\n"
+        f"Notes: {(prospect.get('notes') or '')[:400]}\n"
+        f"Recent activity:\n{activity_block}\n\n"
+        "Suggested next action:"
+    )
+    # Stage-aware deterministic fallback so the UI never shows "—".
+    fallbacks = {
+        "new": "Send a 90-second intro Loom outlining how Bloom solves their #1 pain.",
+        "contacted": "DM on LinkedIn referencing their most recent post, then book a 15-min slot.",
+        "qualified": "Schedule a 30-min discovery call this week and pre-share the agenda.",
+        "proposal": "Send a follow-up checking what's missing from the proposal to close it.",
+        "won": "Kick off onboarding — share the welcome packet and lock in the design call.",
+        "lost": "Send a respectful 'door-open' note plus an asset they'd find useful.",
+    }
+    fallback = fallbacks.get(prospect.get("status", "new"), fallbacks["new"])
+    try:
+        openrouter = getattr(request.app.state, "openrouter", None)
+        if openrouter is not None:
+            res = await openrouter.chat(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=80,
+            )
+            text = (res or "").strip().split("\n")[0]
+            if text:
+                return {"action": text[:240], "source": "ai"}
+    except Exception as exc:  # pragma: no cover
+        log.warning("AI next-action failed: %s", exc)
+    return {"action": fallback, "source": "fallback"}
 
 
 # ============================================================

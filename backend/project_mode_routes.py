@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -426,4 +426,93 @@ async def add_comment(
     return doc
 
 
-__all__ = ["pm_admin_router", "TASK_STATUSES", "TASK_PRIORITIES", "PROJECT_STATUSES"]
+__all__ = ["pm_admin_router", "pm_client_router", "TASK_STATUSES", "TASK_PRIORITIES", "PROJECT_STATUSES"]
+
+
+# =========================================================================
+# Client portal — "team is working on it" live activity widget
+# =========================================================================
+pm_client_router = APIRouter(
+    prefix="/clients/me/team-activity",
+    tags=["project-mode-client"],
+)
+
+
+def _client_dep():
+    from client_routes import get_current_client
+    return get_current_client
+
+
+@pm_client_router.get("")
+async def my_team_activity(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    client=Depends(_client_dep()),
+) -> Dict[str, Any]:
+    """Aggregated PM task activity for the caller's projects.
+
+    Returns enough for the client portal to render a "team is heads-down"
+    widget: per-status counts + the 5 most-recent task updates (title only,
+    no internal description).
+    """
+    email = (client["email"] or "").lower()
+    projects = await db.pm_projects.find(
+        {"client_email": email, "status": {"$ne": "archived"}},
+        {"_id": 0, "id": 1, "name": 1, "color": 1},
+    ).to_list(50)
+    pids = [p["id"] for p in projects]
+    counts = {st: 0 for st in TASK_STATUSES}
+    recent: List[Dict[str, Any]] = []
+    completed_this_week = 0
+    if pids:
+        # Group task counts by status across the caller's projects.
+        pipeline = [
+            {"$match": {"project_id": {"$in": pids}}},
+            {"$group": {"_id": "$status", "n": {"$sum": 1}}},
+        ]
+        async for row in db.pm_tasks.aggregate(pipeline):
+            st = row["_id"]
+            if st in counts:
+                counts[st] = int(row["n"])
+
+        # Last 5 recent task updates — exclude `description` for privacy.
+        recent_docs = (
+            await db.pm_tasks.find(
+                {"project_id": {"$in": pids}},
+                {"_id": 0, "id": 1, "title": 1, "status": 1, "updated_at": 1, "project_id": 1},
+            )
+            .sort("updated_at", -1)
+            .limit(5)
+            .to_list(5)
+        )
+        proj_lookup = {p["id"]: p for p in projects}
+        for t in recent_docs:
+            p = proj_lookup.get(t.get("project_id")) or {}
+            recent.append(
+                {
+                    "id": t["id"],
+                    "title": t["title"],
+                    "status": t["status"],
+                    "updated_at": t.get("updated_at"),
+                    "project_name": p.get("name"),
+                    "project_color": p.get("color"),
+                }
+            )
+
+        # Done-this-week count
+        since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        completed_this_week = await db.pm_tasks.count_documents(
+            {
+                "project_id": {"$in": pids},
+                "status": "done",
+                "updated_at": {"$gte": since},
+            }
+        )
+
+    return {
+        "has_activity": bool(pids) and sum(counts.values()) > 0,
+        "projects_count": len(projects),
+        "counts": counts,
+        "active_count": counts["in_progress"] + counts["review"],
+        "completed_this_week": completed_this_week,
+        "recent": recent,
+    }
