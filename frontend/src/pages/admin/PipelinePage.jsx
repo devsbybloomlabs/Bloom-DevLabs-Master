@@ -29,6 +29,7 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -405,6 +406,10 @@ function ProspectDrawer({ prospect, onClose, api, onChanged, onQuoteRequested })
               )}
             </div>
           </SheetTitle>
+          <SheetDescription className="sr-only">
+            Prospect details — log activity, edit fields, get an AI-suggested next action,
+            and send a quotation.
+          </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-5 mt-4">

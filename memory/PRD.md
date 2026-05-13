@@ -24,6 +24,29 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Improvements bundle (Feb 2026)
+Three high-leverage polish items shipped together:
+
+**(A) Portal Support tab — Ticket pill (10-line trust signal)**
+- `BL-YYYY-####` ref now renders as a clickable monospace pill (testid `contact-history-ticket-{id}`) beside every Previous-message row.
+- Click-to-copy via `navigator.clipboard.writeText` with a toast confirm.
+- Hidden for legacy records without a `ticket_ref`, so no broken pills.
+- Also cleaned the obsolete `"Slack + ThriveDesk"` subtitle → `"Slack + email"`.
+
+**(B) Contact attachment retrofit → Emergent Object Storage**
+- Upload path in `contact_routes.py` now writes to object storage at `bybloomlabs/contact-attachments/{client_email}/{uuid}{ext}`. Stores `attachment.storage_path` in DB.
+- Graceful local-disk fallback if object storage is unavailable (storage init failed, EMERGENT_LLM_KEY missing, etc.). Old `stored_path` field still set in that case so downloads keep working.
+- Download endpoint checks `storage_path` first, falls back to disk for **legacy records** (zero migration needed).
+- Public response always strips `storage_path` + `stored_path` so clients never see internal paths.
+
+**(C) "Today's Coaching" admin dashboard widget**
+- Backend `GET /api/pipeline/coaching/today?limit=3` (admin-auth) ranks active prospects (new/contacted/qualified/proposal — won/lost excluded) by `stage_weight × age_boost × log(1 + deal_value)`. Aging caps at 14 days (so cold leads bubble up). Each card carries a fallback `next_action` per stage so the UI never shows "—". Returns top N (max 10).
+- Frontend `TodaysCoachingCard.jsx` mounts on `/admin/dashboard` left column. 3 cards with avatar initials, stage badge, days-stale chip (color-coded green/amber/rose), deal-value pill, blue next-action chip, refresh button.
+- Clicking a card navigates to `/admin/pipeline?focus={prospect_id}` → `PipelinePage` auto-opens the matching prospect drawer + cleans the query param. Founder is one click away from the AI Suggest button + activity composer for that lead.
+- A11y polish: ProspectDrawer now has a sr-only `SheetDescription` to silence the Radix `aria-describedby` warning.
+
+**Tests** (`test_coaching_and_attachments.py`): 6 pytests covering ranking determinism, limit capping, won/lost exclusion, auth guard, object-storage path correctness, no-internal-path leak, cross-client 404, text-only contact still works. **All green. 262/262 full backend regression.**
+
 ### ✅ Phase H — Public Mega Menu redesign (Feb 2026)
 **Goal**: Replace the cramped 8-link top nav with a modern 3-category mega menu so the public site can carry product/resource/work depth without sacrificing scannability.
 
