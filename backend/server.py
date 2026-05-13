@@ -66,6 +66,8 @@ from project_brief_routes import (  # noqa: E402
     brief_client_router,
 )
 from project_mode_routes import pm_admin_router, pm_client_router  # noqa: E402
+from project_files_routes import pf_admin_router, pf_client_router  # noqa: E402
+import object_storage  # noqa: E402
 from demo_routes import demo_router  # noqa: E402
 from public_tour_routes import public_tour_router  # noqa: E402
 from contact_routes import (  # noqa: E402
@@ -154,6 +156,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.breezedocs.bind_db(db)
     app.state.google_calendar = GoogleCalendarClient()
     app.state.google_calendar.bind_db(db)
+
+    # Init Emergent Object Storage (best-effort — uploads degrade gracefully
+    # with a 503 if the EMERGENT_LLM_KEY is missing).
+    try:
+        object_storage.init_storage()
+    except Exception as exc:
+        log.warning("Object storage init failed (uploads disabled): %s", exc)
 
     # Background scheduler — daily 5am routine generation
     scheduler = AsyncIOScheduler(timezone="UTC")
@@ -336,6 +345,8 @@ api.include_router(brief_admin_router)
 api.include_router(brief_client_router)
 api.include_router(pm_admin_router)
 api.include_router(pm_client_router)
+api.include_router(pf_admin_router)
+api.include_router(pf_client_router)
 api.include_router(demo_router)
 api.include_router(public_tour_router)
 api.include_router(client_contact_router)

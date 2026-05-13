@@ -262,18 +262,17 @@ async def download_attachment(
 contact_admin_router = APIRouter(
     prefix="/admin/portal-contacts",
     tags=["portal-contacts-admin"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
 @contact_admin_router.get("")
 async def admin_list_contacts(
-    request: Request,
     db: AsyncIOMotorDatabase = Depends(get_db),
     status: Optional[str] = None,
     q: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """List portal contacts. `q` matches ticket_ref, email, or subject."""
-    await get_current_user(request)
     filt: Dict[str, Any] = {}
     if status:
         filt["status"] = status
@@ -304,10 +303,8 @@ async def admin_list_contacts(
 @contact_admin_router.post("/{contact_id}/resolve")
 async def admin_resolve_contact(
     contact_id: str,
-    request: Request,
     db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
-    await get_current_user(request)
     res = await db.client_contacts.update_one(
         {"id": contact_id},
         {"$set": {"status": "resolved", "resolved_at": _iso(_now())}},

@@ -29,10 +29,12 @@ import {
   MessageSquare,
   Download,
   Sparkles,
+  FolderOpen,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import ClientContactPanel from "@/pages/client/ClientContactPanel";
 import ProjectBriefView, { ApprovedBriefsAccordion } from "@/pages/client/ProjectBriefView";
+import ProjectFilesView from "@/pages/client/ProjectFilesView";
 import TeamActivityWidget from "@/components/TeamActivityWidget";
 
 function EmptyState({ icon: Icon = Inbox, title, message }) {
@@ -578,10 +580,11 @@ export default function ClientPortal() {
   const [supportClearance, setSupportClearance] = useState(null);
   const [pendingBrief, setPendingBrief] = useState(null);
   const [approvedBriefs, setApprovedBriefs] = useState([]);
+  const [files, setFiles] = useState([]);
 
   // Tab state synced with `?tab=...` URL param so deep-links from emails work
   // (e.g. /portal?tab=invoices, /portal?tab=subscriptions).
-  const VALID_TABS = ["milestones", "orders", "subscriptions", "invoices", "proposals", "brief", "contact", "profile"];
+  const VALID_TABS = ["milestones", "orders", "subscriptions", "invoices", "proposals", "files", "brief", "contact", "profile"];
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(VALID_TABS.includes(urlTab) ? urlTab : "milestones");
@@ -604,8 +607,14 @@ export default function ClientPortal() {
       next.delete("tab");
       setSearchParams(next, { replace: true });
     }
+    if (!loading && activeTab === "files" && files.length === 0) {
+      setActiveTab("milestones");
+      const next = new URLSearchParams(searchParams);
+      next.delete("tab");
+      setSearchParams(next, { replace: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, activeTab, pendingBrief]);
+  }, [loading, activeTab, pendingBrief, files.length]);
 
   const onTabChange = (value) => {
     setActiveTab(value);
@@ -625,7 +634,7 @@ export default function ClientPortal() {
     setLoading(true);
     const api = clientApi(token);
     try {
-      const [o, s, pl, i, p, ob, ms, sc, pb, ab] = await Promise.allSettled([
+      const [o, s, pl, i, p, ob, ms, sc, pb, ab, pf] = await Promise.allSettled([
         api.get("/clients/me/orders"),
         api.get("/clients/subscriptions"),
         api.get("/clients/subscriptions/plans"),
@@ -636,6 +645,7 @@ export default function ClientPortal() {
         api.get("/clients/me/support/clearance"),
         api.get("/clients/me/briefs/pending"),
         api.get("/clients/me/briefs/approved"),
+        api.get("/clients/me/project-files"),
       ]);
       setOrders(o.status === "fulfilled" ? o.value.data : null);
       setSubs(s.status === "fulfilled" ? s.value.data : null);
@@ -647,6 +657,7 @@ export default function ClientPortal() {
       setSupportClearance(sc.status === "fulfilled" ? sc.value.data : null);
       setPendingBrief(pb.status === "fulfilled" ? pb.value.data : null);
       setApprovedBriefs(ab.status === "fulfilled" ? (ab.value.data || []) : []);
+      setFiles(pf.status === "fulfilled" ? (pf.value.data || []) : []);
     } finally {
       setLoading(false);
     }
@@ -770,6 +781,12 @@ export default function ClientPortal() {
             <TabsTrigger value="proposals" data-testid="portal-tab-proposals" className="flex-shrink-0">
               <FileText className="h-4 w-4 mr-1.5" /> Proposals
             </TabsTrigger>
+            {files.length > 0 && (
+              <TabsTrigger value="files" data-testid="portal-tab-files" className="flex-shrink-0">
+                <FolderOpen className="h-4 w-4 mr-1.5" /> Files
+                <span className="ml-1.5 text-[10px] tabular-nums text-muted-foreground">{files.length}</span>
+              </TabsTrigger>
+            )}
             {pendingBrief && (
               <TabsTrigger value="brief" data-testid="portal-tab-brief" className="flex-shrink-0 relative">
                 <Sparkles className="h-4 w-4 mr-1.5 text-amber-500" /> Project Brief
@@ -807,6 +824,11 @@ export default function ClientPortal() {
           <TabsContent value="proposals" className="mt-6">
             <ProposalsList data={proposals} loading={loading} />
           </TabsContent>
+          {files.length > 0 && (
+            <TabsContent value="files" className="mt-6">
+              <ProjectFilesView api={clientApi(token)} />
+            </TabsContent>
+          )}
           {pendingBrief && (
             <TabsContent value="brief" className="mt-6">
               <ProjectBriefView

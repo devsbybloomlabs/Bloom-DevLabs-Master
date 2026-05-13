@@ -1,0 +1,50 @@
+{
+  "summary": "E2E for Phase H (Mega Menu), Phase I (Support Triage), Project Files (object storage) + full backend regression. 256/256 backend tests PASS (full suite ex-phase11/12/13/15/master). All 5 new pytests in test_project_files_and_triage.py PASS. Frontend mega menu (3 panels, links + featured CTAs), admin Support Triage, admin Project Files upload+download+delete, client /portal Files tab (auto-appears after upload), and mobile drawer all verified via Playwright. Two minor frontend issues found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ProjectFilesAdmin",
+        "issue": "Filter input 'pf-list-filter' sends raw substring as client_email to backend which does exact-match (filt['client_email'] = client_email.lower().strip()). Typing 'testclient' returned 0 rows even though file existed for testclient@bybloomlabs.com. Either backend needs regex/prefix match or frontend should do client-side substring filtering.",
+        "selector": "[data-testid=\"pf-list-filter\"]",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "ProjectFilesAdmin",
+        "issue": "data-testid 'pf-list' returned is_visible()=False from Playwright even though child pf-row-{id} cards render correctly. Likely the .space-y-2 wrapper has no measurable bbox in some layouts. Testing still works via child testids, but the documented testid contract should be honored.",
+        "selector": "[data-testid=\"pf-list\"]",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_project_files_and_triage.py",
+    "/app/test_reports/pytest/pf_triage.xml",
+    "/app/test_reports/pytest/regression.xml"
+  ],
+  "action_items": [
+    "Fix pf-list-filter UX: either change backend GET /admin/project-files to accept partial/regex client_email match, or do client-side substring filtering in ProjectFilesAdmin.jsx so the filter actually works for partial emails.",
+    "Verify pf-list testid wrapper renders with visible bbox (consider adding min-height or moving testid to a parent section)."
+  ],
+  "critical_code_review_comments": [
+    "project_files_routes.py: exact-match on client_email filter conflicts with frontend's labeled 'Filter by client email' substring expectation — minor UX gap.",
+    "Backend correctly excludes _id and storage_path from API responses (good).",
+    "Auth guards work end-to-end: 401/403 for unauthenticated, 403 for non-owner client download.",
+    "Soft-delete pattern verified (2nd delete -> 404, download after delete -> 404).",
+    "Ticket ref format BL-YYYY-#### verified live.",
+    "Mega Menu hover panels render correctly with 5 / 4 / 2 link counts + featured CTAs."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (256/256)", "frontend": "95% (all critical flows pass; 2 minor)"},
+  "test_credentials": "Admin founder@thesalvador.group/admin123 · Client testclient@bybloomlabs.com/clientpass123 (both verified working)",
+  "seed_data_creation": "Uploaded e2e_pf.txt (40 bytes, category=deliverable) to testclient@bybloomlabs.com via /admin/project-files. File visible in /portal Files tab for that client. Leave in place — next test iteration can reuse or clean via DELETE /api/admin/project-files/{id}.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite is healthy (256 pass). When testing Project Files admin filter, note that backend client_email param requires exact email match — frontend UX has a small gap (filter input feels like substring but is not). All new testids from this iteration are wired except pf-list bbox visibility. Use REACT_APP_BACKEND_URL=https://ai-scope-builder.preview.emergentagent.com for both backend pytest (E2E_API_BASE) and Playwright.",
+  "rca of the issue": "pf-list-filter: ProjectFilesAdmin.jsx line 61 sends lowercased trimmed string to backend client_email filter. Backend project_files_routes.py line 89 sets filt['client_email'] = exact value. Mongo find() therefore needs exact match. Fix: either change backend to {'client_email': {'$regex': value, '$options':'i'}} OR keep server-side exact match and add a client-side .filter(f => f.client_email.includes(filterEmail)) over the already-loaded list."
+}

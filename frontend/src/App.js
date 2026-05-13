@@ -26,6 +26,8 @@ import SubscriptionsAdmin from "@/pages/admin/SubscriptionsAdmin";
 import LeadMagnetsAdmin from "@/pages/admin/LeadMagnetsAdmin";
 import MilestonesAdmin from "@/pages/admin/MilestonesAdmin";
 import ProjectModeAdmin from "@/pages/admin/ProjectModeAdmin";
+import ProjectFilesAdmin from "@/pages/admin/ProjectFilesAdmin";
+import SupportTriageAdmin from "@/pages/admin/SupportTriageAdmin";
 import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
 import CompaniesAdmin from "@/pages/admin/CompaniesAdmin";
@@ -130,6 +132,8 @@ function App() {
                 <Route path="milestones" element={<MilestonesAdmin />} />
                 <Route path="project-mode" element={<ProjectModeAdmin />} />
                 <Route path="project-mode/:projectId" element={<ProjectModeAdmin />} />
+                <Route path="project-files" element={<ProjectFilesAdmin />} />
+                <Route path="support-triage" element={<SupportTriageAdmin />} />
                 <Route path="clients" element={<ClientsAdmin />} />
                 <Route path="companies" element={<CompaniesAdmin />} />
                 <Route path="integrations" element={<IntegrationsAdmin />} />
