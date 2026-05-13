@@ -24,6 +24,49 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase D part 3 — Per-phase AI Project Brief rewrite (Feb 2026)
+**Goal**: Replace the old "approve whole brief at once" pattern with a per-phase review-and-comment cycle so the client has agency over each section and the team has a tight feedback loop.
+
+**Per-phase state machine:**
+   `draft → sent_for_review → in_revision (client comment) → sent_for_review → approved`
+
+**Backend (`project_brief_routes.py` — full rewrite, 770 lines):**
+- New phase schema: `{summary, status, sent_at, approved_at, latest_comment, admin_reply_note, revisions[], updated_at}`. Every PATCH appends a revision snapshot — full audit trail.
+- New endpoints (all admin-auth or client-auth):
+  - `PATCH /admin/briefs/{id}/phase/{phase_key}` — save summary + optional admin reply chip. **Approved phases return 409** (locked).
+  - `POST /admin/briefs/{id}/phase/{phase_key}/send-for-review` — flip status, send per-phase Emailit email with rendered HTML, Slack notify.
+  - `POST /clients/me/briefs/{id}/phase/{phase_key}/comment` — client leaves a comment, status → `in_revision`, founder Slack + email.
+  - `POST /clients/me/briefs/{id}/phase/{phase_key}/approve` — requires `no_comments_confirmed=true` (mirrors the legal checkbox), 400 otherwise. Idempotent.
+  - `POST /clients/me/briefs/{id}/approve` — **final gate** — refuses 409 unless all 3 phases approved.
+- HTML sanitisation via `bleach` (new dep) on every write — allow-list: p/strong/em/h2/h3/ul/li/a/blockquote/code/pre.
+- Brief-level status auto-derives from rolled-up phase statuses.
+
+**Live milestone sync** (3 new `Brief Review: {Phase}` milestones that live alongside the standard 5 build milestones):
+- `sent_for_review` → "Waiting for your review."
+- `in_revision` → "Our team is reviewing your comments…"
+- `approved` → status=complete + completion_date stamped.
+
+**Full-approval auto-pipeline:**
+- 5 standard build milestones (Discovery / Design / Build / QA / Launch) seed.
+- **Project Mode workspace auto-creates** with AI-generated **Emergent-ready dev tasks** — Claude (OpenRouter) reads the 3 approved phase summaries and emits 8-12 specific tasks like `"Build a /src/pages/Dashboard.jsx React component that fetches /api/x and renders y with shadcn Card components."` Each task is linked to a build milestone via title-match; first task starts `in_progress`. Falls back to a 5-task template if LLM fails.
+- **PDF snapshot** of the approved brief renders via WeasyPrint and uploads to Project Files (category=`brief`). Permanent contract artifact.
+- Founder Slack + email digest fires.
+
+**Frontend (`RichTextEditor.jsx` + `ProjectBriefDialog.jsx` + `ProjectBriefView.jsx`):**
+- **TipTap WYSIWYG admin editor** with toolbar (bold/italic/strike/H2/H3/lists/quote/link/undo/redo). Configured to avoid the duplicate-link extension warning.
+- Admin dialog: 3 phase tabs with live status pills, copy-prompt, save, send, **lock state on approved**, expandable revision history per phase, latest-comment banner with re-roll prompt, admin reply chip input.
+- Client portal Brief tab: **animated progress bar** (Phase 1 ✅ · Phase 2 🔄 · Phase 3 ⏳), per-phase card with:
+  - Read-only TipTap render of the approved summary
+  - Comment textarea + "Your team typically responds within 24h" SLA hint
+  - **Legal checkbox** with EXACT user-specified wording ("I have reviewed Phase X's summary…")
+  - **Approve Phase X** button gated by the checkbox
+  - Revision history viewer (previous versions with the triggering comment shown inline)
+- **Final approve button** locked until all 3 phases approved; click → shadcn AlertDialog with the scope-creep warning.
+
+**Per-phase email** (`send_brief_phase_for_review`): branded HTML email containing the rendered Claude summary + admin's optional note (as a highlighted block) + a "Review Phase X" deep-link button to `/portal?tab=brief&phase=phaseN`.
+
+**Tests** (`test_brief_per_phase.py`): 3 pytests covering the full 18-step state machine, milestone live-sync across 3 transitions, auth guards. **All green. 264/264 backend regression** (incl. legacy brief tests updated to match the new API).
+
 ### ✅ Improvements bundle (Feb 2026)
 Three high-leverage polish items shipped together:
 

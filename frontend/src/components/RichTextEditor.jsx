@@ -54,6 +54,7 @@ export function RichTextEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [2, 3] },
+        link: false, // disabled to avoid duplicate w/ explicit @tiptap/extension-link below
       }),
       Link.configure({
         openOnClick: false,
