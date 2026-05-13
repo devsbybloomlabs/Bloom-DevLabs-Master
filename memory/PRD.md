@@ -24,6 +24,30 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Emergent bridge — one-click "Send to Emergent" on every task (Feb 2026)
+**Goal**: The team's biggest friction was copying a task description into Emergent every time they wanted to start a build. Now it's one click — the prompt is auto-formatted with project context + the always-true house rules and the clipboard is loaded as Emergent opens.
+
+**Frontend (`/app/frontend/src/lib/emergentBridge.js`):**
+- Pure-function `buildEmergentPrompt({ task, project, milestoneTitle })` produces a clean markdown block:
+  ```
+  # {task title}
+  **Project:** {name} · **Client:** {email} · **Milestone:** {milestone}
+  **Priority:** {priority} · **Due:** {date}
+
+  {task description (AI-authored Emergent-ready prompt)}
+  ---
+  **House rules:** /api prefix · MONGO_URL/DB_NAME from .env · REACT_APP_BACKEND_URL · data-testid · shadcn primitives
+  ```
+- `sendToEmergent(...)` copies to clipboard + opens `https://app.emergent.sh` in a new tab.
+
+**Two click surfaces (`ProjectModeAdmin.jsx`):**
+- **Quick rocket icon** appears on TaskCard hover (testid `pm-task-emergent-quick-{id}`) — one click, zero dialog open.
+- **Full "Send to Emergent" button** inside TaskDetailDialog (testid `pm-task-emergent`) — violet styling, sits next to Save changes. Uses the latest edits in the dialog so the prompt reflects any title/description tweaks not yet saved.
+
+**Backend touch:** none — admin milestone-list endpoint already exists (`GET /admin/milestones`) and is now fetched once per page-load to enrich the prompt with milestone titles.
+
+**Tests** (`emergentBridge.test.js`): 7 Jest unit tests covering title heading, context block, description pass-through, always-true house rules, missing-description fallback, null-task safety, no-context graceful degradation. **All green.**
+
 ### ✅ Phase D part 3 — Per-phase AI Project Brief rewrite (Feb 2026)
 **Goal**: Replace the old "approve whole brief at once" pattern with a per-phase review-and-comment cycle so the client has agency over each section and the team has a tight feedback loop.
 

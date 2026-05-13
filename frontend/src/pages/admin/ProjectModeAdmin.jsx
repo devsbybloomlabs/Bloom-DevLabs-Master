@@ -44,8 +44,10 @@ import {
   AlertTriangle,
   User as UserIcon,
   CheckCircle2,
+  Rocket,
 } from "lucide-react";
 import { toast } from "sonner";
+import { sendToEmergent } from "@/lib/emergentBridge";
 
 const STATUS_META = {
   todo: { label: "To do", color: "bg-slate-100 text-slate-700 border-slate-200" },
@@ -250,7 +252,7 @@ function NewTaskDialog({ open, onOpenChange, onCreated, api, project, defaultSta
   );
 }
 
-function TaskDetailDialog({ task, onClose, api, onChanged }) {
+function TaskDetailDialog({ task, onClose, api, onChanged, project, milestoneLookup }) {
   const open = Boolean(task);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -397,15 +399,35 @@ function TaskDetailDialog({ task, onClose, api, onChanged }) {
                 onChange={(e) => setEdit({ ...edit, due_date: e.target.value })}
               />
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-2">
               <Button variant="destructive" size="sm" onClick={remove} data-testid="pm-task-delete">
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                 Delete
               </Button>
-              <Button onClick={save} disabled={busy} data-testid="pm-task-save">
-                {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
-                Save changes
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    sendToEmergent({
+                      task: { ...task, ...edit },
+                      project,
+                      milestoneTitle: milestoneLookup?.[task.milestone_id]?.title,
+                    });
+                    toast.success("Prompt copied — paste it into Emergent");
+                  }}
+                  data-testid="pm-task-emergent"
+                  title="Copy as Emergent prompt & open emergent.sh"
+                  className="border-violet-300 text-violet-700 hover:bg-violet-50"
+                >
+                  <Rocket className="h-3.5 w-3.5 mr-1.5" />
+                  Send to Emergent
+                </Button>
+                <Button onClick={save} disabled={busy} data-testid="pm-task-save">
+                  {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+                  Save changes
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -449,40 +471,63 @@ function TaskDetailDialog({ task, onClose, api, onChanged }) {
   );
 }
 
-function TaskCard({ task, onOpen }) {
+function TaskCard({ task, onOpen, project, milestoneLookup }) {
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(task)}
-      className="w-full text-left rounded-lg border border-border bg-background p-3 hover:shadow-md hover:border-primary/40 transition-all"
-      data-testid={`pm-task-card-${task.id}`}
+    <div
+      className="group relative"
+      data-testid={`pm-task-card-wrap-${task.id}`}
     >
-      <p className="text-sm font-medium leading-snug">{task.title}</p>
-      {task.description && (
-        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{task.description}</p>
-      )}
-      <div className="flex items-center justify-between mt-2 gap-2">
-        <PriorityChip priority={task.priority} />
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          {task.due_date && (
-            <span className="inline-flex items-center gap-0.5">
-              <Clock className="h-3 w-3" />
-              {new Date(task.due_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-            </span>
-          )}
-          {task.assignee && (
-            <span className="inline-flex items-center gap-0.5 truncate max-w-[100px]">
-              <UserIcon className="h-3 w-3" />
-              {task.assignee.split("@")[0]}
-            </span>
-          )}
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        className="w-full text-left rounded-lg border border-border bg-background p-3 hover:shadow-md hover:border-primary/40 transition-all"
+        data-testid={`pm-task-card-${task.id}`}
+      >
+        <p className="text-sm font-medium leading-snug pr-6">{task.title}</p>
+        {task.description && (
+          <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{task.description}</p>
+        )}
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <PriorityChip priority={task.priority} />
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            {task.due_date && (
+              <span className="inline-flex items-center gap-0.5">
+                <Clock className="h-3 w-3" />
+                {new Date(task.due_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              </span>
+            )}
+            {task.assignee && (
+              <span className="inline-flex items-center gap-0.5 truncate max-w-[100px]">
+                <UserIcon className="h-3 w-3" />
+                {task.assignee.split("@")[0]}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+      {/* Hover-only Send-to-Emergent rocket */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          sendToEmergent({
+            task,
+            project,
+            milestoneTitle: milestoneLookup?.[task.milestone_id]?.title,
+          });
+          toast.success("Prompt copied — paste it into Emergent");
+        }}
+        title="Copy as Emergent prompt & open emergent.sh"
+        data-testid={`pm-task-emergent-quick-${task.id}`}
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-md bg-violet-100 hover:bg-violet-200 text-violet-700 p-1"
+      >
+        <Rocket className="h-3 w-3" />
+      </button>
+    </div>
   );
 }
 
-function Column({ status, tasks, project, onCardOpen, onAdd }) {
+function Column({ status, tasks, project, milestoneLookup, onCardOpen, onAdd }) {
   const meta = STATUS_META[status];
   return (
     <div className="flex flex-col w-72 shrink-0" data-testid={`pm-col-${status}`}>
@@ -506,7 +551,15 @@ function Column({ status, tasks, project, onCardOpen, onAdd }) {
         {tasks.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-6 italic">Empty</p>
         ) : (
-          tasks.map((t) => <TaskCard key={t.id} task={t} onOpen={onCardOpen} />)
+          tasks.map((t) => (
+            <TaskCard
+              key={t.id}
+              task={t}
+              onOpen={onCardOpen}
+              project={project}
+              milestoneLookup={milestoneLookup}
+            />
+          ))
         )}
       </div>
     </div>
@@ -524,10 +577,33 @@ export default function ProjectModeAdmin() {
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState("todo");
   const [openTask, setOpenTask] = useState(null);
+  const [milestoneLookup, setMilestoneLookup] = useState({});
 
   useEffect(() => {
     document.title = "Project Mode — Bloom Labs";
   }, []);
+
+  // Load all milestones (admin route) once so we can show milestone titles
+  // in the Send-to-Emergent prompt.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await api.get("/admin/milestones");
+        if (cancelled) return;
+        const lookup = {};
+        (r.data || []).forEach((m) => {
+          lookup[m.id] = m;
+        });
+        setMilestoneLookup(lookup);
+      } catch {
+        // Best-effort — the prompt still works without milestone titles.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
 
   const loadProjects = useCallback(async () => {
     try {
@@ -682,6 +758,7 @@ export default function ProjectModeAdmin() {
                   status={s}
                   tasks={board.columns[s] || []}
                   project={board.project}
+                  milestoneLookup={milestoneLookup}
                   onCardOpen={setOpenTask}
                   onAdd={(st) => {
                     setNewTaskStatus(st);
@@ -714,6 +791,8 @@ export default function ProjectModeAdmin() {
       <TaskDetailDialog
         task={openTask}
         api={api}
+        project={board?.project}
+        milestoneLookup={milestoneLookup}
         onClose={() => setOpenTask(null)}
         onChanged={(updated) => {
           if (updated) setOpenTask(updated);
