@@ -24,6 +24,46 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase H — Public Mega Menu redesign (Feb 2026)
+**Goal**: Replace the cramped 8-link top nav with a modern 3-category mega menu so the public site can carry product/resource/work depth without sacrificing scannability.
+
+**Frontend (`Header.jsx`):**
+- 3 hover triggers (Platform · Resources · Work) → each opens a full-width panel with rich iconified cards + a featured CTA on the right (Try the platform / Watch first / Ready to brief us).
+- Smart hover behaviour: 140ms close delay so users don't lose the panel when moving the cursor; ChevronDown rotates 180° on active.
+- Mobile drawer preserved with a flat link list + Client Login + Book CTA.
+- Test IDs: `mega-trigger-{platform|resources|work}`, `mega-panel-{id}`, `mega-link-{id}`, `mega-featured-{tour|demo|book}`.
+
+### ✅ Phase I — Auto ticket numbering + Support Triage admin (Feb 2026)
+**Goal**: Every portal contact already gets an auto-minted `BL-YYYY-####` ticket ref — this phase exposes a fast lookup tool so the team can triage by ref, email, or keyword.
+
+**Backend changes:**
+- Fixed a latent 500 in `/admin/portal-contacts` and `/admin/portal-contacts/{id}/resolve` — promoted auth from incorrect in-handler `get_current_user(request)` call to router-level `Depends`.
+- Existing search supports filtering by status + free-text `q` across ticket_ref / email / name / subject / body.
+
+**Frontend (`SupportTriageAdmin.jsx`):**
+- New page at `/admin/support-triage` (Sales group, LifeBuoy icon).
+- Search input with 350ms debounce, status filter dropdown, 3 tally cards (Open / In progress / Resolved).
+- Expandable ticket rows with inline Resolve button + body toggle.
+- Test IDs: `support-triage-admin`, `support-triage-search`, `support-triage-status-filter`, `support-triage-tallies`, `support-triage-results`, `ticket-row-{id}`, `ticket-row-{id}-toggle`, `ticket-row-{id}-resolve`.
+
+### ✅ Project Files (Feb 2026)
+**Goal**: Replace local-disk uploads with Emergent Object Storage and ship a clean "Files" tab for clients to download deliverables (PDFs, mockups, ZIP archives).
+
+**Backend:**
+- New `object_storage.py` helper: init-once handshake, auto-retry on 403/429, `put_object`/`get_object`/`guess_content_type`. Started at FastAPI startup; degrades to 503 on uploads if `EMERGENT_LLM_KEY` is missing.
+- New `project_files_routes.py`:
+  - Collection `project_files`: `{id, company_id?, client_email, storage_path, original_filename, content_type, size_bytes, category (deliverable|brief|mockup|invoice|other), notes, uploaded_by, uploaded_at, is_deleted}`.
+  - Admin: `GET/POST /admin/project-files`, `GET /admin/project-files/{id}/download`, `DELETE /admin/project-files/{id}` (soft-delete only — storage has no delete API).
+  - Client: `GET /clients/me/project-files` + `GET /clients/me/project-files/{id}/download` — scoped to the caller's email OR any company they're a contact of.
+  - All responses strip `storage_path` so clients never see internal paths.
+  - 100MB ceiling, content-type enforced, empty file rejected.
+
+**Frontend:**
+- `/admin/project-files` (`ProjectFilesAdmin.jsx`): drop-file upload form + filter input + soft-delete + Download. Substring filter is client-side for instant feedback.
+- `/portal` "Files" tab (`ProjectFilesView.jsx`): conditional tab that only appears when client has ≥1 file. Category-colored badges, fmtBytes, blob-stream download via authenticated endpoint.
+
+**Tests** (`test_project_files_and_triage.py`): 5 pytests (upload + admin download + client download + cross-client 403 + soft-delete + auth guards + ticket-ref format + triage search by 3 axes + status filter + resolve flow). **All green. 256/256 backend regression.**
+
 ### ✅ Phase G — Breakcold-style Pipeline Kanban + AI suggest (Feb 2026)
 **Goal**: Replace the table-style `/admin/pipeline` with a rich Kanban + activity stream + AI-powered next-action coach. Keeps the existing `prospects` collection — adds a kanban view, a `pipeline_activity` audit log, and three new endpoints.
 

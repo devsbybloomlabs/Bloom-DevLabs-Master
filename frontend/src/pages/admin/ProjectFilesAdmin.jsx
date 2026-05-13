@@ -5,7 +5,7 @@
  * + notes, hit Upload. List below shows every file with size + category
  * + uploader + download/delete.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAdminApi } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,16 +57,16 @@ export default function ProjectFilesAdmin() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filterEmail.trim()) params.set("client_email", filterEmail.trim().toLowerCase());
-      const r = await api.get(`/admin/project-files?${params.toString()}`);
+      // Always fetch the full list; we do substring filtering client-side so
+      // the "Filter by client email" input feels instant + supports partials.
+      const r = await api.get("/admin/project-files");
       setFiles(r.data || []);
     } catch {
       toast.error("Failed to load files");
     } finally {
       setLoading(false);
     }
-  }, [api, filterEmail]);
+  }, [api]);
 
   useEffect(() => {
     document.title = "Project Files — Bloom Labs";
@@ -130,6 +130,15 @@ export default function ProjectFilesAdmin() {
       toast.error("Delete failed");
     }
   };
+
+  const visibleFiles = useMemo(() => {
+    const q = filterEmail.trim().toLowerCase();
+    if (!q) return files;
+    return files.filter((f) =>
+      (f.client_email || "").toLowerCase().includes(q) ||
+      (f.original_filename || "").toLowerCase().includes(q)
+    );
+  }, [files, filterEmail]);
 
   return (
     <div className="space-y-6" data-testid="project-files-admin">
@@ -241,15 +250,17 @@ export default function ProjectFilesAdmin() {
           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           Loading…
         </div>
-      ) : files.length === 0 ? (
+      ) : visibleFiles.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            No files uploaded yet for this filter.
+            {files.length === 0
+              ? "No files uploaded yet."
+              : `No files match "${filterEmail.trim()}".`}
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2" data-testid="pf-list">
-          {files.map((f) => (
+        <div className="space-y-2 min-h-[40px]" data-testid="pf-list">
+          {visibleFiles.map((f) => (
             <Card key={f.id} className="border-border" data-testid={`pf-row-${f.id}`}>
               <CardContent className="p-3.5 flex items-center gap-3 flex-wrap">
                 <div className="h-9 w-9 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
