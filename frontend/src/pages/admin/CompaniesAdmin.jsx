@@ -35,6 +35,7 @@ import {
   ChevronRight,
   Loader2,
   Tag,
+  Trash2,
 } from "lucide-react";
 import CompanyDetailDrawer from "@/components/admin/CompanyDetailDrawer";
 

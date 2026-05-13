@@ -550,7 +550,6 @@ async def update_provider_credentials(
 @integrations_admin_router.get("/health")
 async def integrations_health(
     request: Request,
-    nifty: NiftyClient = Depends(get_nifty),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
     """Unified health snapshot for ALL integrations.
@@ -560,7 +559,7 @@ async def integrations_health(
     `/test` endpoints to refresh a specific provider.
 
     Status values:
-      • green  — configured AND last ping ok (or no ping yet but configured for Nifty connected)
+      • green  — configured AND last ping ok
       • yellow — configured but never tested / last ping failed
       • red    — not configured
     """
@@ -596,32 +595,6 @@ async def integrations_health(
         _status("emailit", bool(os.environ.get("EMAILIT_API_KEY"))),
         _status("paypal", bool(os.environ.get("PAYPAL_CLIENT_ID"))),
     ]
-
-    # Nifty — based on token presence + last stored connectivity
-    nifty_connected = await nifty.is_connected()
-    nifty_last = pings.get("nifty")
-    if nifty_connected:
-        items.append({
-            "provider": "nifty",
-            "status": "green" if (nifty_last is None or nifty_last.get("ok")) else "yellow",
-            "configured": True,
-            "last_ping": nifty_last,
-        })
-    elif nifty.is_oauth_configured:
-        items.append({
-            "provider": "nifty",
-            "status": "yellow",
-            "configured": True,
-            "last_ping": nifty_last,
-            "detail": "OAuth configured but not connected",
-        })
-    else:
-        items.append({
-            "provider": "nifty",
-            "status": "red",
-            "configured": False,
-            "last_ping": None,
-        })
 
     # Slack (incoming webhook)
     slack_last = pings.get("slack")

@@ -472,6 +472,17 @@ function ContactsTab({ companyId, contacts, api, onChange }) {
     }
   };
 
+  const hardDelete = async (id, name) => {
+    if (!window.confirm(`Delete contact "${name}" PERMANENTLY?\n\nThis cannot be undone.`)) return;
+    try {
+      await api.delete(`/admin/contacts/${id}/hard`);
+      toast.success("Deleted");
+      onChange();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Delete failed");
+    }
+  };
+
   return (
     <>
       <div className="flex justify-end">
@@ -540,7 +551,13 @@ function ContactsTab({ companyId, contacts, api, onChange }) {
                   </Button>
                 )}
                 {!p.is_primary && (
-                  <Button variant="ghost" size="sm" onClick={() => archive(p.id)} title="Archive">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => hardDelete(p.id, p.name)}
+                    title="Delete permanently"
+                    data-testid={`drawer-contact-delete-${p.id}`}
+                  >
                     <Trash2 className="h-3.5 w-3.5 text-rose-500" />
                   </Button>
                 )}

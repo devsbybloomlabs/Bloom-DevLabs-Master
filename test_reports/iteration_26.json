@@ -1,0 +1,45 @@
+{
+  "summary": "Wave 1 cleanup verification — backend pytest (7/7 hard delete + nifty health PASS in 2.94s) + Playwright sweep across /admin/companies, /admin/dashboard, /admin/invoices, /admin/onboarding, /admin/revenue (404 confirmed), /portal milestones, and CompanyDetailDrawer contacts tab. Support email routing confirmed at code level (SUPPORT_EMAIL=support@bybloomlabs.com, FOUNDER cc'd, X-Bloom-Ticket/Support-UID/Company headers wired in contact_routes.py:493-504). /api/clients/me/contact smoke test returned ticket_ref=BL-2026-0057 (matches BL-YYYY-#### format). All 12 review items verified PASS — zero functional regressions found. Only nit: TipTap duplicate 'link' extension warning persists (already documented in iteration_25, non-blocking) and a benign 'DialogContent requires DialogTitle' a11y warning on the company drawer.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CompanyDetailDrawer", "issues": ["Radix a11y console warning: '`DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.' Wrap the drawer's visible company name in a <DialogTitle> (or VisuallyHidden DialogTitle) to silence. Non-blocking."]},
+      {"screen": "RichTextEditor (TipTap)", "issues": ["Pre-existing iteration_25 nit still present: duplicate 'link' extension warning at TipTap init. Non-blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_hard_delete.py",
+    "/app/test_reports/pytest/hard_delete.xml"
+  ],
+  "action_items": [
+    "(Optional/nit) Wrap company drawer title in <DialogTitle> (or VisuallyHidden) to clear the Radix a11y console warning.",
+    "(Optional/nit) Disable StarterKit's built-in link extension in RichTextEditor.jsx to clear the TipTap duplicate-extension warning."
+  ],
+  "critical_code_review_comments": [
+    "Backend DELETE /api/admin/companies/{id}/hard cascades correctly: returns {ok:true, deleted:{company:1, contacts>=2, activity>=1}}. Subsequent GET on company returns 404 and contact-hard-delete on a cascaded contact also returns 404. Verified end-to-end.",
+    "Backend DELETE /api/admin/contacts/{id}/hard correctly refuses primary contact with HTTP 400 (detail contains 'primary'), and deletes non-primary with 200. Both paths covered by tests.",
+    "GET /api/admin/integrations/health no longer returns a 'nifty' provider entry — confirmed via curl and pytest. Now returns exactly: openrouter, emailit, paypal, slack, google_calendar, breezedocs.",
+    "/admin/companies renders clean (no 'Trash2 is not defined' crash). 92 company rows render with hover-revealed delete buttons exposing data-testid=admin-company-delete-{id}. Trash2 lucide import is in place.",
+    "CompanyDetailDrawer → Contacts tab: primary contact shows star/promote button only (testid drawer-contact-{id}), non-primary contact shows BOTH star AND drawer-contact-delete-{id} trash button. Verified by seeding a 2-contact company and listing drawer testids: ['drawer-contact-{primary_id}', 'drawer-contact-{secondary_id}', 'drawer-contact-delete-{secondary_id}'] — exactly 1 delete button as expected. Hard-delete cleanup of the seed company succeeded.",
+    "Dashboard integrations health strip: no 'nifty' anywhere in the rendered DOM. All 5 expected provider pills (openrouter/emailit/paypal/slack/breezedocs) render.",
+    "Admin sidebar renders 6 groups in correct order: DAILY → PIPELINE → DELIVERY → MONEY → AUTHORITY → SYSTEM. Project Mode + Project Files live under DELIVERY. NO Revenue link, NO Nifty link. /admin/revenue navigation returns blank body + react-router 'No routes matched location' warning — route fully removed.",
+    "/admin/invoices View action: clicking the ExternalLink icon issues GET /api/admin/invoices/{id}/pdf with `Authorization: Bearer <bloom_admin_token>` header → 200 OK. localStorage.bloom_admin_token confirmed populated post-login.",
+    "/admin/onboarding ProjectBriefDialog WYSIWYG markdown paste: pasted '## Heading 2\\n\\n**bold text** and *italic*\\n\\n- bullet one\\n- bullet two' into the TipTap editor. Resulting innerHTML: `<h2>Heading 2</h2><p><strong>bold text</strong> and <em>italic</em></p><ul class=\"tight\"><li><p>bullet one</p></li><li><p>bullet two</p></li></ul>`. Raw `##`/`**` characters NOT present anywhere — tiptap-markdown transformPastedText is wired up correctly.",
+    "/portal Milestones tab: 5 placeholder nodes render with data-placeholder='true', computed opacity=0.5, classes include 'opacity-50', 'UP NEXT' pill text present (uppercase), and all 5 standard phases (Discovery & Brief Sign-off, Design Language, Build — Core flows, QA & Polish, Launch) visible in greyed-out style.",
+    "Backend POST /api/clients/me/contact (multipart) returns ticket_ref matching BL-YYYY-#### format (BL-2026-0057 observed). Code path in contact_routes.py:493-504 verified: primary_to=SUPPORT_EMAIL ('support@bybloomlabs.com'), cc_list includes FOUNDER_EMAIL, headers X-Bloom-Ticket/X-Bloom-Support-UID/X-Bloom-Company set on email payload. Endpoint healthy and produces ticket+notification.",
+    "Per-phase AI Project Brief regression: dialog still opens with all 3 phase tabs, prompt copy, summary editor, save/send buttons present (covered in iteration_25; no regression observed while accessing the same dialog for the markdown paste test)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (7/7 hard delete + integrations health PASS)", "frontend": "100% (all 8 frontend flows verified, only 2 non-blocking console a11y warnings)"},
+  "test_credentials": "Admin: founder@thesalvador.group / admin123 (POST /api/auth/login → access_token → localStorage.bloom_admin_token). Client: testclient@bybloomlabs.com / clientpass123 (POST /api/clients/login).",
+  "seed_data_creation": "Backend pytest auto-cleans (TEST_HardDel_* and TEST_PrimGuard_* and TEST_NPdel_* companies created and hard-deleted in-test). Frontend test created one TEST_DrawerDel_5fb10v company via /api/admin/companies (with 1 primary auto-contact + 1 'Sec Contact' secondary), then deleted it via /api/admin/companies/{id}/hard. Plus 1 ephemeral support ticket BL-2026-0057 from the contact-endpoint smoke (TEST_smoke wave1) is orphaned — safe to ignore or delete from contacts collection if desired. One TEST_HardDel_51e9e471 company from a flaky earlier run is still in DB (visible in /admin/companies screenshots) — orphan, low priority cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All Wave 1 cleanup features (delete companies/contacts, sidebar reorg, /admin/revenue removal, Nifty UI removal from health endpoint+dashboard+sidebar, milestone placeholders, WYSIWYG markdown paste, invoice PDF auth header, support email routing) are production-ready. Re-run hard-delete suite with: `export REACT_APP_BACKEND_URL=https://wave1-cleanups.preview.emergentagent.com && pytest /app/backend/tests/test_hard_delete.py -v` (2.94s, 7/7 PASS). For sidebar/companies/invoices/onboarding/portal/drawer Playwright sweep, see iteration_26 transcript. Two pre-existing non-blocking console warnings remain: Radix DialogTitle a11y warning on CompanyDetailDrawer + TipTap duplicate 'link' extension warning. Neither breaks functionality.",
+  "rca of the issue": "N/A — no bugs uncovered this iteration. All 12 acceptance criteria PASS."
+}
