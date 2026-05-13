@@ -154,6 +154,27 @@ async def upload_file(
             title=f"File uploaded — {doc['original_filename']}",
             meta={"file_id": doc["id"], "category": category},
         )
+    # Best-effort Google Drive mirror — fires only when sync_to_drive is on for
+    # the matching project. Failures are logged inside the helper and do NOT
+    # affect the primary upload response.
+    try:
+        from google_drive_routes import mirror_file_bytes_to_drive  # noqa: WPS433
+        project = await db.pm_projects.find_one(
+            {"client_email": email, "sync_to_drive": True},
+            {"_id": 0},
+            sort=[("created_at", -1)],
+        )
+        if project:
+            await mirror_file_bytes_to_drive(
+                db,
+                project,
+                data,
+                doc["original_filename"],
+                content_type,
+                doc["id"],
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Drive mirror skipped: %s", exc)
     return _public(doc)
 
 

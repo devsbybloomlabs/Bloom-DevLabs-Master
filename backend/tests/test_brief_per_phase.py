@@ -277,7 +277,9 @@ def test_full_state_machine(setup):
     assert fresh["approved_at"]
     assert fresh["approved_by_email"] == setup["email"]
 
-    # 17. Build milestones (5 default) were seeded
+    # 17. Build milestones (5 default) were seeded — single consolidated
+    # 'Discovery & Brief Sign-off' card now reflects the brief review state
+    # instead of 3 'Brief Review: X' cards (Feb 2026 consolidation).
     r = requests.get(f"{API_BASE}/clients/me/milestones", headers=C, timeout=15)
     assert r.status_code == 200
     titles = [m["title"] for m in r.json()]
@@ -287,9 +289,10 @@ def test_full_state_machine(setup):
         "Build — Core flows",
         "QA & Polish",
         "Launch",
-        "Brief Review: Design Language",
     ]:
         assert must in titles, f"{must} missing from {titles}"
+    # Legacy per-phase 'Brief Review: X' rows must be archived after consolidation.
+    assert not any(t.startswith("Brief Review:") for t in titles), titles
 
     # 18. Project Mode project + tasks were created (seeded in background — LLM call ~5-30s)
     import time
@@ -311,7 +314,9 @@ def test_full_state_machine(setup):
 
 
 # -------------------------------------------------------------------------
-# Review milestone sync — separately tested for clarity
+# Review milestone sync — single consolidated 'Discovery & Brief Sign-off'
+# milestone now reflects per-phase progress via emoji-chip description
+# (Feb 2026 redesign — see project_brief_routes.PHASE_SHORT_LABEL).
 # -------------------------------------------------------------------------
 def test_review_milestone_status_sync(setup):
     A, C, brief = setup["A"], setup["C"], setup["brief"]
@@ -330,14 +335,19 @@ def test_review_milestone_status_sync(setup):
         timeout=15,
     )
 
-    # Milestone should exist with status "in_progress" and "Waiting for your review."
+    # ONE Discovery milestone must exist in_progress with phase1 marked sent.
     r = requests.get(f"{API_BASE}/clients/me/milestones", headers=C, timeout=15)
-    review = [m for m in r.json() if m["title"] == "Brief Review: Design Language"]
-    assert len(review) == 1
-    assert review[0]["status"] == "in_progress"
-    assert "Waiting" in review[0]["description"]
+    discovery = [m for m in r.json() if m["title"] == "Discovery & Brief Sign-off"]
+    assert len(discovery) == 1
+    assert discovery[0]["status"] == "in_progress"
+    # Description carries per-phase status chips. Phase1 sent → 👀 icon.
+    assert "👀 Design Language" in discovery[0]["description"]
+    # NO legacy per-phase rows.
+    assert not any(
+        m["title"].startswith("Brief Review:") for m in r.json()
+    )
 
-    # Client comments → description flips
+    # Client comments → phase status flips to in_revision → chip becomes 💬.
     requests.post(
         f"{API_BASE}/clients/me/briefs/{bid}/phase/phase1/comment",
         json={"comment": "Let's tweak the typography"},
@@ -345,10 +355,10 @@ def test_review_milestone_status_sync(setup):
         timeout=15,
     )
     r = requests.get(f"{API_BASE}/clients/me/milestones", headers=C, timeout=15)
-    review = [m for m in r.json() if m["title"] == "Brief Review: Design Language"]
-    assert "reviewing your comments" in review[0]["description"]
+    discovery = [m for m in r.json() if m["title"] == "Discovery & Brief Sign-off"]
+    assert "💬 Design Language" in discovery[0]["description"]
 
-    # Admin re-saves + re-sends → back to "Waiting"
+    # Admin re-saves + re-sends → back to 👀.
     requests.patch(
         f"{API_BASE}/admin/briefs/{bid}/phase/phase1",
         json={"summary": "<p>v2 summary</p>"},
@@ -362,10 +372,10 @@ def test_review_milestone_status_sync(setup):
         timeout=15,
     )
     r = requests.get(f"{API_BASE}/clients/me/milestones", headers=C, timeout=15)
-    review = [m for m in r.json() if m["title"] == "Brief Review: Design Language"]
-    assert "Waiting" in review[0]["description"]
+    discovery = [m for m in r.json() if m["title"] == "Discovery & Brief Sign-off"]
+    assert "👀 Design Language" in discovery[0]["description"]
 
-    # Client approves → milestone status flips to complete
+    # Client approves phase1 → ✅, but Discovery still in_progress (need all 3).
     requests.post(
         f"{API_BASE}/clients/me/briefs/{bid}/phase/phase1/approve",
         json={"no_comments_confirmed": True},
@@ -373,9 +383,9 @@ def test_review_milestone_status_sync(setup):
         timeout=15,
     )
     r = requests.get(f"{API_BASE}/clients/me/milestones", headers=C, timeout=15)
-    review = [m for m in r.json() if m["title"] == "Brief Review: Design Language"]
-    assert review[0]["status"] == "complete"
-    assert review[0]["completion_date"]
+    discovery = [m for m in r.json() if m["title"] == "Discovery & Brief Sign-off"]
+    assert "✅ Design Language" in discovery[0]["description"]
+    assert discovery[0]["status"] == "in_progress"  # phase2/3 still pending
 
 
 def test_auth_guards():

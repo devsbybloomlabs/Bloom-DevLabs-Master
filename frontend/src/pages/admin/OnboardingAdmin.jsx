@@ -557,13 +557,56 @@ export default function OnboardingAdmin() {
                       )}
                       {p === 3 && (
                         <>
-                          {renderField("Company Name", data.company_name)}
-                          {renderField("Industry", data.industry)}
-                          {renderField("Target Audience", data.target_audience)}
-                          {renderField("Unique Value Proposition", data.uvp)}
-                          {renderField("Success Metrics", data.success_metrics)}
-                          {renderField("Launch Date", data.launch_date)}
-                          {renderField("Notes for the team", data.notes)}
+                          {renderField("Project Name", data.project_name)}
+                          {renderField("Company Story", data.company_story)}
+                          {renderField("Goals", data.goals)}
+                          {renderField("Timeline Expectation", data.timeline_expectation)}
+                          {Array.isArray(data.success_scenarios) && data.success_scenarios.length > 0 && (
+                            <div>
+                              <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
+                                Success Scenarios
+                              </div>
+                              <ul className="space-y-1.5">
+                                {data.success_scenarios.map((s, i) => (
+                                  <li key={i} className="text-sm bg-secondary/40 rounded px-2.5 py-1.5">
+                                    <div className="font-medium">{s.description || "—"}</div>
+                                    {s.metric && (
+                                      <div className="text-xs text-muted-foreground mt-0.5">
+                                        Metric: {s.metric}
+                                      </div>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {/* Phase 3 kickoff fields (added Feb 2026) */}
+                          {data.company_logo_url && (
+                            <div>
+                              <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
+                                Company Logo
+                              </div>
+                              <a
+                                href={data.company_logo_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block"
+                              >
+                                <img
+                                  src={data.company_logo_url}
+                                  alt="Company logo"
+                                  className="max-h-16 rounded border border-border bg-white p-2"
+                                />
+                              </a>
+                            </div>
+                          )}
+                          {renderField("Phone", data.phone)}
+                          {renderField(
+                            "Best Time to Call",
+                            data.best_time_to_call
+                              ? `${data.best_time_to_call}${data.best_time_timezone ? ` (${data.best_time_timezone})` : ""}`
+                              : null
+                          )}
                         </>
                       )}
                     </div>

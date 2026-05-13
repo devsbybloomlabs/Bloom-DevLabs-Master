@@ -165,7 +165,7 @@ export default function ProjectBriefDialog({ open, onClose, onboarding, api }) {
     toast.success("Prompt copied — paste into Claude.");
   };
 
-  const saveSummary = async (key) => {
+  const saveSummary = async (key, { resendAfter = false } = {}) => {
     if (!brief) return;
     if (!draft[key]?.trim() || draft[key] === "<p></p>") {
       toast.error("Add a summary first.");
@@ -179,8 +179,19 @@ export default function ProjectBriefDialog({ open, onClose, onboarding, api }) {
         `/admin/briefs/${brief.id}/phase/${key}`,
         payload
       );
-      setBrief(r.data);
-      toast.success("Saved");
+      let updated = r.data;
+      if (resendAfter) {
+        // Chain Save → Send for review so the client sees the new version
+        // immediately. Uses the existing note_to_client if the admin typed one.
+        const s = await api.post(
+          `/admin/briefs/${brief.id}/phase/${key}/send-for-review`,
+          { note_to_client: noteToClient[key] || null }
+        );
+        updated = s.data;
+        setNoteToClient({ ...noteToClient, [key]: "" });
+      }
+      setBrief(updated);
+      toast.success(resendAfter ? "Saved & re-sent for review" : "Saved");
       setAdminReplyNote({ ...adminReplyNote, [key]: "" });
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Save failed");
@@ -433,20 +444,35 @@ export default function ProjectBriefDialog({ open, onClose, onboarding, api }) {
                         {busy ? (
                           <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                         ) : null}
-                        Save summary
+                        Save draft
                       </Button>
-                      <Button
-                        onClick={() => sendForReview(key)}
-                        disabled={busy || !p.summary}
-                        data-testid={`brief-send-${key}`}
-                      >
-                        <Send className="h-3.5 w-3.5 mr-1.5" />
-                        {status === "in_revision"
-                          ? "Re-send for review"
-                          : status === "sent_for_review"
-                          ? "Re-send for review"
-                          : "Send for review"}
-                      </Button>
+                      {hasComment && status === "in_revision" ? (
+                        // Combined Save + Re-send when responding to a client comment.
+                        // This is the most common admin action after a re-roll.
+                        <Button
+                          onClick={() => saveSummary(key, { resendAfter: true })}
+                          disabled={busy || !draft[key]?.trim()}
+                          data-testid={`brief-save-and-resend-${key}`}
+                        >
+                          {busy ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5 mr-1.5" />
+                          )}
+                          Save & re-send for review
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => sendForReview(key)}
+                          disabled={busy || !p.summary}
+                          data-testid={`brief-send-${key}`}
+                        >
+                          <Send className="h-3.5 w-3.5 mr-1.5" />
+                          {status === "sent_for_review"
+                            ? "Re-send for review"
+                            : "Send for review"}
+                        </Button>
+                      )}
                     </div>
                   )}
 

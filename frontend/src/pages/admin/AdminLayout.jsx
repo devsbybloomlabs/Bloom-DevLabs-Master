@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useMatch } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import {
@@ -29,6 +29,7 @@ import {
   LifeBuoy,
   KanbanSquare,
   FolderUp,
+  ArrowLeft,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { BRAND } from "@/lib/brand";
@@ -143,6 +144,13 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  // Focus Shell — when entering Project Mode for a SPECIFIC project
+  // (/admin/project-mode/{id}) we hide the admin chrome so the founder
+  // can concentrate on one project at a time. The list page
+  // /admin/project-mode keeps the regular layout.
+  const focusMatch = useMatch("/admin/project-mode/:projectId");
+  const isFocusMode = Boolean(focusMatch);
+
   // SEO: ensure admin pages are not indexed (belt-and-suspenders alongside robots.txt)
   useEffect(() => {
     const meta = document.createElement("meta");
@@ -163,6 +171,51 @@ export default function AdminLayout() {
     toast.success("Signed out");
     navigate("/admin/login");
   };
+
+  if (isFocusMode) {
+    return (
+      <div
+        className="min-h-screen bg-[var(--warm-50)] flex flex-col"
+        data-testid="admin-layout-focus"
+      >
+        {/* Slim focus-mode top bar */}
+        <header
+          className="sticky top-0 z-30 bg-background border-b border-border h-12 flex items-center justify-between px-4 sm:px-6"
+          data-testid="focus-shell-topbar"
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/admin/project-mode")}
+            className="h-9 -ml-2"
+            data-testid="focus-shell-back"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1.5" />
+            Back to Admin
+          </Button>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground inline-flex items-center gap-1.5">
+            <KanbanSquare className="h-3.5 w-3.5" />
+            Focus Mode
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLogout}
+            aria-label="Sign out"
+            className="h-9 w-9"
+            data-testid="focus-shell-logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </header>
+        <main className="flex-1 min-w-0 overflow-x-hidden" data-testid="focus-shell-main">
+          <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--warm-50)]" data-testid="admin-layout">

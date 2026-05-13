@@ -182,7 +182,6 @@ def generate_company_prompt(phase3: Dict[str, Any]) -> str:
         f"Company story: {phase3.get('company_story') or '(unspecified)'}\n"
         f"Goals: {phase3.get('goals') or '(unspecified)'}\n"
         f"Timeline: {phase3.get('timeline_expectation') or '(unspecified)'}\n"
-        f"Budget: {phase3.get('budget') or '(unspecified)'}\n"
         f"Success scenarios:\n{scen_block}\n\n"
         "Output ONLY the summary (no preamble)."
     )
@@ -250,36 +249,84 @@ async def _publish_brief_status(
 
 
 # =========================================================================
-# Brief Review milestones (lives alongside the standard 5-phase plan)
+# Brief Review milestone — single consolidated card (Feb 2026 rewrite)
 # =========================================================================
-REVIEW_MILESTONE_PREFIX = "Brief Review:"
+# Originally each phase had its own "Brief Review: X" milestone. That cluttered
+# the client portal timeline (3 review cards + 5 build cards = 8 cards) and
+# created visual duplication after approval. New design: ONE milestone titled
+# exactly "Discovery & Brief Sign-off" (matches the standard build plan) whose
+# description carries per-phase progress chips. It flips to `complete` when
+# all 3 phases approve, then the rest of the build plan seeds.
+REVIEW_MILESTONE_PREFIX = "Brief Review:"   # kept for legacy archive matching
+DISCOVERY_MILESTONE_TITLE = "Discovery & Brief Sign-off"
 
+# Legacy per-phase mapping retained for migration (archive old rows on next sync).
 PHASE_TO_REVIEW_TITLE = {
     "phase1": f"{REVIEW_MILESTONE_PREFIX} Design Language",
     "phase2": f"{REVIEW_MILESTONE_PREFIX} Functionality",
     "phase3": f"{REVIEW_MILESTONE_PREFIX} Company Background",
 }
 
+PHASE_SHORT_LABEL = {
+    "phase1": "Design Language",
+    "phase2": "Functionality",
+    "phase3": "Company Background",
+}
+
+
+def _build_discovery_description(phase_summaries: Dict[str, Any]) -> str:
+    """Render a human-readable progress string from the 3 phase statuses."""
+    icons = {
+        "draft": "⏳",
+        "sent_for_review": "👀",
+        "in_revision": "💬",
+        "approved": "✅",
+    }
+    parts = []
+    for k in PHASE_KEYS:
+        s = (phase_summaries.get(k) or {}).get("status", "draft")
+        icon = icons.get(s, "⏳")
+        parts.append(f"{icon} {PHASE_SHORT_LABEL[k]}")
+    return " · ".join(parts)
+
+
+async def _archive_legacy_review_milestones(
+    db: AsyncIOMotorDatabase, brief: Dict[str, Any]
+) -> None:
+    """Hard-delete the old per-phase 'Brief Review: X' milestones from the DB.
+
+    Idempotent — safe to call on every brief access. Keeps the timeline clean
+    so existing clients automatically get the consolidated single-card view."""
+    client_email = (brief.get("client_email") or "").lower()
+    if not client_email:
+        return
+    project_name = (brief.get("project_name") or "").strip()
+    q = {
+        "client_email": client_email,
+        "title": {"$regex": f"^{REVIEW_MILESTONE_PREFIX}"},
+    }
+    if project_name:
+        q["project_name"] = project_name
+    await db.milestones.delete_many(q)
+
 
 async def _ensure_review_milestone(
-    db: AsyncIOMotorDatabase, brief: Dict[str, Any], phase_key: str
+    db: AsyncIOMotorDatabase, brief: Dict[str, Any], phase_key: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
-    """Create the review-milestone for this phase if it doesn't exist yet.
+    """Create the SINGLE Discovery & Brief Sign-off milestone if it doesn't
+    exist yet. Returns the milestone doc (already in DB).
 
-    Returns the milestone doc (already in DB)."""
-    if phase_key not in PHASE_KEYS:
-        return None
+    `phase_key` is accepted for API compat with the legacy per-phase signature
+    but is no longer used to vary the title."""
     client_email = (brief.get("client_email") or "").lower()
     if not client_email:
         return None
     project_name = (brief.get("project_name") or "Project").strip()
-    title = PHASE_TO_REVIEW_TITLE[phase_key]
     existing = await db.milestones.find_one(
         {
             "client_email": client_email,
             "project_name": project_name,
-            "linked_brief_id": brief["id"],
-            "linked_brief_phase": phase_key,
+            "title": DISCOVERY_MILESTONE_TITLE,
         },
         {"_id": 0},
     )
@@ -290,9 +337,9 @@ async def _ensure_review_milestone(
         "id": str(uuid.uuid4()),
         "client_email": client_email,
         "project_name": project_name,
-        "title": title,
+        "title": DISCOVERY_MILESTONE_TITLE,
         "status": "in_progress",
-        "description": "Waiting for your review.",
+        "description": _build_discovery_description(brief.get("phase_summaries") or {}),
         "is_final_deliverable": False,
         "notify_client_on_complete": False,
         "nifty_task_id": None,
@@ -304,42 +351,44 @@ async def _ensure_review_milestone(
         "last_updated": now.isoformat(),
         "created_at": now.isoformat(),
         "linked_brief_id": brief["id"],
-        "linked_brief_phase": phase_key,
+        "linked_brief_phase": None,
     }
     await db.milestones.insert_one(doc)
     return doc
 
 
 async def _sync_review_milestone(
-    db: AsyncIOMotorDatabase, brief: Dict[str, Any], phase_key: str, phase: Dict[str, Any]
+    db: AsyncIOMotorDatabase,
+    brief: Dict[str, Any],
+    phase_key: Optional[str] = None,
+    phase: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """Reflect the phase's status into its review milestone."""
-    await _ensure_review_milestone(db, brief, phase_key)
-    status = phase.get("status", "draft")
-    description_by_status = {
-        "draft": "Our team is drafting the summary.",
-        "sent_for_review": "Waiting for your review.",
-        "in_revision": "Our team is reviewing your comments…",
-        "approved": "Approved — locked in.",
-    }
-    mstatus_by_status = {
-        "draft": "in_progress",
-        "sent_for_review": "in_progress",
-        "in_revision": "in_progress",
-        "approved": "complete",
-    }
+    """Reflect the rolled-up phase statuses onto the single Discovery card."""
+    # First archive any legacy per-phase rows so they disappear from the client
+    # timeline on the next render.
+    await _archive_legacy_review_milestones(db, brief)
+    await _ensure_review_milestone(db, brief)
+
+    # Re-read the brief so the phase summary we're updating from is fresh.
+    fresh = await db.project_briefs.find_one({"id": brief["id"]}, {"_id": 0}) or brief
+    summaries = fresh.get("phase_summaries") or {}
+
+    all_approved = all(
+        (summaries.get(k) or {}).get("status") == "approved" for k in PHASE_KEYS
+    )
+    new_status = "complete" if all_approved else "in_progress"
     update = {
-        "status": mstatus_by_status.get(status, "in_progress"),
-        "description": description_by_status.get(status, ""),
+        "status": new_status,
+        "description": _build_discovery_description(summaries),
         "last_updated": _now_iso(),
     }
-    if status == "approved":
+    if all_approved:
         update["completion_date"] = _now_iso()
     await db.milestones.update_one(
         {
-            "linked_brief_id": brief["id"],
-            "linked_brief_phase": phase_key,
+            "title": DISCOVERY_MILESTONE_TITLE,
             "client_email": (brief.get("client_email") or "").lower(),
+            "project_name": (brief.get("project_name") or "").strip(),
         },
         {"$set": update},
     )
@@ -358,7 +407,7 @@ DEFAULT_MILESTONE_PLAN: List[Dict[str, Any]] = [
     {
         "title": "Design Language",
         "description": "Style tile, color system, typography, hero concepts.",
-        "status": "pending",
+        "status": "in_progress",
         "offset_days": 10,
     },
     {
@@ -391,24 +440,21 @@ async def _seed_build_milestones(
     project_name = (brief.get("project_name") or "Project").strip()
     if not client_email:
         return 0
-    existing = await db.milestones.count_documents(
-        {
-            "client_email": client_email,
-            "project_name": project_name,
-            "linked_brief_phase": None,  # not a review milestone
-        }
+    # Per-title idempotency: skip any milestone titles that already exist for
+    # this client/project. The Discovery & Brief Sign-off milestone is now
+    # pre-created during the per-phase review flow, so we expect it to exist
+    # already at full-approval time — seed the remaining 4 build milestones.
+    existing_titles = set(
+        await db.milestones.distinct(
+            "title",
+            {"client_email": client_email, "project_name": project_name},
+        )
     )
-    # We also check title because old briefs may have seeded without the new
-    # `linked_brief_phase` field.
-    titles = await db.milestones.distinct(
-        "title",
-        {"client_email": client_email, "project_name": project_name},
-    )
-    if existing > 0 or any(t in [p["title"] for p in DEFAULT_MILESTONE_PLAN] for t in titles):
-        return 0
     now = _now()
     docs = []
     for plan in DEFAULT_MILESTONE_PLAN:
+        if plan["title"] in existing_titles:
+            continue
         due = now + timedelta(days=int(plan.get("offset_days") or 7))
         docs.append(
             {

@@ -334,8 +334,11 @@ async def _process_phase3(
         f"Goals:\n{p3.get('goals', '—')}",
         "",
         f"Timeline Expectation: {p3.get('timeline_expectation', '—')}",
-        f"Budget: {p3.get('budget', '—')}",
+        f"Phone: {p3.get('phone', '—')}",
+        f"Best time to call: {p3.get('best_time_to_call', '—')} ({p3.get('best_time_timezone', '—')})",
     ]
+    if p3.get("company_logo_url"):
+        desc_lines.append(f"Company logo: {p3['company_logo_url']}")
     desc_kickoff = "\n".join(desc_lines)
     due = _business_days_from_now(2)
     nifty: NiftyClient = request.app.state.nifty

@@ -45,6 +45,9 @@ import {
   User as UserIcon,
   CheckCircle2,
   Rocket,
+  FolderUp,
+  Download,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { sendToEmergent } from "@/lib/emergentBridge";
@@ -566,6 +569,163 @@ function Column({ status, tasks, project, milestoneLookup, onCardOpen, onAdd }) 
   );
 }
 
+function ProjectFilesPanel({ project, api }) {
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!project) return;
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (project.client_email) params.set("client_email", project.client_email);
+      const r = await api.get(`/admin/project-files?${params.toString()}`);
+      setFiles(r.data || []);
+    } catch {
+      toast.error("Failed to load files");
+    } finally {
+      setLoading(false);
+    }
+  }, [api, project]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("File exceeds 100MB limit");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("client_email", project.client_email || "");
+      fd.append("category", "deliverable");
+      await api.post("/admin/project-files", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Uploaded");
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const download = async (f) => {
+    try {
+      const res = await api.get(`/admin/project-files/${f.id}/download`, {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = f.original_filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Download failed");
+    }
+  };
+
+  const remove = async (f) => {
+    if (!window.confirm(`Delete "${f.original_filename}"?`)) return;
+    try {
+      await api.delete(`/admin/project-files/${f.id}`);
+      toast.success("Deleted");
+      load();
+    } catch {
+      toast.error("Delete failed");
+    }
+  };
+
+  return (
+    <div className="space-y-4" data-testid="pm-files-panel">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Files scoped to <strong>{project.client_email || "this project"}</strong>
+        </p>
+        <label
+          className="inline-flex items-center gap-2 rounded-lg border border-primary bg-primary text-primary-foreground text-sm px-3.5 py-2 cursor-pointer hover:bg-primary/90 transition-colors"
+          data-testid="pm-files-upload-label"
+        >
+          {uploading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Upload className="h-4 w-4" />
+          )}
+          Upload file
+          <input
+            type="file"
+            className="sr-only"
+            onChange={onUpload}
+            disabled={uploading}
+            data-testid="pm-files-upload-input"
+          />
+        </label>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-10 text-sm text-muted-foreground">
+          <Loader2 className="h-5 w-5 mx-auto animate-spin" />
+        </div>
+      ) : files.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-10 text-center">
+            <FolderUp className="h-10 w-10 mx-auto text-muted-foreground/60 mb-2" />
+            <p className="text-sm font-medium">No files yet</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Upload deliverables, mockups, or invoices here.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2" data-testid="pm-files-list">
+          {files.map((f) => (
+            <Card key={f.id} data-testid={`pm-file-row-${f.id}`}>
+              <CardContent className="p-3 flex items-center gap-3">
+                <FolderUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{f.original_filename}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {f.category} · {(f.size_bytes / 1024).toFixed(0)}KB ·{" "}
+                    {new Date(f.uploaded_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => download(f)}
+                  data-testid={`pm-file-download-${f.id}`}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => remove(f)}
+                  data-testid={`pm-file-delete-${f.id}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProjectModeAdmin() {
   const api = useAdminApi();
   const navigate = useNavigate();
@@ -578,6 +738,7 @@ export default function ProjectModeAdmin() {
   const [newTaskStatus, setNewTaskStatus] = useState("todo");
   const [openTask, setOpenTask] = useState(null);
   const [milestoneLookup, setMilestoneLookup] = useState({});
+  const [pmView, setPmView] = useState("kanban"); // "kanban" | "files"
 
   useEffect(() => {
     document.title = "Project Mode — Bloom Labs";
@@ -609,14 +770,12 @@ export default function ProjectModeAdmin() {
     try {
       const r = await api.get("/admin/pm/projects");
       setProjects(r.data || []);
-      // Auto-select first if no projectId in URL
-      if (!projectId && r.data?.length > 0) {
-        navigate(`/admin/project-mode/${r.data[0].id}`, { replace: true });
-      }
+      // No auto-redirect — keep the list view stable when user navigates back
+      // from focus mode. Clicking a project rail item enters focus mode.
     } catch (e) {
       toast.error("Failed to load projects");
     }
-  }, [api, projectId, navigate]);
+  }, [api]);
 
   const loadBoard = useCallback(async () => {
     if (!projectId) {
@@ -735,8 +894,43 @@ export default function ProjectModeAdmin() {
           </div>
         </aside>
 
-        {/* Kanban */}
+        {/* Kanban / Files view */}
         <div className="flex-1 min-w-0">
+          {/* View toggle — Kanban / Files */}
+          {board && (
+            <div
+              className="inline-flex rounded-lg border border-border bg-secondary/40 p-1 mb-4"
+              data-testid="pm-view-toggle"
+            >
+              <button
+                type="button"
+                onClick={() => setPmView("kanban")}
+                data-testid="pm-view-kanban"
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  pmView === "kanban"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <KanbanSquare className="h-3.5 w-3.5" />
+                Kanban
+              </button>
+              <button
+                type="button"
+                onClick={() => setPmView("files")}
+                data-testid="pm-view-files"
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  pmView === "files"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <FolderUp className="h-3.5 w-3.5" />
+                Files
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
               <Loader2 className="h-5 w-5 mr-2 animate-spin" />
@@ -750,6 +944,8 @@ export default function ProjectModeAdmin() {
                 Create one to start tracking work.
               </p>
             </div>
+          ) : pmView === "files" ? (
+            <ProjectFilesPanel project={board.project} api={api} />
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-4 -mx-2 px-2">
               {STATUS_ORDER.map((s) => (

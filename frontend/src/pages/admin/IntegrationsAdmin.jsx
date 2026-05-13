@@ -49,6 +49,8 @@ import {
   Sparkles,
   CreditCard,
   Users,
+  FolderSync,
+  ExternalLink,
 } from "lucide-react";
 
 const PROVIDER_META = {
@@ -58,6 +60,21 @@ const PROVIDER_META = {
 };
 
 export default function IntegrationsAdmin() {
+  // Surface the `?drive_connected=1` / `?drive_error=...` notice from the
+  // Google OAuth callback so the founder gets immediate feedback.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("drive_connected")) {
+      toast.success("Google Drive connected");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    const err = params.get("drive_error");
+    if (err) {
+      toast.error(`Google Drive: ${err}`);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   return (
     <div className="space-y-6" data-testid="admin-integrations-page">
       <div>
@@ -70,6 +87,7 @@ export default function IntegrationsAdmin() {
         </p>
       </div>
       <ProvidersGrid />
+      <GoogleDriveCard />
       <IntegrationCredentialsForm />
       <AbStatsCard />
     </div>
@@ -664,6 +682,223 @@ function ProvidersGrid() {
               );
             })}
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+// ============================================================================
+// Google Drive Mirror Sync
+// ============================================================================
+function GoogleDriveCard() {
+  const api = useAdminApi();
+  const [status, setStatus] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [s, p] = await Promise.all([
+        api.get("/admin/google-drive/status"),
+        api.get("/admin/pm/projects"),
+      ]);
+      setStatus(s.data);
+      setProjects(p.data || []);
+    } catch {
+      // tolerate — show whatever loaded
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const r = await api.get("/admin/google-drive/connect");
+      window.location.href = r.data.authorization_url;
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Connect failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnect = async () => {
+    if (!window.confirm("Disconnect Google Drive? Per-project toggles will stop syncing.")) return;
+    setBusy(true);
+    try {
+      await api.post("/admin/google-drive/disconnect");
+      toast.success("Disconnected");
+      load();
+    } catch (e) {
+      toast.error("Disconnect failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const togglePromise = async (projectId, enable) => {
+    try {
+      await api.post(`/admin/google-drive/projects/${projectId}/toggle?enable=${enable}`);
+      toast.success(enable ? "Drive sync enabled" : "Drive sync disabled");
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Toggle failed");
+    }
+  };
+
+  const syncNow = async (projectId) => {
+    setBusy(true);
+    try {
+      const r = await api.post(`/admin/google-drive/projects/${projectId}/sync-now`);
+      toast.success(`Synced ${r.data.synced} file(s), ${r.data.failed} failed`);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Sync failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isConfigured = status?.configured;
+  const isConnected = status?.connected;
+
+  return (
+    <Card data-testid="gdrive-card">
+      <CardHeader>
+        <CardTitle className="inline-flex items-center gap-2">
+          <FolderSync className="h-5 w-5" style={{ color: "#0F9D58" }} />
+          Google Drive Mirror Sync
+          {isConnected ? (
+            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+              <CheckCircle2 className="h-3 w-3 mr-0.5" /> Connected
+            </Badge>
+          ) : isConfigured ? (
+            <Badge variant="outline">Not connected</Badge>
+          ) : (
+            <Badge className="bg-rose-100 text-rose-700 border-rose-200">
+              Not configured
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          When enabled, every project file you upload is mirrored into a
+          "Bloom Labs — {`{Project Name}`}" folder inside your Google Drive.
+        </p>
+        {!isConfigured && (
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm">
+            <p className="font-medium text-amber-900">Setup required</p>
+            <p className="text-amber-900/80 mt-1">
+              Add <code className="bg-amber-100 px-1 rounded text-xs">GOOGLE_CLIENT_ID</code>,{" "}
+              <code className="bg-amber-100 px-1 rounded text-xs">GOOGLE_CLIENT_SECRET</code>,
+              and{" "}
+              <code className="bg-amber-100 px-1 rounded text-xs">GOOGLE_DRIVE_REDIRECT_URI</code>{" "}
+              to <code className="bg-amber-100 px-1 rounded text-xs">backend/.env</code>.
+              See the setup checklist in your last agent summary.
+            </p>
+          </div>
+        )}
+        {isConfigured && !isConnected && (
+          <Button onClick={connect} disabled={busy} data-testid="gdrive-connect-btn">
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Link2 className="h-4 w-4 mr-2" />}
+            Connect Google Drive
+          </Button>
+        )}
+        {isConnected && (
+          <>
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary/40 px-3 py-2">
+              <div className="text-sm">
+                <p className="font-medium">{status.account_email || "Connected"}</p>
+                <p className="text-xs text-muted-foreground">
+                  Last refresh:{" "}
+                  {status.last_refresh_at
+                    ? new Date(status.last_refresh_at).toLocaleString()
+                    : "—"}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={disconnect} disabled={busy} data-testid="gdrive-disconnect-btn">
+                <Unlink className="h-3.5 w-3.5 mr-1.5" />
+                Disconnect
+              </Button>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground mb-2">
+                Per-project sync ({projects.length} project{projects.length === 1 ? "" : "s"})
+              </p>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : projects.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  No PM projects yet — create one in Project Mode first.
+                </p>
+              ) : (
+                <div className="space-y-2" data-testid="gdrive-projects-list">
+                  {projects.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2"
+                      data-testid={`gdrive-project-row-${p.id}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.client_email || "no client"}
+                          {p.last_sync_at &&
+                            ` · last synced ${new Date(p.last_sync_at).toLocaleString()}`}
+                        </p>
+                      </div>
+                      {p.drive_folder_link && (
+                        <a
+                          href={p.drive_folder_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Open
+                        </a>
+                      )}
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(p.sync_to_drive)}
+                          onChange={(e) => togglePromise(p.id, e.target.checked)}
+                          data-testid={`gdrive-toggle-${p.id}`}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span className="text-xs">Sync</span>
+                      </label>
+                      {p.sync_to_drive && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => syncNow(p.id)}
+                          disabled={busy}
+                          data-testid={`gdrive-sync-now-${p.id}`}
+                        >
+                          {busy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

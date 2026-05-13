@@ -29,6 +29,10 @@ import {
   Palette,
   Sparkles,
   Building2,
+  Upload,
+  X,
+  Phone,
+  Clock,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 
@@ -456,6 +460,41 @@ function Phase2Form({ data, setArrayItem, setField }) {
 function Phase3Form({ data, setArrayItem, setField }) {
   const scenarios = data.success_scenarios || [emptyScenario(), emptyScenario(), emptyScenario()];
   while (scenarios.length < 3) scenarios.push(emptyScenario());
+  // Logo upload state (kept inside the form so it resets on remount)
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState("");
+
+  const onLogoChosen = async (file) => {
+    if (!file) return;
+    const ALLOWED = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
+    if (!ALLOWED.includes(file.type)) {
+      setLogoError("Use PNG, JPG, WebP, or SVG");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError("Logo must be 5MB or less");
+      return;
+    }
+    setLogoError("");
+    setUploadingLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await clientApi.post("/clients/me/uploads/logo", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setField("company_logo_url", r.data.url);
+      setField("company_logo_thumbnail", r.data.thumbnail_url || r.data.url);
+      toast.success("Logo uploaded");
+    } catch (e) {
+      const detail = e?.response?.data?.detail || "Upload failed";
+      setLogoError(detail);
+      toast.error(detail);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -487,6 +526,71 @@ function Phase3Form({ data, setArrayItem, setField }) {
           data-testid="onboarding-goals"
           className="mt-1.5 min-h-[100px]"
         />
+      </div>
+
+      {/* Company logo (uploaded to Publit.io) */}
+      <div>
+        <Label className="text-sm flex items-center gap-1.5">
+          Company logo <span className="text-xs text-muted-foreground">(optional)</span>
+        </Label>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          PNG, JPG, WebP, or SVG · up to 5MB
+        </p>
+        {data.company_logo_url ? (
+          <div className="mt-1.5 flex items-center gap-3 rounded-lg border border-border bg-card p-3">
+            <img
+              src={data.company_logo_url}
+              alt="Company logo"
+              className="h-14 w-14 object-contain bg-white rounded border border-border"
+              data-testid="onboarding-logo-preview"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-muted-foreground truncate">{data.company_logo_url}</p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setField("company_logo_url", "");
+                setField("company_logo_thumbnail", "");
+              }}
+              data-testid="onboarding-logo-remove"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <label
+            className="mt-1.5 flex items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/30 px-4 py-5 cursor-pointer hover:bg-secondary/50 transition-colors"
+            data-testid="onboarding-logo-upload-label"
+          >
+            {uploadingLogo ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Uploading…</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Click to upload your logo
+                </span>
+              </>
+            )}
+            <input
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
+              className="sr-only"
+              data-testid="onboarding-logo-input"
+              onChange={(e) => onLogoChosen(e.target.files?.[0])}
+              disabled={uploadingLogo}
+            />
+          </label>
+        )}
+        {logoError && (
+          <p className="text-xs text-rose-600 mt-1.5">{logoError}</p>
+        )}
       </div>
 
       <div>
@@ -537,14 +641,60 @@ function Phase3Form({ data, setArrayItem, setField }) {
           />
         </div>
         <div>
-          <Label className="text-sm">Budget</Label>
+          <Label className="text-sm inline-flex items-center gap-1.5">
+            <Phone className="h-3.5 w-3.5" /> Phone number
+          </Label>
           <Input
-            value={data.budget || ""}
-            onChange={(e) => setField("budget", e.target.value)}
-            placeholder='e.g. "$8,995 (Custom Build)"'
-            data-testid="onboarding-budget"
+            type="tel"
+            value={data.phone || ""}
+            onChange={(e) => setField("phone", e.target.value)}
+            placeholder='e.g. "+1 415 555 0123"'
+            data-testid="onboarding-phone"
             className="mt-1.5"
           />
+        </div>
+      </div>
+
+      {/* Best time to call — structured dropdown + timezone */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <Label className="text-sm inline-flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" /> Best time to call
+          </Label>
+          <select
+            value={data.best_time_to_call || ""}
+            onChange={(e) => setField("best_time_to_call", e.target.value)}
+            data-testid="onboarding-best-time"
+            className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <option value="">— Choose a window —</option>
+            <option value="morning">Morning (9 AM – 12 PM)</option>
+            <option value="afternoon">Afternoon (12 PM – 5 PM)</option>
+            <option value="evening">Evening (5 PM – 8 PM)</option>
+            <option value="anytime">Anytime within business hours</option>
+          </select>
+        </div>
+        <div>
+          <Label className="text-sm">Timezone</Label>
+          <select
+            value={data.best_time_timezone || ""}
+            onChange={(e) => setField("best_time_timezone", e.target.value)}
+            data-testid="onboarding-best-time-timezone"
+            className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <option value="">— Choose your timezone —</option>
+            <option value="PT">PT — Pacific (US/Canada)</option>
+            <option value="MT">MT — Mountain (US/Canada)</option>
+            <option value="CT">CT — Central (US/Canada)</option>
+            <option value="ET">ET — Eastern (US/Canada)</option>
+            <option value="GMT">GMT — UK / Western Europe</option>
+            <option value="CET">CET — Central Europe</option>
+            <option value="IST">IST — India</option>
+            <option value="SGT">SGT — Singapore / SE Asia</option>
+            <option value="JST">JST — Japan / Korea</option>
+            <option value="AEST">AEST — Sydney</option>
+            <option value="other">Other (mention in goals above)</option>
+          </select>
         </div>
       </div>
     </div>

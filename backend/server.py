@@ -74,6 +74,14 @@ from contact_routes import (  # noqa: E402
     client_contact_router,
     contact_admin_router,
 )
+from publitio_routes import (  # noqa: E402
+    publitio_admin_router,
+    publitio_client_router,
+)
+from google_drive_routes import (  # noqa: E402
+    gdrive_admin_router,
+    gdrive_oauth_router,
+)
 from ab_test_routes import public_ab_router, ab_admin_router  # noqa: E402
 from nifty_workspaces_routes import nifty_workspaces_router  # noqa: E402
 from google_calendar_client import GoogleCalendarClient  # noqa: E402
@@ -351,6 +359,10 @@ api.include_router(demo_router)
 api.include_router(public_tour_router)
 api.include_router(client_contact_router)
 api.include_router(contact_admin_router)
+api.include_router(publitio_client_router)
+api.include_router(publitio_admin_router)
+api.include_router(gdrive_admin_router)
+api.include_router(gdrive_oauth_router)
 api.include_router(public_ab_router)
 api.include_router(ab_admin_router)
 api.include_router(nifty_workspaces_router)
