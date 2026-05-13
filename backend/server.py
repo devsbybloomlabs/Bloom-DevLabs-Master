@@ -65,6 +65,7 @@ from project_brief_routes import (  # noqa: E402
     brief_admin_router,
     brief_client_router,
 )
+from project_mode_routes import pm_admin_router  # noqa: E402
 from demo_routes import demo_router  # noqa: E402
 from public_tour_routes import public_tour_router  # noqa: E402
 from contact_routes import (  # noqa: E402
@@ -333,6 +334,7 @@ api.include_router(support_public_router)
 api.include_router(support_client_router)
 api.include_router(brief_admin_router)
 api.include_router(brief_client_router)
+api.include_router(pm_admin_router)
 api.include_router(demo_router)
 api.include_router(public_tour_router)
 api.include_router(client_contact_router)

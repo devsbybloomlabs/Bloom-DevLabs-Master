@@ -1,0 +1,33 @@
+{
+  "summary": "Phase F (Project Mode Kanban) + Brief milestone auto-seed fully verified. Backend: 243/243 pytests PASS (includes 5 new tests in test_project_mode.py + 1 extended assertion block in test_project_brief_e2e.py for milestone auto-seed). Frontend E2E: admin /admin/project-mode loads with sidebar entry, project rail, new-project dialog, kanban columns with per-column '+' add buttons, task creation, task-detail dialog with status pills + editable fields + save/delete + comment thread, status transitions, and comment posting — all flows succeed via the documented data-testid selectors. Milestone auto-seed on brief approval produces the exact 5 titles (Discovery & Brief Sign-off [in_progress], Design Language, Build — Core flows, QA & Polish, Launch [is_final_deliverable=true]) and is idempotent on second approval.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_project_mode.py",
+    "/app/backend/tests/test_project_brief_e2e.py",
+    "/app/test_reports/pytest/iteration_21_new.xml",
+    "/app/test_reports/pytest/iteration_21_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "project_mode_routes.py — task done→milestone auto-complete is solid; consider adding an audit log entry on the milestone (current code mutates status + completion_date only) so the timeline UI can show 'auto-completed via task X'. Non-blocking.",
+    "Brief auto-seed (_seed_milestones_from_brief in project_brief_routes.py) keys idempotency on (client_email, project_name). If project_name is ever edited post-approval the second call would create dupes — currently approval is one-way so this is safe, but worth a defensive comment.",
+    "ProjectModeAdmin.jsx is a large single-file page; consider splitting the task-detail dialog into its own component to keep the rail/board state pure. Non-blocking, code is readable as-is.",
+    "Frontend new-project dialog has 4 inputs (name, client_email, color hex, color picker?) — submit succeeds with just name+email which is the intended path; verified."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (243/243)", "frontend": "100%"},
+  "test_credentials": "Admin: founder@thesalvador.group / admin123. Client: testclient@bybloomlabs.com / clientpass123.",
+  "seed_data_creation": "Created 1 ephemeral Project Mode project ('E2E PM Test {ts}') + 1 task + 1 comment during Playwright UI test. ALL CLEANED UP at end of run via direct mongo deletes (pm_projects, pm_tasks, pm_comments). Backend pytests are self-cleaning via fixture teardowns.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase F (Project Mode in-house Kanban) is production-ready. Backend has 243 passing tests covering: brief auto-seed milestones (titles, statuses, is_final_deliverable, idempotency), PM project CRUD with auto-slug + company_id resolution, PM task lifecycle (status/priority validation, order_idx assignment, status transitions, board grouping), task→milestone auto-completion, comment add/list with cascade-on-task-delete, and auth + 404 guards. Frontend testids verified: project-mode-admin, pm-project-rail, pm-new-project-btn, pm-new-project-dialog, pm-new-project-submit, pm-col-add-{status}, pm-new-task-dialog, pm-new-task-submit, pm-task-card-{id}, pm-task-detail-dialog, pm-task-move-{status} (5 pills), pm-task-save, pm-task-delete, pm-task-comments, pm-task-comment-input, pm-task-comment-submit. Sidebar entry 'Project Mode' is present with KanbanSquare icon. To rerun: `export E2E_API_BASE=https://ai-scope-builder.preview.emergentagent.com/api && pytest /app/backend/tests/ -q --ignore=/app/backend/tests/test_phase11.py --ignore=/app/backend/tests/test_phase12.py --ignore=/app/backend/tests/test_phase13.py --ignore=/app/backend/tests/test_phase15.py --ignore=/app/backend/tests/test_master_workflow.py`.",
+  "rca_of_the_issue": "No bugs found. First Playwright run did not actually wait for the login navigation (used a guess-based wait_for_url('**/admin/**') against the login URL which matched immediately); recovered by using page.expect_navigation context and explicitly waiting for networkidle. NOT a product bug — testing-script-only correction."
+}

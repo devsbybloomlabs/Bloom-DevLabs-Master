@@ -25,6 +25,7 @@ import InvoicesAdmin from "@/pages/admin/InvoicesAdmin";
 import SubscriptionsAdmin from "@/pages/admin/SubscriptionsAdmin";
 import LeadMagnetsAdmin from "@/pages/admin/LeadMagnetsAdmin";
 import MilestonesAdmin from "@/pages/admin/MilestonesAdmin";
+import ProjectModeAdmin from "@/pages/admin/ProjectModeAdmin";
 import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
 import CompaniesAdmin from "@/pages/admin/CompaniesAdmin";
@@ -127,6 +128,8 @@ function App() {
                 <Route path="subscriptions" element={<SubscriptionsAdmin />} />
                 <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
                 <Route path="milestones" element={<MilestonesAdmin />} />
+                <Route path="project-mode" element={<ProjectModeAdmin />} />
+                <Route path="project-mode/:projectId" element={<ProjectModeAdmin />} />
                 <Route path="clients" element={<ClientsAdmin />} />
                 <Route path="companies" element={<CompaniesAdmin />} />
                 <Route path="integrations" element={<IntegrationsAdmin />} />

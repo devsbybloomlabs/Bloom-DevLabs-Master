@@ -27,6 +27,7 @@ import {
   Plug,
   ImagePlus,
   LifeBuoy,
+  KanbanSquare,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { BRAND } from "@/lib/brand";
@@ -49,6 +50,7 @@ const NAV = [
   { to: "/admin/onboarding", label: "Onboarding", icon: ClipboardList, group: "Sales" },
   { to: "/admin/support-clearance", label: "Support Clearance", icon: ShieldCheck, group: "Sales" },
   { to: "/admin/milestones", label: "Milestones", icon: Target, group: "Sales" },
+  { to: "/admin/project-mode", label: "Project Mode", icon: KanbanSquare, group: "Sales" },
   { to: "/admin/lead-magnets", label: "Lead Magnets", icon: Sparkles, group: "Authority" },
   { to: "/admin/credibility", label: "Credibility Hub", icon: ShieldCheck, group: "Authority" },
   { to: "/admin/case-studies", label: "Case Studies", icon: Award, group: "Authority" },

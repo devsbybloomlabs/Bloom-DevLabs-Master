@@ -39,7 +39,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -177,6 +177,98 @@ def build_prompts_from_onboarding(onboarding: Dict[str, Any]) -> Dict[str, str]:
         "function": generate_function_prompt(onboarding.get("phase2") or {}),
         "company": generate_company_prompt(onboarding.get("phase3") or {}),
     }
+
+
+# =========================================================================
+# Auto-seed milestones on brief approval
+# =========================================================================
+# Default 5-phase build plan. Each phase becomes a Milestone the client sees
+# inside the animated Project Timeline.  Phase 1 (Discovery) is marked
+# `in_progress` on approval so the client gets the "we already started" moment.
+DEFAULT_MILESTONE_PLAN: List[Dict[str, Any]] = [
+    {
+        "title": "Discovery & Brief Sign-off",
+        "description": "Brief approved. Team is reviewing scope, success metrics, and timeline.",
+        "status": "in_progress",
+        "offset_days": 3,
+    },
+    {
+        "title": "Design Language",
+        "description": "Style tile, color system, typography, hero concepts.",
+        "status": "pending",
+        "offset_days": 10,
+    },
+    {
+        "title": "Build — Core flows",
+        "description": "Frontend + backend for the highest-leverage user journeys.",
+        "status": "pending",
+        "offset_days": 28,
+    },
+    {
+        "title": "QA & Polish",
+        "description": "Cross-browser, mobile, accessibility, copy pass, edge cases.",
+        "status": "pending",
+        "offset_days": 38,
+    },
+    {
+        "title": "Launch",
+        "description": "DNS, monitoring, analytics, hand-off, founder walkthrough.",
+        "status": "pending",
+        "offset_days": 45,
+        "is_final_deliverable": True,
+        "notify_client_on_complete": True,
+    },
+]
+
+
+async def _seed_milestones_from_brief(
+    db: AsyncIOMotorDatabase, brief: Dict[str, Any]
+) -> int:
+    """Insert default milestones tied to the client's project on approval.
+
+    Idempotent — skips creation when this client already has milestones for
+    this exact project_name. Returns the number of milestones inserted.
+    """
+    client_email = brief.get("client_email")
+    project_name = (brief.get("project_name") or "Project").strip()
+    if not client_email:
+        return 0
+    existing = await db.milestones.count_documents(
+        {"client_email": client_email.lower(), "project_name": project_name}
+    )
+    if existing > 0:
+        return 0  # Already seeded — leave whatever's there alone.
+
+    now = datetime.now(timezone.utc)
+    docs: List[Dict[str, Any]] = []
+    for plan in DEFAULT_MILESTONE_PLAN:
+        due = now + timedelta(days=int(plan.get("offset_days") or 7))
+        docs.append(
+            {
+                "id": str(uuid.uuid4()),
+                "client_email": client_email.lower(),
+                "project_name": project_name,
+                "title": plan["title"],
+                "status": plan.get("status", "pending"),
+                "description": plan.get("description", ""),
+                "is_final_deliverable": bool(plan.get("is_final_deliverable", False)),
+                "notify_client_on_complete": bool(
+                    plan.get("notify_client_on_complete", False)
+                ),
+                "nifty_task_id": None,
+                "due_date": due.isoformat(),
+                "completion_date": None,
+                "blocked_reason": None,
+                "blocked_eta": None,
+                "notes": [],
+                "last_updated": now.isoformat(),
+                "created_at": now.isoformat(),
+                "seeded_from_brief": brief.get("id"),
+            }
+        )
+    if docs:
+        await db.milestones.insert_many(docs)
+    return len(docs)
 
 
 # =========================================================================
@@ -482,6 +574,9 @@ async def approve_brief(
             }
         },
     )
+    # ----- Auto-seed initial milestones from the approved brief -----
+    # Tiny "wow we already started" moment for the client.
+    seeded = await _seed_milestones_from_brief(db, brief)
     if brief.get("company_id"):
         await log_activity(
             db,
@@ -489,7 +584,7 @@ async def approve_brief(
             type="brief.approved",
             title=f"Brief APPROVED by client — {brief['project_name']}",
             actor=f"client:{client['email']}",
-            meta={"brief_id": brief_id, "approved_at": now},
+            meta={"brief_id": brief_id, "approved_at": now, "milestones_seeded": seeded},
         )
     # Notify founder via email + Slack
     try:

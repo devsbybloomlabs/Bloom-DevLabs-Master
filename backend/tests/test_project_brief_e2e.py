@@ -131,6 +131,7 @@ def _delete_onboarding(onboarding_id: str, email: str) -> None:
             await db.onboardings.delete_one({"id": onboarding_id})
             await db.project_briefs.delete_many({"client_email": email})
             await db.clients.delete_many({"email": email})
+            await db.milestones.delete_many({"client_email": email})
         finally:
             client.close()
 
@@ -260,6 +261,20 @@ def test_full_brief_flow(admin_token, seeded):
     assert approved["status"] == "approved"
     assert approved["approved_by_email"] == email
     assert approved["approved_at"] is not None
+
+    # 8b. Milestones auto-seeded on approval ("we already started" moment)
+    r = requests.get(f"{API_BASE}/clients/me/milestones", headers=C, timeout=15)
+    assert r.status_code == 200
+    ms = r.json()
+    titles = [m.get("title") for m in ms]
+    assert "Discovery & Brief Sign-off" in titles
+    assert "Launch" in titles
+    # First milestone should be in_progress
+    first = next(m for m in ms if m["title"] == "Discovery & Brief Sign-off")
+    assert first["status"] == "in_progress"
+    # Final deliverable flag set on Launch
+    launch = next(m for m in ms if m["title"] == "Launch")
+    assert launch["is_final_deliverable"] is True
 
     # 9. Idempotent re-approve
     r = requests.post(
