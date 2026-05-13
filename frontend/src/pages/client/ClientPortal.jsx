@@ -28,9 +28,11 @@ import {
   PartyPopper,
   MessageSquare,
   Download,
+  Sparkles,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import ClientContactPanel from "@/pages/client/ClientContactPanel";
+import ProjectBriefView, { ApprovedBriefsAccordion } from "@/pages/client/ProjectBriefView";
 
 function EmptyState({ icon: Icon = Inbox, title, message }) {
   return (
@@ -78,16 +80,21 @@ function fmt(amount, currency = "USD") {
   }
 }
 
-function OrdersList({ data, loading }) {
+function OrdersList({ data, loading, approvedBriefs }) {
   if (loading) return <Skeleton className="h-32 w-full" />;
   const pp = data?.paypal || [];
   const ah = data?.agencyhandy || [];
   if (!pp.length && !ah.length) {
     return (
-      <EmptyState
-        title="No orders yet"
-        message="Your purchases and project orders will appear here."
-      />
+      <div className="space-y-4">
+        <EmptyState
+          title="No orders yet"
+          message="Your purchases and project orders will appear here."
+        />
+        {Array.isArray(approvedBriefs) && approvedBriefs.length > 0 && (
+          <ApprovedBriefsAccordion briefs={approvedBriefs} />
+        )}
+      </div>
     );
   }
   return (
@@ -138,6 +145,9 @@ function OrdersList({ data, loading }) {
           </CardContent>
         </Card>
       ))}
+      {Array.isArray(approvedBriefs) && approvedBriefs.length > 0 && (
+        <ApprovedBriefsAccordion briefs={approvedBriefs} />
+      )}
     </div>
   );
 }
@@ -565,10 +575,12 @@ export default function ClientPortal() {
   const [milestones, setMilestones] = useState(null);
   const [loading, setLoading] = useState(true);
   const [supportClearance, setSupportClearance] = useState(null);
+  const [pendingBrief, setPendingBrief] = useState(null);
+  const [approvedBriefs, setApprovedBriefs] = useState([]);
 
   // Tab state synced with `?tab=...` URL param so deep-links from emails work
   // (e.g. /portal?tab=invoices, /portal?tab=subscriptions).
-  const VALID_TABS = ["milestones", "orders", "subscriptions", "invoices", "proposals", "contact", "profile"];
+  const VALID_TABS = ["milestones", "orders", "subscriptions", "invoices", "proposals", "brief", "contact", "profile"];
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(VALID_TABS.includes(urlTab) ? urlTab : "milestones");
@@ -580,6 +592,19 @@ export default function ClientPortal() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTab]);
+
+  useEffect(() => {
+    // After the brief is approved (or never existed), drop the tab so the
+    // user doesn't get stranded on an empty view. Only act after the initial
+    // load completes so we don't race the fetch.
+    if (!loading && activeTab === "brief" && !pendingBrief) {
+      setActiveTab("milestones");
+      const next = new URLSearchParams(searchParams);
+      next.delete("tab");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, activeTab, pendingBrief]);
 
   const onTabChange = (value) => {
     setActiveTab(value);
@@ -599,7 +624,7 @@ export default function ClientPortal() {
     setLoading(true);
     const api = clientApi(token);
     try {
-      const [o, s, pl, i, p, ob, ms, sc] = await Promise.allSettled([
+      const [o, s, pl, i, p, ob, ms, sc, pb, ab] = await Promise.allSettled([
         api.get("/clients/me/orders"),
         api.get("/clients/subscriptions"),
         api.get("/clients/subscriptions/plans"),
@@ -608,6 +633,8 @@ export default function ClientPortal() {
         api.get("/clients/me/onboarding"),
         api.get("/clients/me/milestones"),
         api.get("/clients/me/support/clearance"),
+        api.get("/clients/me/briefs/pending"),
+        api.get("/clients/me/briefs/approved"),
       ]);
       setOrders(o.status === "fulfilled" ? o.value.data : null);
       setSubs(s.status === "fulfilled" ? s.value.data : null);
@@ -617,6 +644,8 @@ export default function ClientPortal() {
       setOnboarding(ob.status === "fulfilled" ? ob.value.data : null);
       setMilestones(ms.status === "fulfilled" ? ms.value.data : null);
       setSupportClearance(sc.status === "fulfilled" ? sc.value.data : null);
+      setPendingBrief(pb.status === "fulfilled" ? pb.value.data : null);
+      setApprovedBriefs(ab.status === "fulfilled" ? (ab.value.data || []) : []);
     } finally {
       setLoading(false);
     }
@@ -740,6 +769,12 @@ export default function ClientPortal() {
             <TabsTrigger value="proposals" data-testid="portal-tab-proposals" className="flex-shrink-0">
               <FileText className="h-4 w-4 mr-1.5" /> Proposals
             </TabsTrigger>
+            {pendingBrief && (
+              <TabsTrigger value="brief" data-testid="portal-tab-brief" className="flex-shrink-0 relative">
+                <Sparkles className="h-4 w-4 mr-1.5 text-amber-500" /> Project Brief
+                <span className="ml-1.5 inline-flex h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" aria-hidden />
+              </TabsTrigger>
+            )}
             <TabsTrigger value="contact" data-testid="portal-tab-contact" className="flex-shrink-0">
               <MessageSquare className="h-4 w-4 mr-1.5" /> Support
             </TabsTrigger>
@@ -751,7 +786,7 @@ export default function ClientPortal() {
             <MilestonesList data={milestones} loading={loading} />
           </TabsContent>
           <TabsContent value="orders" className="mt-6">
-            <OrdersList data={orders} loading={loading} />
+            <OrdersList data={orders} loading={loading} approvedBriefs={approvedBriefs} />
           </TabsContent>
           <TabsContent value="subscriptions" className="mt-6">
             <SubscriptionsList
@@ -768,6 +803,15 @@ export default function ClientPortal() {
           <TabsContent value="proposals" className="mt-6">
             <ProposalsList data={proposals} loading={loading} />
           </TabsContent>
+          {pendingBrief && (
+            <TabsContent value="brief" className="mt-6">
+              <ProjectBriefView
+                brief={pendingBrief}
+                api={clientApi(token)}
+                onApproved={loadAll}
+              />
+            </TabsContent>
+          )}
           <TabsContent value="contact" className="mt-6">
             <ClientContactPanel token={token} />
           </TabsContent>
