@@ -33,11 +33,13 @@ from fastapi import (
     Form,
     HTTPException,
     Request,
+    Response,
     UploadFile,
 )
 from fastapi.responses import FileResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+import object_storage
 from auth import get_current_user
 from client_routes import get_current_client
 from db_utils import prepare_for_mongo, serialize_doc
@@ -124,18 +126,46 @@ async def submit_contact(
         if len(contents) > MAX_UPLOAD_BYTES:
             raise HTTPException(413, "File must be under 10MB")
         if contents:
+            # Try object storage first; fall back to disk if storage is unavailable
+            # (keeps the contact form functional even during outages or in test
+            # environments without EMERGENT_LLM_KEY).
+            attachment_id = uuid4().hex
             ext = Path(file.filename).suffix.lower()[:10] or ".bin"
-            stored_name = f"{uuid4().hex}{ext}"
-            stored_path = _ensure_upload_dir() / stored_name
-            async with aiofiles.open(stored_path, "wb") as fh:
-                await fh.write(contents)
+            content_type = (
+                file.content_type or mimetypes.guess_type(file.filename)[0]
+            )
+            client_email_lc = (client.get("email") or "").lower()
+            storage_path: Optional[str] = None
+            disk_path: Optional[str] = None
+            try:
+                rel = f"contact-attachments/{client_email_lc}/{attachment_id}{ext}"
+                result = object_storage.put_object(
+                    rel, contents, content_type or "application/octet-stream"
+                )
+                storage_path = result["path"]
+            except object_storage.StorageDisabled:
+                # Fall through to disk
+                pass
+            except Exception as exc:
+                log.warning(
+                    "Object storage put failed for contact attachment, falling back to disk: %s",
+                    exc,
+                )
+
+            if not storage_path:
+                stored_name = f"{attachment_id}{ext}"
+                disk_target = _ensure_upload_dir() / stored_name
+                async with aiofiles.open(disk_target, "wb") as fh:
+                    await fh.write(contents)
+                disk_path = str(disk_target)
+
             attachment_meta = {
-                "id": stored_name,
+                "id": attachment_id,
                 "original_name": file.filename,
                 "size_bytes": len(contents),
-                "content_type": file.content_type
-                or mimetypes.guess_type(file.filename)[0],
-                "stored_path": str(stored_path),
+                "content_type": content_type,
+                "storage_path": storage_path,  # set if uploaded to object storage
+                "stored_path": disk_path,  # set if fell back to disk
             }
 
     client_email = client.get("email")
@@ -200,7 +230,9 @@ async def submit_contact(
     fresh = await db.client_contacts.find_one({"id": contact_id}, {"_id": 0})
     if fresh and fresh.get("attachment"):
         fresh["attachment"] = {
-            k: v for k, v in fresh["attachment"].items() if k != "stored_path"
+            k: v
+            for k, v in fresh["attachment"].items()
+            if k not in ("stored_path", "storage_path")
         }
     return {
         "contact": serialize_doc(fresh),
@@ -224,7 +256,9 @@ async def list_my_contacts(
     for d in docs:
         if d.get("attachment"):
             d["attachment"] = {
-                k: v for k, v in d["attachment"].items() if k != "stored_path"
+                k: v
+                for k, v in d["attachment"].items()
+                if k not in ("stored_path", "storage_path")
             }
     return [serialize_doc(d) for d in docs]
 
@@ -236,7 +270,8 @@ async def download_attachment(
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """Owner-only file download. Verifies the requesting client matches the
-    contact's `client_email` before serving."""
+    contact's `client_email` before serving. Supports both new object-storage
+    attachments and legacy disk-stored ones (backward compat)."""
     contact = await db.client_contacts.find_one(
         {
             "attachment.id": attachment_id,
@@ -246,14 +281,36 @@ async def download_attachment(
     )
     if not contact or not contact.get("attachment"):
         raise HTTPException(404, "Not found")
-    stored_path = Path(contact["attachment"].get("stored_path") or "")
-    if not stored_path.exists():
-        raise HTTPException(410, "File no longer available")
-    return FileResponse(
-        path=stored_path,
-        media_type=contact["attachment"].get("content_type") or "application/octet-stream",
-        filename=contact["attachment"].get("original_name") or attachment_id,
-    )
+    att = contact["attachment"]
+    content_type = att.get("content_type") or "application/octet-stream"
+    filename = att.get("original_name") or attachment_id
+
+    # 1. New path — object storage
+    storage_path = att.get("storage_path")
+    if storage_path:
+        try:
+            data, _ = object_storage.get_object(storage_path)
+        except Exception as exc:
+            log.warning("Object storage fetch failed for %s: %s", storage_path, exc)
+            raise HTTPException(410, "File no longer available")
+        return Response(
+            content=data,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            },
+        )
+
+    # 2. Legacy path — local disk
+    disk_path = Path(att.get("stored_path") or "")
+    if disk_path and disk_path.exists():
+        return FileResponse(
+            path=disk_path,
+            media_type=content_type,
+            filename=filename,
+        )
+
+    raise HTTPException(410, "File no longer available")
 
 
 # =========================================================================

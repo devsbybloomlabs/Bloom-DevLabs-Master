@@ -11,6 +11,7 @@
  * and the Send Quotation CTA.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { authClient, useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -732,6 +733,7 @@ function NewProspectDialog({ open, onOpenChange, api, onCreated, defaultStatus }
 export default function PipelinePage() {
   const { token } = useAuth();
   const api = useMemo(() => authClient(token), [token]);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -756,6 +758,24 @@ export default function PipelinePage() {
     document.title = "Pipeline — Bloom Labs";
     load();
   }, [load]);
+
+  // Auto-open a prospect drawer when ?focus={id} is present (deep-link from
+  // the dashboard's "Today's coaching" card).
+  useEffect(() => {
+    const focus = searchParams.get("focus");
+    if (!focus || !board) return;
+    for (const stage of Object.keys(board.columns || {})) {
+      const hit = (board.columns[stage] || []).find((p) => p.id === focus);
+      if (hit) {
+        setOpenProspect(hit);
+        const next = new URLSearchParams(searchParams);
+        next.delete("focus");
+        setSearchParams(next, { replace: true });
+        break;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board, searchParams]);
 
   const totals = board?.totals || { prospects: 0, closed_revenue: 0, open_value: 0 };
 

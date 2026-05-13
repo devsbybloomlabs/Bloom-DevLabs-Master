@@ -1,0 +1,40 @@
+{
+  "summary": "Tested 3 improvements end-to-end: (A) Today's Coaching widget on /admin/dashboard, (B) Contact attachment retrofit to Emergent Object Storage, (C) Portal Support tab ticket pill + ThriveDesk copy cleanup. Full backend regression PASSED: 262/262 pytests in ~157s across all phases (ex-phase11/12/13/15/master per main agent's instructions). All 6 new pytests in test_coaching_and_attachments.py PASS. Frontend Playwright verified coaching card renders, refresh works, item click navigates to /admin/pipeline and auto-opens ProspectDrawer with ?focus= cleaned from URL; portal Support tab shows BL-2026-0019 ticket pill with click-to-copy and 'Slack + email' subtitle (ThriveDesk removed). No critical or minor backend/frontend issues.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ProspectDrawer (via coaching item click)", "issues": ["Console warning: 'Missing Description or aria-describedby={undefined} for {DialogContent}' — a11y warning only, drawer functions correctly. Consider adding aria-describedby to the Radix DialogContent for screen readers."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_coaching_and_attachments.py",
+    "/app/test_reports/pytest/coaching_attachments.xml",
+    "/app/test_reports/pytest/full_regression.xml"
+  ],
+  "action_items": [
+    "Optional polish: add aria-describedby to ProspectDrawer DialogContent to silence Radix a11y console warning (not blocking)."
+  ],
+  "critical_code_review_comments": [
+    "GET /api/pipeline/coaching/today correctly excludes won/lost, caps limit at 10, requires auth (401/403 without token), returns deterministic ranking (proposal $25k > new $0) — verified.",
+    "Contact attachment now writes to Emergent Object Storage with path prefix 'bybloomlabs/contact-attachments/...'; storage_path populated, legacy stored_path is None for new uploads. Public response correctly strips BOTH path fields — no internal leak.",
+    "Cross-client GET /api/clients/me/contact/attachment/{id} returns 404 (email-scoped filter hides existence — good security pattern, no auth leak).",
+    "Ticket pill rendered as monospace BL-YYYY-#### with proper data-testid 'contact-history-ticket-{id}'; navigator.clipboard.writeText verified working in browser context.",
+    "Subtitle copy updated correctly: 'Slack + ThriveDesk' -> 'Slack + email'. No stray 'ThriveDesk' string anywhere in /portal Support tab body.",
+    "PipelinePage useSearchParams ?focus={id} correctly auto-opens ProspectDrawer for the named prospect and removes the query param from URL after open — verified clean URL post-click.",
+    "Coaching card UI renders 2 items when only 2 active prospects exist (gracefully handles <3 case); refresh button hits the endpoint and re-renders without errors.",
+    "Backend regression suite 262/262 PASS confirms no regressions to contact_routes admin endpoints (POST /api/admin/portal-contacts and /resolve), project files, support triage, breezedocs, paypal, invoices, onboarding, phase16, phase18.5 etc."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (262/262 + 6/6 new)", "frontend": "100% (all critical flows pass; 1 a11y console warning)"},
+  "test_credentials": "Admin founder@thesalvador.group/admin123 · Client testclient@bybloomlabs.com/clientpass123 (both verified working)",
+  "seed_data_creation": "test_coaching_and_attachments.py self-cleans (deletes seeded prospects/clients/client_contacts in fixtures finally blocks). Existing testclient ticket BL-2026-0019 from smoke tests still present in DB — used to verify ticket pill rendering in /portal Support tab.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend suite is 262/262 green (full run ~2.5 min, exclude phase11/12/13/15/master per main agent). Coaching card lives at /admin/dashboard left column under 'Today's coaching' heading — testids: coaching-card, coaching-card-refresh, coaching-item-{0..N-1}. Pipeline auto-focus param: /admin/pipeline?focus={prospect_id}. Portal ticket pill testid pattern: contact-history-ticket-{contact_id}, shows BL-YYYY-#### in monospace and copies on click via navigator.clipboard. Contact attachments now use Emergent Object Storage (bybloomlabs/contact-attachments/ prefix); legacy disk fallback still works via stored_path field for backward compat. EMERGENT_LLM_KEY in /app/backend/.env is required for object storage uploads to succeed.",
+  "rca of the issue": "N/A — no bugs found this iteration."
+}

@@ -167,7 +167,7 @@ export default function ClientContactPanel({ token }) {
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             We typically respond within 2 hours during business days. Your message
-            routes directly to our support team in Slack + ThriveDesk.
+            routes directly to our support team via Slack + email.
           </p>
         </CardHeader>
         <CardContent>
@@ -310,6 +310,23 @@ export default function ClientContactPanel({ token }) {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
+                          {c.ticket_ref && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                navigator.clipboard?.writeText(c.ticket_ref).then(
+                                  () => toast.success(`${c.ticket_ref} copied`),
+                                  () => {}
+                                );
+                              }}
+                              title="Click to copy"
+                              className="font-mono text-[10px] font-semibold bg-secondary/70 hover:bg-secondary px-2 py-0.5 rounded transition-colors cursor-copy"
+                              data-testid={`contact-history-ticket-${c.id}`}
+                            >
+                              {c.ticket_ref}
+                            </button>
+                          )}
                           <span className="font-medium text-sm truncate">{c.subject}</span>
                           <Badge className={`${pri.color} border-0 text-[10px] capitalize`}>
                             {c.priority}

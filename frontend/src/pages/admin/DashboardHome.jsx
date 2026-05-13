@@ -25,6 +25,7 @@ import BlockTimer from "@/components/admin/BlockTimer";
 import MRRWidget from "@/components/admin/MRRWidget";
 import IntegrationsHealthStrip from "@/components/admin/IntegrationsHealthStrip";
 import DemoModeCard from "@/components/admin/DemoModeCard";
+import TodaysCoachingCard from "@/components/admin/TodaysCoachingCard";
 
 const BLOCK_BG = {
   OUTREACH: "bg-[#3B82F6]/10 text-[#1E3A8A] border-[#3B82F6]/30",
@@ -222,6 +223,9 @@ export default function DashboardHome() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-6 min-w-0">
           <BlockTimer blocks={routine?.blocks || []} />
+
+          {/* Today's coaching — 3 hottest prospects to nudge */}
+          <TodaysCoachingCard />
 
           {/* MRR + revenue actions snapshot from Agency Handy */}
           <MRRWidget />

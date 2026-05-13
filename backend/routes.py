@@ -488,6 +488,92 @@ async def pipeline_summary(db=Depends(get_db)) -> Dict[str, Any]:
 # ============================================================
 PIPELINE_STAGES = ("new", "contacted", "qualified", "proposal", "won", "lost")
 
+# Stage weights — closer to "won" gets more points.
+PIPELINE_STAGE_WEIGHTS = {
+    "new": 1.0,
+    "contacted": 2.0,
+    "qualified": 3.5,
+    "proposal": 5.0,
+    # Won/lost intentionally excluded from coaching surfacing.
+}
+
+
+@pipeline_router.get("/coaching/today")
+async def coaching_today(
+    request: Request,
+    db=Depends(get_db),
+    limit: int = 3,
+) -> Dict[str, Any]:
+    """Surfaces the prospects most likely to close this week.
+
+    Score = stage_weight × (1 + days_since_activity / 7) × log(1 + deal_value).
+    The aging term boosts deals that have gone cold, the deal_value term keeps
+    high-ticket prospects on top. Won/lost are excluded.
+
+    Each card also carries the latest AI next-action (fallback-only, fast).
+    """
+    import math
+    from datetime import datetime, timezone
+
+    candidates = await db.prospects.find(
+        {"status": {"$in": list(PIPELINE_STAGE_WEIGHTS.keys())}},
+        {"_id": 0},
+    ).to_list(2000)
+    now = datetime.now(timezone.utc)
+    scored: List[Dict[str, Any]] = []
+    for p in candidates:
+        stage = p.get("status", "new")
+        weight = PIPELINE_STAGE_WEIGHTS.get(stage, 1.0)
+        # days since the last touch (or creation if never touched)
+        last_iso = p.get("last_activity_at") or p.get("updated_at") or p.get("created_at")
+        try:
+            last = datetime.fromisoformat((last_iso or "").replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            last = now
+        days_stale = max(0.0, (now - last).total_seconds() / 86400.0)
+        # Cap the aging boost — at 14 days we already mark it max-stale.
+        age_boost = 1.0 + min(days_stale, 14.0) / 7.0
+        try:
+            dv = float(p.get("deal_value") or 0)
+        except (TypeError, ValueError):
+            dv = 0.0
+        value_boost = math.log1p(max(dv, 0))
+        score = weight * age_boost * (value_boost + 0.5)
+        scored.append(
+            {
+                "id": p["id"],
+                "name": p.get("name"),
+                "company": p.get("company"),
+                "email": p.get("email"),
+                "linkedin": p.get("linkedin"),
+                "status": stage,
+                "deal_value": p.get("deal_value"),
+                "next_action": p.get("next_action"),
+                "days_stale": round(days_stale, 1),
+                "score": round(score, 2),
+            }
+        )
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    top = scored[: max(1, min(int(limit or 3), 10))]
+
+    # Stage-aware fallback action so each card always has SOMETHING.
+    fallbacks = {
+        "new": "Send a 90-second intro Loom outlining how Bloom solves their #1 pain.",
+        "contacted": "Reply on LinkedIn referencing their most recent post; book a 15-min slot.",
+        "qualified": "Schedule a 30-min discovery this week; pre-share the agenda.",
+        "proposal": "Send a follow-up checking what's missing from the proposal to close it.",
+    }
+    for card in top:
+        if not card.get("next_action"):
+            card["next_action"] = fallbacks.get(card["status"], fallbacks["new"])
+
+    return {
+        "generated_at": now.isoformat(),
+        "total_candidates": len(candidates),
+        "items": top,
+    }
+
 
 @pipeline_router.get("/board")
 async def pipeline_board(db=Depends(get_db)) -> Dict[str, Any]:
