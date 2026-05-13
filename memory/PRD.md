@@ -24,6 +24,47 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Phase G — Breakcold-style Pipeline Kanban + AI suggest (Feb 2026)
+**Goal**: Replace the table-style `/admin/pipeline` with a rich Kanban + activity stream + AI-powered next-action coach. Keeps the existing `prospects` collection — adds a kanban view, a `pipeline_activity` audit log, and three new endpoints.
+
+**Backend (`routes.py::pipeline_router`):**
+- `GET /api/pipeline/board` — Kanban-grouped {stages, columns: {new|contacted|qualified|proposal|won|lost: []}, totals: {prospects, closed_revenue, open_value, by_stage}}.
+- `POST /api/pipeline/prospects/{id}/move {status}` — drag-and-drop transition with HTTP-400 enum validation. Persists `last_activity_at` and writes a `stage.changed` event to `pipeline_activity`. Idempotent (same-stage move is a no-op).
+- `POST/GET /api/pipeline/prospects/{id}/activity` — log a touch (types: note/call/email/linkedin_dm/meeting) + list (newest first). Bumps `last_activity_at`.
+- `GET /api/pipeline/prospects/{id}/ai-suggestion` — single AI-generated next action via OpenRouter + the existing emergent LLM key. Includes a deterministic stage-aware fallback so the UI **never** breaks if the LLM is unreachable. Returns `{action, source: "ai"|"fallback"}`.
+
+**Frontend (`PipelinePage.jsx`):**
+- 6-column Kanban (New / Contacted / Qualified / Proposal / Won / Lost) with HTML5 drag-and-drop **plus** keyboard-accessible "Move ▾" menu on every card (testable + screen-reader friendly).
+- Rich card: avatar initials, name + company chip, deal-value pill, next-action chip (arrow icon), linkedin/email icon row, last-activity timestamp.
+- 4 stat tiles: Prospects · Open value · Closed revenue · Win rate (% won of total).
+- Click any card → side `Sheet` drawer with:
+  - **AI next action** panel (Suggest button → renders + Apply-to-card button).
+  - **Log a touch** composer with 5 type-buttons (Note / Call / Email / LinkedIn DM / Meeting).
+  - **Activity stream** (chronological, includes auto-logged stage transitions).
+  - Full editable details (Name, Company, Email, LinkedIn, Industry, Deal value, Stage, Source, Next action, Notes).
+  - Save · Send quote (re-uses SendQuotationDialog) · Delete actions.
+
+**Tests** (`test_pipeline_kanban.py`): 8 pytests covering board grouping, move + invalid-stage 400 + 404 + idempotency, activity stream (all 5 types, sort, last_activity_at bump), AI suggestion (`ai` and `fallback` sources), auth guards. **All green.**
+
+### ✅ Team Activity Widget — "team is heads-down" indicator (Feb 2026)
+**Goal**: Tiny but high-impact UX touch on the client portal — when the team is actively working on PM tasks, the client opens the Milestones tab and sees a live pulse card with counts + recent moves. Hides entirely when there's no activity, so clients without active projects don't see empty noise.
+
+**Backend (`project_mode_routes.py::pm_client_router`):**
+- `GET /api/clients/me/team-activity` (client-auth) — aggregates the caller's PM projects + tasks. Returns:
+  - `has_activity` boolean (false when client has 0 PM projects → frontend hides the card)
+  - `projects_count`, `counts` per status, `active_count` (in_progress + review), `completed_this_week`
+  - `recent` — last 5 task updates (title + status + updated_at + project_name + project_color). **`description` is stripped server-side to prevent internal notes leaking**.
+
+**Frontend (`TeamActivityWidget.jsx`):**
+- Renders inside the Milestones tab on `/portal` above the existing animated timeline.
+- Pulsing green dot + "Team is heads-down" label.
+- 3 stat tiles (In progress · In review · Shipped this wk).
+- Rose alert banner when blocked count > 0.
+- Recent activity list (max 5) with color-coded status dots + relative time.
+- Auto-refreshes every 30 seconds while the tab is mounted.
+
+**Tests**: 3 pytests in `test_pipeline_kanban.py` (empty client, populated client with PM tasks, auth-guard).
+
 ### ✅ Phase F — In-house Project Mode (Feb 2026)
 **Goal**: Replace the unreliable Nifty integration with a self-contained Kanban PM suite. Founder + team manage internal task state without depending on a third-party OAuth that keeps disconnecting.
 

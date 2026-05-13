@@ -178,7 +178,7 @@ function ProspectCard({ prospect, onOpen, onDragStart }) {
   );
 }
 
-function Column({ stage, prospects, onCardOpen, onDragStart, onDropTo }) {
+function Column({ stage, prospects, allStages, onCardOpen, onDragStart, onDropTo, onQuickMove }) {
   const [over, setOver] = useState(false);
   return (
     <div className="flex flex-col w-72 shrink-0" data-testid={`pipeline-col-${stage.id}`}>
@@ -211,12 +211,49 @@ function Column({ stage, prospects, onCardOpen, onDragStart, onDropTo }) {
           </p>
         ) : (
           prospects.map((p) => (
-            <ProspectCard
-              key={p.id}
-              prospect={p}
-              onOpen={onCardOpen}
-              onDragStart={onDragStart}
-            />
+            <div key={p.id} className="group relative">
+              <ProspectCard
+                prospect={p}
+                onOpen={onCardOpen}
+                onDragStart={onDragStart}
+              />
+              {/* Quick-move menu — keyboard-accessible & testable alternative to drag-drop */}
+              <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <details className="relative">
+                  <summary
+                    className="list-none cursor-pointer rounded-md bg-background/95 border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`pipeline-card-move-${p.id}`}
+                    aria-label="Move card"
+                  >
+                    Move
+                  </summary>
+                  <div
+                    className="absolute right-0 top-full mt-1 z-20 rounded-md border border-border bg-background shadow-lg p-1 w-32"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {allStages
+                      .filter((s) => s.id !== p.status)
+                      .map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onQuickMove?.(p, s.id);
+                          }}
+                          className="w-full text-left text-xs px-2 py-1 rounded hover:bg-secondary/60 inline-flex items-center gap-1.5"
+                          data-testid={`pipeline-card-move-${p.id}-to-${s.id}`}
+                        >
+                          <span className={`h-1.5 w-1.5 rounded-full ${s.accent}`} />
+                          {s.label}
+                        </button>
+                      ))}
+                  </div>
+                </details>
+              </div>
+            </div>
           ))
         )}
       </div>
@@ -750,6 +787,25 @@ export default function PipelinePage() {
     }
   };
 
+  const onQuickMove = async (prospect, toStage) => {
+    if (!prospect || prospect.status === toStage) return;
+    setBoard((prev) => {
+      if (!prev) return prev;
+      const cols = { ...prev.columns };
+      cols[prospect.status] = (cols[prospect.status] || []).filter((p) => p.id !== prospect.id);
+      cols[toStage] = [{ ...prospect, status: toStage }, ...(cols[toStage] || [])];
+      return { ...prev, columns: cols };
+    });
+    try {
+      await api.post(`/pipeline/prospects/${prospect.id}/move`, { status: toStage });
+      toast.success(`Moved to ${STAGES.find((s) => s.id === toStage)?.label}`);
+      load();
+    } catch (e) {
+      toast.error("Move failed");
+      load();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
@@ -808,10 +864,12 @@ export default function PipelinePage() {
           <Column
             key={s.id}
             stage={s}
+            allStages={STAGES}
             prospects={board?.columns?.[s.id] || []}
             onCardOpen={setOpenProspect}
             onDragStart={onDragStart}
             onDropTo={onDropTo}
+            onQuickMove={onQuickMove}
           />
         ))}
       </div>
