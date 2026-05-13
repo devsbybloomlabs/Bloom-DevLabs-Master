@@ -69,7 +69,6 @@ export default function IntegrationsAdmin() {
           locally so admin pages stay fast.
         </p>
       </div>
-      <NiftyCard />
       <ProvidersGrid />
       <IntegrationCredentialsForm />
       <AbStatsCard />

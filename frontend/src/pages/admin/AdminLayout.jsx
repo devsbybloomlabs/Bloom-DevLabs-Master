@@ -36,24 +36,32 @@ import { toast } from "sonner";
 import NotificationsBell from "@/components/admin/NotificationsBell";
 
 const NAV = [
+  // ── Daily — open this in the morning ───────────────────────────────────
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Daily" },
   { to: "/admin/routine", label: "Today's Routine", icon: CalendarClock, group: "Daily" },
-  { to: "/admin/outreach", label: "Outreach AI", icon: Users, group: "Daily" },
-  { to: "/admin/content", label: "Content AI", icon: PenSquare, group: "Daily" },
-  { to: "/admin/pipeline", label: "Pipeline", icon: TrendingUp, group: "Sales" },
-  { to: "/admin/revenue", label: "Revenue & Clients", icon: CircleDollarSign, group: "Sales" },
-  { to: "/admin/companies", label: "Companies", icon: Users, group: "Sales" },
-  { to: "/admin/paypal-plans", label: "PayPal Plans", icon: Repeat, group: "Sales" },
-  { to: "/admin/paypal-orders", label: "PayPal Orders", icon: Receipt, group: "Sales" },
-  { to: "/admin/invoices", label: "Invoices", icon: FileText, group: "Sales" },
-  { to: "/admin/proposals", label: "Proposals", icon: FileText, group: "Sales" },
-  { to: "/admin/subscriptions", label: "Subscriptions", icon: Repeat, group: "Sales" },
-  { to: "/admin/onboarding", label: "Onboarding", icon: ClipboardList, group: "Sales" },
-  { to: "/admin/support-clearance", label: "Support Clearance", icon: ShieldCheck, group: "Sales" },
-  { to: "/admin/milestones", label: "Milestones", icon: Target, group: "Sales" },
-  { to: "/admin/project-mode", label: "Project Mode", icon: KanbanSquare, group: "Sales" },
-  { to: "/admin/project-files", label: "Project Files", icon: FolderUp, group: "Sales" },
-  { to: "/admin/support-triage", label: "Support Triage", icon: LifeBuoy, group: "Sales" },
+  { to: "/admin/support-triage", label: "Support Triage", icon: LifeBuoy, group: "Daily" },
+
+  // ── Pipeline — win new work ────────────────────────────────────────────
+  { to: "/admin/pipeline", label: "Pipeline", icon: TrendingUp, group: "Pipeline" },
+  { to: "/admin/outreach", label: "Outreach AI", icon: Users, group: "Pipeline" },
+  { to: "/admin/companies", label: "Companies", icon: Users, group: "Pipeline" },
+  { to: "/admin/proposals", label: "Proposals", icon: FileText, group: "Pipeline" },
+
+  // ── Delivery — ship the work ───────────────────────────────────────────
+  { to: "/admin/onboarding", label: "Onboarding", icon: ClipboardList, group: "Delivery" },
+  { to: "/admin/project-mode", label: "Project Mode", icon: KanbanSquare, group: "Delivery" },
+  { to: "/admin/project-files", label: "Project Files", icon: FolderUp, group: "Delivery" },
+  { to: "/admin/milestones", label: "Milestones", icon: Target, group: "Delivery" },
+  { to: "/admin/support-clearance", label: "Support Clearance", icon: ShieldCheck, group: "Delivery" },
+
+  // ── Money ──────────────────────────────────────────────────────────────
+  { to: "/admin/invoices", label: "Invoices", icon: FileText, group: "Money" },
+  { to: "/admin/subscriptions", label: "Subscriptions", icon: Repeat, group: "Money" },
+  { to: "/admin/paypal-plans", label: "PayPal Plans", icon: Repeat, group: "Money" },
+  { to: "/admin/paypal-orders", label: "PayPal Orders", icon: Receipt, group: "Money" },
+
+  // ── Authority — content + brand ────────────────────────────────────────
+  { to: "/admin/content", label: "Content AI", icon: PenSquare, group: "Authority" },
   { to: "/admin/lead-magnets", label: "Lead Magnets", icon: Sparkles, group: "Authority" },
   { to: "/admin/credibility", label: "Credibility Hub", icon: ShieldCheck, group: "Authority" },
   { to: "/admin/case-studies", label: "Case Studies", icon: Award, group: "Authority" },
@@ -61,12 +69,14 @@ const NAV = [
   { to: "/admin/thought-leadership", label: "Thought Leadership", icon: BookOpen, group: "Authority" },
   { to: "/admin/blog", label: "Blog", icon: Newspaper, group: "Authority" },
   { to: "/admin/authority", label: "Authority Score", icon: ShieldCheck, group: "Authority" },
-  { to: "/admin/analytics", label: "Analytics", icon: BarChart3, group: "Insights" },
-  { to: "/admin/integrations", label: "Integrations", icon: Plug, group: "Insights" },
-  { to: "/admin/settings", label: "Settings", icon: SettingsIcon, group: "Insights" },
+
+  // ── System ─────────────────────────────────────────────────────────────
+  { to: "/admin/analytics", label: "Analytics", icon: BarChart3, group: "System" },
+  { to: "/admin/integrations", label: "Integrations", icon: Plug, group: "System" },
+  { to: "/admin/settings", label: "Settings", icon: SettingsIcon, group: "System" },
 ];
 
-const GROUPS = ["Daily", "Sales", "Authority", "Insights"];
+const GROUPS = ["Daily", "Pipeline", "Delivery", "Money", "Authority", "System"];
 
 function SidebarItem({ to, label, Icon, onClick }) {
   return (

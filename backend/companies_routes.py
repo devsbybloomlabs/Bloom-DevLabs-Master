@@ -385,6 +385,28 @@ async def archive_company(
     return {"ok": True}
 
 
+@companies_admin_router.delete("/{company_id}/hard")
+async def hard_delete_company(
+    company_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Permanent delete — cascades to contacts + activity log. Use sparingly."""
+    co = await db.companies.find_one({"id": company_id}, {"_id": 0, "id": 1})
+    if not co:
+        raise HTTPException(404, "Company not found")
+    n_contacts = await db.contacts.delete_many({"company_id": company_id})
+    n_activity = await db.activity_log.delete_many({"company_id": company_id})
+    await db.companies.delete_one({"id": company_id})
+    return {
+        "ok": True,
+        "deleted": {
+            "company": 1,
+            "contacts": n_contacts.deleted_count,
+            "activity": n_activity.deleted_count,
+        },
+    }
+
+
 @companies_admin_router.get("/{company_id}/activity")
 async def get_company_activity(
     company_id: str,
@@ -524,6 +546,23 @@ async def archive_contact(
         {"id": contact_id},
         {"$set": {"archived": True, "updated_at": _now_iso()}},
     )
+    return {"ok": True}
+
+
+@contacts_admin_router.delete("/{contact_id}/hard")
+async def hard_delete_contact(
+    contact_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Permanent delete. Primary contact still can't be removed without promoting another first."""
+    contact = await db.contacts.find_one({"id": contact_id}, {"_id": 0})
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+    if contact.get("is_primary"):
+        raise HTTPException(
+            400, "Primary contact can't be deleted. Promote another contact first."
+        )
+    await db.contacts.delete_one({"id": contact_id})
     return {"ok": True}
 
 

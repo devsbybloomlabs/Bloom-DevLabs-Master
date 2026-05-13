@@ -481,9 +481,36 @@ const MILESTONE_STATUS_META = {
   blocked: { label: "On Hold", icon: PauseCircle, cls: "bg-red-100 text-red-800" },
 };
 
+// Standard build-phase plan — used to project "what's coming next" even
+// when those milestones haven't been seeded yet (e.g. while the brief is
+// still being reviewed).
+const STANDARD_BUILD_MILESTONES = [
+  { title: "Discovery & Brief Sign-off", description: "Brief reviewed, scoped, and signed." },
+  { title: "Design Language", description: "Style tile, color system, typography, hero concepts." },
+  { title: "Build — Core flows", description: "Frontend + backend for the highest-leverage user journeys." },
+  { title: "QA & Polish", description: "Cross-browser, mobile, accessibility, copy pass, edge cases." },
+  { title: "Launch", description: "DNS, monitoring, analytics, hand-off, founder walkthrough." },
+];
+
 function MilestonesList({ data, loading }) {
   if (loading) return <Skeleton className="h-64 w-full" />;
-  return <MilestoneTimeline milestones={data || []} />;
+  const live = data || [];
+  // Map of titles already seeded for this client (so we don't duplicate).
+  const liveTitles = new Set(live.map((m) => (m.title || "").trim()));
+  const upcomingPlaceholders = STANDARD_BUILD_MILESTONES.filter(
+    (p) => !liveTitles.has(p.title)
+  ).map((p) => ({
+    id: `placeholder-${p.title}`,
+    title: p.title,
+    description: p.description,
+    status: "pending",
+    placeholder: true,
+    last_updated: null,
+    due_date: null,
+    notes: [],
+  }));
+  const merged = [...live, ...upcomingPlaceholders];
+  return <MilestoneTimeline milestones={merged} />;
 }
 
 function ProfilePanel({ client, refreshClient, token }) {

@@ -27,10 +27,7 @@ import {
 const META = {
   openrouter: { label: "OpenRouter", icon: Sparkles },
   emailit: { label: "Emailit", icon: Mail },
-  agencyhandy: { label: "AgencyHandy", icon: Users },
   paypal: { label: "PayPal", icon: CreditCard },
-  nifty: { label: "Nifty PM", icon: Activity },
-  approval_studio: { label: "Approval Studio", icon: ImagePlus },
   thrivedesk: { label: "ThriveDesk", icon: LifeBuoy },
   slack: { label: "Slack", icon: MessageSquare },
   google_calendar: { label: "Google Calendar", icon: CalendarDays },

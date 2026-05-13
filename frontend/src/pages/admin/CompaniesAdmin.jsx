@@ -219,49 +219,72 @@ export default function CompaniesAdmin() {
       ) : (
         <div className="space-y-2" data-testid="admin-companies-list">
           {filtered.map((c) => (
-            <button
+            <div
               key={c.id}
-              onClick={() => setDrawerCompanyId(c.id)}
-              className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 hover:shadow-sm transition-all flex items-center gap-4 group"
-              data-testid={`admin-company-row-${c.id}`}
+              className="relative group w-full bg-card border border-border rounded-lg hover:border-primary/40 hover:shadow-sm transition-all"
             >
-              <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm shrink-0">
-                {(c.name || "?").slice(0, 2).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-medium truncate">{c.name}</p>
-                  {c.support_tier && c.support_tier !== "none" && (
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] uppercase tracking-wider ${TIER_STYLES[c.support_tier] || ""}`}
-                    >
-                      {c.support_tier}
-                    </Badge>
-                  )}
-                  {Array.isArray(c.tags) && c.tags.slice(0, 2).map((t) => (
-                    <Badge key={t} variant="outline" className="text-[10px]">
-                      <Tag className="h-2.5 w-2.5 mr-1" />
-                      {t}
-                    </Badge>
-                  ))}
+              <button
+                onClick={() => setDrawerCompanyId(c.id)}
+                className="w-full text-left p-4 flex items-center gap-4 pr-12"
+                data-testid={`admin-company-row-${c.id}`}
+              >
+                <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm shrink-0">
+                  {(c.name || "?").slice(0, 2).toUpperCase()}
                 </div>
-                <p className="text-sm text-muted-foreground truncate flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1">
-                    <Mail className="h-3 w-3" />
-                    {c.primary_email}
-                  </span>
-                  {c.phone && (
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium truncate">{c.name}</p>
+                    {c.support_tier && c.support_tier !== "none" && (
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] uppercase tracking-wider ${TIER_STYLES[c.support_tier] || ""}`}
+                      >
+                        {c.support_tier}
+                      </Badge>
+                    )}
+                    {Array.isArray(c.tags) && c.tags.slice(0, 2).map((t) => (
+                      <Badge key={t} variant="outline" className="text-[10px]">
+                        <Tag className="h-2.5 w-2.5 mr-1" />
+                        {t}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate flex items-center gap-3">
                     <span className="inline-flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      {c.phone}
+                      <Mail className="h-3 w-3" />
+                      {c.primary_email}
                     </span>
-                  )}
-                  {c.domain && <span className="text-xs">· {c.domain}</span>}
-                </p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0" />
-            </button>
+                    {c.phone && (
+                      <span className="inline-flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {c.phone}
+                      </span>
+                    )}
+                    {c.domain && <span className="text-xs">· {c.domain}</span>}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0" />
+              </button>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (!window.confirm(`Delete "${c.name}" PERMANENTLY?\n\nAll contacts and activity history for this company will also be removed. This cannot be undone.`)) return;
+                  try {
+                    await api.delete(`/admin/companies/${c.id}/hard`);
+                    toast.success("Deleted");
+                    load();
+                  } catch (e2) {
+                    toast.error(e2?.response?.data?.detail || "Delete failed");
+                  }
+                }}
+                title="Delete permanently"
+                data-testid={`admin-company-delete-${c.id}`}
+                className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md text-rose-600 hover:bg-rose-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
           ))}
         </div>
       )}

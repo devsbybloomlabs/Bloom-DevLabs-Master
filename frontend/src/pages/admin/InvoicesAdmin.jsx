@@ -249,22 +249,35 @@ export default function InvoicesAdmin() {
     }
   };
 
-  const downloadPdf = async (inv) => {
+  const _adminToken = () =>
+    localStorage.getItem("bloom_admin_token") || localStorage.getItem("auth_token");
+
+  const downloadPdf = async (inv, { inline = false } = {}) => {
     try {
       const headers = {};
-      const token = localStorage.getItem("auth_token");
+      const token = _adminToken();
       if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(`${BACKEND}/api/admin/invoices/${inv.id}/pdf`, { headers });
+      const res = await fetch(`${BACKEND}/api/admin/invoices/${inv.id}/pdf`, {
+        headers,
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${inv.number}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      if (inline) {
+        // Open in a new tab — blob URL keeps the bytes locally, no auth needed.
+        const w = window.open(url, "_blank", "noopener,noreferrer");
+        // Revoke after the tab has loaded it. 60s is safe.
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        if (!w) toast.message("Allow pop-ups to view the invoice");
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${inv.number}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
     } catch (e) {
       toast.error("PDF download failed");
     }
@@ -427,7 +440,7 @@ export default function InvoicesAdmin() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => window.open(`${BACKEND}/api/admin/invoices/${inv.id}/pdf?inline=1`, "_blank")}
+                      onClick={() => downloadPdf(inv, { inline: true })}
                       data-testid={`admin-invoice-view-${inv.id}`}
                     >
                       <ExternalLink className="h-3.5 w-3.5 mr-1.5" />

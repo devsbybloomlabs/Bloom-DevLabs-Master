@@ -51,6 +51,7 @@ UPLOAD_DIR = Path(os.environ.get("UPLOADS_DIR", "/app/backend/uploads"))
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB
 ALLOWED_PRIORITIES = {"low", "medium", "high"}
 FOUNDER_EMAIL = os.environ.get("FOUNDER_EMAIL", "founder@thesalvador.group")
+SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@bybloomlabs.com")
 
 
 def _ensure_upload_dir() -> Path:
@@ -215,6 +216,7 @@ async def submit_contact(
             body=body,
             priority=pri,
             attachment=attachment_meta,
+            db=db,
         )
     except Exception as exc:
         log.warning("Founder notify email failed: %s", exc)
@@ -384,13 +386,53 @@ async def _email_founder_notification(
     body: str,
     priority: str,
     attachment: Optional[Dict[str, Any]],
+    db: AsyncIOMotorDatabase,
 ) -> None:
-    """Forward the contact submission to the founder via Emailit so they can
-    reply directly. Subject includes the ticket ref for clean threading."""
+    """Forward the contact submission to support@ AND founder via Emailit so
+    they can reply directly. Subject includes the ticket ref for clean
+    threading. Payload carries full client metadata so ThriveDesk can attribute
+    + update the contact record."""
     emailit = request.app.state.emailit
     if not getattr(emailit, "is_configured", False):
         return
     base = os.environ.get("APP_BASE_URL", "https://bybloomlabs.com").rstrip("/")
+
+    # Enrich with client company + support tier info so support sees who's writing.
+    client_doc = await db.clients.find_one(
+        {"email": client_email.lower()},
+        {"_id": 0, "phone": 1, "company": 1, "created_at": 1},
+    ) or {}
+    company_doc = await db.companies.find_one(
+        {"primary_email": client_email.lower()},
+        {"_id": 0, "name": 1, "support_uid": 1, "support_tier": 1, "id": 1},
+    ) or {}
+    metadata_rows = []
+    if client_doc.get("phone"):
+        metadata_rows.append(("Phone", client_doc["phone"]))
+    if client_doc.get("company") or company_doc.get("name"):
+        metadata_rows.append(("Company", company_doc.get("name") or client_doc.get("company")))
+    if company_doc.get("support_uid"):
+        metadata_rows.append(("Support UID", company_doc["support_uid"]))
+    if company_doc.get("support_tier"):
+        metadata_rows.append(("Tier", company_doc["support_tier"].upper()))
+    if client_doc.get("created_at"):
+        metadata_rows.append(("Client since", str(client_doc["created_at"])[:10]))
+    portal_company_link = (
+        f"{base}/admin/companies/{company_doc['id']}" if company_doc.get("id") else ""
+    )
+    metadata_html = ""
+    if metadata_rows:
+        rows = "".join(
+            f"<tr><td style='padding:2px 12px 2px 0;color:#64748B;font-size:12px;'>{_esc(k)}</td>"
+            f"<td style='padding:2px 0;font-size:13px;color:#0F172A;'>{_esc(str(v))}</td></tr>"
+            for k, v in metadata_rows
+        )
+        metadata_html = (
+            "<table style='border-collapse:collapse;margin:8px 0 16px;'>"
+            f"{rows}"
+            "</table>"
+        )
+
     attachment_block = ""
     if attachment:
         link = f"{base}/api/clients/me/contact/attachment/{attachment['id']}"
@@ -402,19 +444,27 @@ async def _email_founder_notification(
     pri_color = {"high": "#DC2626", "medium": "#F59E0B", "low": "#64748B"}.get(
         priority.lower(), "#64748B"
     )
+    portal_link_html = (
+        f"<p style='margin:16px 0 0;'><a href='{portal_company_link}' "
+        f"style='color:#1E3A8A;font-size:12px;'>Open company in admin →</a></p>"
+        if portal_company_link
+        else ""
+    )
     html = (
         f"<div style='font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#0F172A;padding:24px;max-width:640px;'>"
         f"<p style='color:#64748B;font-size:12px;margin:0 0 8px;'>Ticket ref</p>"
         f"<p style='font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:600;margin:0 0 16px;color:#1E3A8A;'>{ticket_ref}</p>"
         f"<h2 style='color:#1E3A8A;margin:0 0 8px;'>{_esc(subject)}</h2>"
-        f"<p style='margin:0 0 16px;'>"
+        f"<p style='margin:0 0 4px;'>"
         f"From: <strong>{_esc(client_name)}</strong> &lt;{_esc(client_email)}&gt; · "
         f"Priority: <span style='color:{pri_color};font-weight:600;'>{priority.upper()}</span>"
         f"</p>"
+        f"{metadata_html}"
         f"<div style='border-left:3px solid #1E3A8A;padding:12px 16px;background:#F8FAFC;border-radius:8px;'>"
         f"<p style='margin:0;white-space:pre-wrap;'>{_esc(body)}</p>"
         f"</div>"
         f"{attachment_block}"
+        f"{portal_link_html}"
         f"<p style='color:#94A3B8;font-size:12px;margin-top:24px;'>"
         f"Reply to this email — your response goes straight to the client. "
         f"Paste <code>{ticket_ref}</code> into ThriveDesk to thread."
@@ -423,7 +473,9 @@ async def _email_founder_notification(
     )
     text = (
         f"[{ticket_ref}] {subject}\n\n"
-        f"From: {client_name} <{client_email}> · Priority: {priority.upper()}\n\n"
+        f"From: {client_name} <{client_email}> · Priority: {priority.upper()}\n"
+        + "".join(f"{k}: {v}\n" for k, v in metadata_rows)
+        + "\n"
         f"{body}\n\n"
         + (
             f"Attachment: {attachment.get('original_name')} ({_human_size(attachment.get('size_bytes', 0))})\n"
@@ -432,13 +484,44 @@ async def _email_founder_notification(
             else ""
         )
     )
-    await emailit.send_email(
-        to=FOUNDER_EMAIL,
-        reply_to=client_email,
-        subject=f"[{ticket_ref}] {subject}",
-        html=html,
-        text=text,
-    )
+
+    # Route to support@ (primary) + cc founder. Standard headers carry the
+    # full client context — ThriveDesk uses these to attribute the inbound
+    # message to the right contact record.
+    extra_headers = {
+        "Reply-To": client_email,
+        "X-Bloom-Ticket": ticket_ref,
+        "X-Bloom-Client-Email": client_email,
+        "X-Bloom-Client-Name": client_name,
+        "X-Bloom-Priority": priority,
+    }
+    if company_doc.get("support_uid"):
+        extra_headers["X-Bloom-Support-UID"] = company_doc["support_uid"]
+    if company_doc.get("name"):
+        extra_headers["X-Bloom-Company"] = company_doc["name"]
+
+    primary_to = SUPPORT_EMAIL
+    cc_list = [FOUNDER_EMAIL] if FOUNDER_EMAIL and FOUNDER_EMAIL != SUPPORT_EMAIL else None
+
+    try:
+        await emailit.send_email(
+            to=primary_to,
+            cc=cc_list,
+            reply_to=client_email,
+            subject=f"[{ticket_ref}] {subject}",
+            html=html,
+            text=text,
+            headers=extra_headers,
+        )
+    except TypeError:
+        # Fallback if the emailit client doesn't yet support cc/headers kwargs
+        await emailit.send_email(
+            to=primary_to,
+            reply_to=client_email,
+            subject=f"[{ticket_ref}] {subject}",
+            html=html,
+            text=text,
+        )
 
 
 def _human_size(n: int) -> str:

@@ -259,15 +259,22 @@ function MilestoneNode({ milestone, showConfetti }) {
 
   return (
     <li
-      className="relative pl-14 group"
+      className={`relative pl-14 group ${milestone.placeholder ? "opacity-50" : ""}`}
       data-testid={`milestone-node-${milestone.id}`}
       data-status={milestone.status}
+      data-placeholder={milestone.placeholder ? "true" : "false"}
     >
+      {/* "Up next" pill on placeholder rows */}
+      {milestone.placeholder && (
+        <span className="absolute -top-1 right-2 text-[9px] uppercase tracking-wider font-semibold text-muted-foreground bg-secondary/60 rounded-full px-2 py-0.5">
+          Up next
+        </span>
+      )}
       {/* Node circle on the rail */}
       <div
         className={`absolute left-0 top-0 h-10 w-10 rounded-full border-2 flex items-center justify-center transition-all ${meta.nodeCls} ${
           milestone.status === "completed" ? "shadow-md" : ""
-        }`}
+        } ${milestone.placeholder ? "grayscale" : ""}`}
       >
         <Icon className={`h-5 w-5 ${meta.spin ? "animate-spin" : ""}`} />
         {showConfetti && (
