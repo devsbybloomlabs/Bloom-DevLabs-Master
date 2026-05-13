@@ -504,3 +504,90 @@ async def send_brief_approved_to_founder(
         html=html,
         text=f"{client_email} approved the brief for {project_name} at {approved_at}.",
     )
+
+
+async def send_brief_phase_for_review(
+    emailit,
+    *,
+    to: str,
+    name: str,
+    project_name: str,
+    phase_title: str,
+    phase_label: str,
+    summary_html: str,
+    admin_note: Optional[str],
+    portal_url: str,
+) -> Dict[str, Any]:
+    """Per-phase: a phase summary is ready for the client's review/comment."""
+    safe_summary = summary_html or "<p>(summary missing)</p>"
+    note_block = (
+        f'<div style="background:#F5F4EE;border-left:3px solid #1E3A8A;padding:12px 14px;'
+        f'margin:16px 0;border-radius:6px;font-size:14px;color:#2A2D36;">'
+        f'<strong style="display:block;font-size:11px;text-transform:uppercase;'
+        f'letter-spacing:0.08em;color:#1E3A8A;margin-bottom:6px;">A note from your team</strong>'
+        f'{admin_note}</div>'
+        if admin_note
+        else ""
+    )
+    body = (
+        _h1(f"A phase of your brief is ready, {name}")
+        + _p(
+            f"We've drafted the <strong>{phase_title}</strong> phase summary for "
+            f"<strong>{project_name}</strong>. Have a read — leave a comment if anything's off, "
+            f"or approve it to lock that piece in."
+        )
+        + note_block
+        + f'<div style="background:#FFFFFF;border:1px solid #E9E7DF;border-radius:10px;'
+          f'padding:18px 20px;margin:18px 0;font-size:14px;line-height:1.65;color:#2A2D36;">'
+          f'<p style="margin:0 0 6px;font-size:11px;text-transform:uppercase;'
+          f'letter-spacing:0.08em;color:#6F7280;">{phase_label} · Summary</p>'
+          f'{safe_summary}'
+          f'</div>'
+        + f'<p style="margin:24px 0;">{_button(portal_url, f"Review {phase_label}")}</p>'
+        + _p(
+            "If you have changes, leave a comment in the portal and we'll iterate. "
+            "Your team typically responds within 24 hours."
+        )
+    )
+    html = _frame(
+        preheader=f"{phase_title} ready for your review.",
+        body_html=body,
+    )
+    return await _safe_send(
+        emailit,
+        to=to,
+        subject=f"{phase_label}: {phase_title} ready · {project_name} · {BRAND_NAME}",
+        html=html,
+        text=f"Your {phase_title} phase summary is ready: {portal_url}",
+    )
+
+
+async def send_brief_phase_commented_to_founder(
+    emailit,
+    *,
+    to: str,
+    project_name: str,
+    client_email: str,
+    phase_title: str,
+    comment: str,
+) -> Dict[str, Any]:
+    """Founder gets pinged when a client leaves a comment on a phase."""
+    safe_comment = (comment or "")[:1200].replace("\n", "<br>")
+    body = (
+        _h1(f"💬 New comment on {phase_title}")
+        + _p(f"<strong>{client_email}</strong> left a comment on <strong>{project_name}</strong>.")
+        + f'<div style="background:#FFF8E1;border-left:3px solid #F59E0B;padding:12px 14px;'
+          f'margin:16px 0;border-radius:6px;font-size:14px;color:#2A2D36;">{safe_comment}</div>'
+        + _p("Re-roll the summary with their feedback and re-send for approval.")
+    )
+    html = _frame(
+        preheader=f"Comment from {client_email} on {phase_title}.",
+        body_html=body,
+    )
+    return await _safe_send(
+        emailit,
+        to=to,
+        subject=f"💬 Brief comment · {phase_title} · {project_name}",
+        html=html,
+        text=f"{client_email} commented on {phase_title}: {comment[:280]}",
+    )

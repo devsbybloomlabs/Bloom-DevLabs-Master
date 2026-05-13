@@ -1,0 +1,46 @@
+{
+  "summary": "End-to-end review of the rewritten PER-PHASE AI Project Brief flow. Backend: full regression 264/264 PASS (~199s) excluding phase11/12/13/15/master per main agent instructions + 3/3 PASS on test_brief_per_phase.py (state machine, milestone sync, auth guards; 41s due to ~25s LLM call for Emergent dev task seeding) + 3/3 PASS on test_project_brief_e2e.py. Frontend: client portal /portal?tab=brief renders progress bar, per-phase card with rendered HTML summary (<strong>/<h2>/<ul> all pass through bleach sanitiser), comment textarea + 24h SLA hint, legal checkbox with EXACT required wording, Approve Phase button correctly disabled until checkbox ticked, final 'Approve full Project Brief' button correctly disabled until all 3 phases approved. Comment submission successfully flips card to 'Our team is reviewing…' state. Admin dialog renders TipTap WYSIWYG editor with rt-bold/rt-italic toolbar, 3 phase tabs with live status pills ('CLIENT COMMENTED' shown after client comment), Save/Send/Prompt-copy/History-toggle/Reply-chip all visible with correct testids. Latest client comment surfaces prominently in admin dialog with 'Show history (1)' revision history toggle.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RichTextEditor (TipTap)", "issues": ["Console warning: '[tiptap warn]: Duplicate extension names found: [link]. This can lead to issues.' — both StarterKit and an explicitly added Link extension register 'link'. Should disable link inside StarterKit or remove the duplicate to silence warning. Non-blocking, editor functions correctly."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_brief_per_phase.py",
+    "/app/backend/tests/test_project_brief_e2e.py",
+    "/app/test_reports/pytest/brief_per_phase.xml",
+    "/app/test_reports/pytest/brief_e2e.xml",
+    "/app/test_reports/pytest/full_regression.xml"
+  ],
+  "action_items": [
+    "Minor: Silence the TipTap 'Duplicate extension names found: [link]' console warning in RichTextEditor.jsx (disable StarterKit link or drop the explicit Link import).",
+    "Optional regression coverage: add a pytest case asserting the per-phase Emailit fire-and-forget does NOT 500 the send-for-review endpoint when SMTP is unreachable (currently only smoke-tested via try/except)."
+  ],
+  "critical_code_review_comments": [
+    "Per-phase state machine works correctly across all 18 transitions: draft → sent_for_review → in_revision (comment) → draft (PATCH) → sent_for_review → approved. Verified via backend test + UI smoke.",
+    "Approve guard returns 400 when no_comments_confirmed=false, 200 when true, 409 when phase not in sent_for_review — all 3 paths verified by test_full_state_machine.",
+    "Phase lock-on-approval works: PATCH on approved phase returns 409 (test verified).",
+    "HTML sanitisation via bleach strips <script> tags while preserving allowed tags (p/strong/em/h2/h3/ul/li/a/blockquote/code/pre) — verified in test_full_state_machine assertion 3.",
+    "Final approval gate refuses with 409 unless all 3 phases approved — verified assertion 14.",
+    "On full approval: brief flips to status=approved, 5 standard build milestones seeded (Discovery / Design / Build / QA / Launch + 3 Brief Review milestones), Project Mode workspace created with LLM-generated dev tasks (poll-verified within 60s), PDF brief snapshot uploaded to project_files (cleanup fixture deletes it) — all assertions 16-18 pass.",
+    "Live milestone sync verified for all 3 status text variants: 'Waiting for your review.' (sent_for_review), 'Our team is reviewing your comments…' (in_revision), 'Approved — locked in.' / status=complete (approved) — assertion in test_review_milestone_status_sync.",
+    "Auth guards: unauth POST to send-for-review and comment both return 401/403 — verified.",
+    "Client portal /portal?tab=brief renders correctly with all required data-testids; legal checkbox text matches the exact required wording verbatim ('I have reviewed Phase 1\\'s summary, I confirm that this is correct and I am leaving no comments. By checking this box, I understand that any requests made outside the scope of this summary may incur new fees.').",
+    "Admin ProjectBriefDialog renders all required testids: brief-dialog, brief-tab-phase1/2/3, brief-summary-phase1 (editable when not locked), rt-bold, rt-italic, brief-save-phase1, brief-send-phase1, brief-prompt-copy-phase1, brief-history-toggle-phase1.",
+    "Status pill on admin Phase 1 tab correctly flips to 'CLIENT COMMENTED' after client posts a comment — confirmed visually."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (264/264 regression + 3/3 per-phase + 3/3 e2e)", "frontend": "100% (all critical testids resolve & state transitions work; 1 non-blocking TipTap console warning)"},
+  "test_credentials": "Admin: founder@thesalvador.group / admin123. Client (test): testclient@bybloomlabs.com / clientpass123. Ad-hoc client per run: ui-brief-{ts}@bybloomlabs.com (created via /api/clients/register).",
+  "seed_data_creation": "Seeded one disposable client (ui-brief-1778670407@bybloomlabs.com) + brief id 9d6b70ab-16e1-4f33-94a0-ba3928af80ef with Phase 1 sent_for_review for UI testing. Posted a comment to verify in_revision transition. Backend pytest fixture cleans up its own seeded data via _drop helper across project_briefs/milestones/pm_projects/pm_tasks/clients/project_files. The UI-seeded brief above is NOT auto-cleaned — orphan brief lives in 'in_revision' state under that disposable email; safe to ignore or main agent can drop project_briefs where client_email starts with 'ui-brief-' if desired.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Per-phase brief rewrite is production-ready. To re-run regression: `export REACT_APP_BACKEND_URL=https://ai-scope-builder.preview.emergentagent.com && export E2E_API_BASE=https://ai-scope-builder.preview.emergentagent.com/api && pytest /app/backend/tests/ -q --ignore=backend/tests/test_phase11.py --ignore=backend/tests/test_phase12.py --ignore=backend/tests/test_phase13.py --ignore=backend/tests/test_phase15.py --ignore=backend/tests/test_master_workflow.py`. Full per-phase suite takes ~41s (LLM-bound on Project Mode task generation). Frontend testids fully comply with spec: portal-brief-view, brief-progress-bar, portal-brief-phase-{key}, portal-brief-comment-{key}, portal-brief-comment-submit-{key}, portal-brief-checkbox-{key}, portal-brief-checkbox-label-{key}, portal-brief-approve-{key}, portal-brief-approve-btn, portal-brief-confirm-dialog, portal-brief-confirm-cancel, portal-brief-confirm-approve, portal-brief-history-toggle-{key}, portal-brief-history-{key}; admin: brief-dialog, brief-tab-{key}, brief-summary-{key} / brief-summary-readonly-{key}, rt-bold, rt-italic, brief-save-{key}, brief-send-{key}, brief-prompt-copy-{key}, brief-history-toggle-{key}, brief-reply-{key}, brief-note-{key}, brief-revision-{key}-{idx}. Single non-blocking TipTap link-extension duplicate warning. Note: brief tab on /portal only renders while brief.status=in_review (a pending phase exists); once all 3 phases approved, the tab disappears and the brief moves to the Orders accordion's 'Approved briefs' section.",
+  "rca of the issue": "N/A — no bugs found this iteration. The rewrite is feature-complete and matches all 14 acceptance criteria in the review request."
+}

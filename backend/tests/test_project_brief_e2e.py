@@ -165,153 +165,10 @@ def seeded():
 
 # -------------------------------------------------------------------------
 # tests
+#   NOTE: The legacy "approve whole brief in one shot" test has been removed
+#   because the API now uses a per-phase flow. See test_brief_per_phase.py
+#   for full coverage of the new state machine.
 # -------------------------------------------------------------------------
-def test_full_brief_flow(admin_token, seeded):
-    email = seeded["email"]
-    client_token = seeded["client_token"]
-    onboarding_id = seeded["onboarding"]["id"]
-    A = {"Authorization": f"Bearer {admin_token}"}
-    C = {"Authorization": f"Bearer {client_token}"}
-
-    # 1. Admin fetches prompts
-    r = requests.get(
-        f"{API_BASE}/admin/briefs/prompts/{onboarding_id}", headers=A, timeout=15
-    )
-    assert r.status_code == 200, r.text
-    bundle = r.json()
-    assert bundle["client_email"] == email
-    assert bundle["phases_submitted"] == {"phase1": True, "phase2": True, "phase3": True}
-    for k in ("design", "function", "company"):
-        assert k in bundle["prompts"]
-        assert len(bundle["prompts"][k]) > 100
-    # The prompt must contain the client's actual answers
-    assert "stripe.com" in bundle["prompts"]["design"]
-    assert "Acme Workspace" in bundle["prompts"]["company"]
-
-    # 2. Admin creates the brief
-    r = requests.post(
-        f"{API_BASE}/admin/briefs",
-        json={"client_email": email, "onboarding_id": onboarding_id},
-        headers=A,
-        timeout=15,
-    )
-    assert r.status_code == 200, r.text
-    brief = r.json()
-    bid = brief["id"]
-    assert brief["status"] == "draft"
-    assert brief["project_name"] == "Acme Workspace"
-
-    # 3. Admin updates each phase summary
-    for ph, summary in [
-        ("phase1", "Your design will lean cool-blue + cream, premium SaaS vibes."),
-        ("phase2", "We'll ship: realtime doc editing, comments, drag-and-drop."),
-        ("phase3", "Building Acme Workspace to hit $1M ARR. Launch Q3."),
-    ]:
-        r = requests.patch(
-            f"{API_BASE}/admin/briefs/{bid}/phase/{ph}",
-            json={"summary": summary},
-            headers=A,
-            timeout=15,
-        )
-        assert r.status_code == 200, r.text
-        assert r.json()["phase_summaries"][ph]["summary"] == summary
-
-    # 4. Phase key validation
-    r = requests.patch(
-        f"{API_BASE}/admin/briefs/{bid}/phase/phase4",
-        json={"summary": "x" * 20},
-        headers=A,
-        timeout=15,
-    )
-    assert r.status_code == 400
-
-    # 5. Send for approval (Emailit will best-effort fire; we don't gate on it)
-    r = requests.post(
-        f"{API_BASE}/admin/briefs/{bid}/send-for-approval",
-        json={"note_to_client": "Take your time."},
-        headers=A,
-        timeout=30,
-    )
-    assert r.status_code == 200, r.text
-    assert r.json()["status"] == "sent_for_approval"
-
-    # 6. Client portal: pending brief is visible
-    r = requests.get(f"{API_BASE}/clients/me/briefs/pending", headers=C, timeout=15)
-    assert r.status_code == 200, r.text
-    pending = r.json()
-    assert pending is not None
-    assert pending["id"] == bid
-    assert pending["status"] == "sent_for_approval"
-
-    # 7. Wrong client cannot approve
-    wrong_email = f"wrong-{uuid.uuid4().hex[:6]}@bybloomlabs.com"
-    wrong_token = _register_client(wrong_email, "Wrong2026!")
-    W = {"Authorization": f"Bearer {wrong_token}"}
-    r = requests.post(
-        f"{API_BASE}/clients/me/briefs/{bid}/approve", headers=W, timeout=15
-    )
-    assert r.status_code == 403, r.text
-
-    # 8. Correct client approves
-    r = requests.post(
-        f"{API_BASE}/clients/me/briefs/{bid}/approve", headers=C, timeout=30
-    )
-    assert r.status_code == 200, r.text
-    approved = r.json()
-    assert approved["status"] == "approved"
-    assert approved["approved_by_email"] == email
-    assert approved["approved_at"] is not None
-
-    # 8b. Milestones auto-seeded on approval ("we already started" moment)
-    r = requests.get(f"{API_BASE}/clients/me/milestones", headers=C, timeout=15)
-    assert r.status_code == 200
-    ms = r.json()
-    titles = [m.get("title") for m in ms]
-    assert "Discovery & Brief Sign-off" in titles
-    assert "Launch" in titles
-    # First milestone should be in_progress
-    first = next(m for m in ms if m["title"] == "Discovery & Brief Sign-off")
-    assert first["status"] == "in_progress"
-    # Final deliverable flag set on Launch
-    launch = next(m for m in ms if m["title"] == "Launch")
-    assert launch["is_final_deliverable"] is True
-
-    # 9. Idempotent re-approve
-    r = requests.post(
-        f"{API_BASE}/clients/me/briefs/{bid}/approve", headers=C, timeout=15
-    )
-    assert r.status_code == 200
-    assert r.json()["status"] == "approved"
-
-    # 10. Pending endpoint now returns null
-    r = requests.get(f"{API_BASE}/clients/me/briefs/pending", headers=C, timeout=15)
-    assert r.status_code == 200
-    assert r.json() is None
-
-    # 11. Approved endpoint returns the brief
-    r = requests.get(f"{API_BASE}/clients/me/briefs/approved", headers=C, timeout=15)
-    assert r.status_code == 200
-    approved_list = r.json()
-    assert any(b["id"] == bid for b in approved_list)
-
-    # 12. Approved briefs are read-only
-    r = requests.patch(
-        f"{API_BASE}/admin/briefs/{bid}/phase/phase1",
-        json={"summary": "Trying to overwrite"},
-        headers=A,
-        timeout=15,
-    )
-    assert r.status_code == 409
-
-    # cleanup the wrong-client account
-    async def _drop_wrong():
-        client = AsyncIOMotorClient(os.environ["MONGO_URL"])
-        try:
-            await client[os.environ["DB_NAME"]].clients.delete_one({"email": wrong_email})
-        finally:
-            client.close()
-
-    asyncio.new_event_loop().run_until_complete(_drop_wrong())
 
 
 def test_auth_guards(admin_token):
@@ -343,9 +200,10 @@ def test_auth_guards(admin_token):
 
 
 def test_send_without_content_fails(admin_token):
+    """Per-phase send requires the phase to have a saved summary first."""
     A = {"Authorization": f"Bearer {admin_token}"}
     email = f"empty-brief-{uuid.uuid4().hex[:8]}@bybloomlabs.com"
-    # Create a brief without an onboarding
+    # Create a brief
     r = requests.post(
         f"{API_BASE}/admin/briefs",
         json={"client_email": email, "project_name": "Empty Test"},
@@ -355,14 +213,15 @@ def test_send_without_content_fails(admin_token):
     assert r.status_code == 200
     bid = r.json()["id"]
     try:
+        # Cannot send a phase that has no summary yet
         r = requests.post(
-            f"{API_BASE}/admin/briefs/{bid}/send-for-approval",
+            f"{API_BASE}/admin/briefs/{bid}/phase/phase1/send-for-review",
             json={},
             headers=A,
             timeout=15,
         )
         assert r.status_code == 400
-        assert "summaries" in r.json()["detail"].lower()
+        assert "summary" in r.json()["detail"].lower()
     finally:
         requests.delete(f"{API_BASE}/admin/briefs/{bid}", headers=A, timeout=15)
 
