@@ -74,6 +74,41 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
   **Project:** {name} · **Client:** {email} · **Milestone:** {milestone}
   **Priority:** {priority} · **Due:** {date}
 
+### ✅ Phases A · B · C · D + Phase E Backend Scaffold (Feb 2026)
+**Goal**: knock out the founder-reported brief/onboarding/milestone issues + ship the Project Mode Focus Shell + scaffold Google Drive Mirror Sync. All verifiable items PASS — backend 21/21 (`test_iteration_27.py` 11 new + `test_brief_per_phase.py` 3 + `test_hard_delete.py` 7) + Playwright 6/6 acceptance items + full regression 268/268 still green.
+
+**Phase A — Brief flow bug fixes**
+- A1: `OnboardingAdmin.jsx` Phase 3 detail view was reading the wrong field names (`company_name`, `industry`, `uvp` …). Fixed to render the actual stored keys (`project_name`, `company_story`, `goals`, `timeline_expectation`, `success_scenarios`, `phone`, `best_time_to_call`, `company_logo_url`).
+- A2: Brief re-roll/re-send confusion. After a client comment, admin used to need 2 clicks (Save then Re-send). New `Save & re-send for review` button (`brief-save-and-resend-{key}`) chains PATCH summary → POST send-for-review in one round trip so the client sees the brief immediately flip back to `sent_for_review`. Renamed the legacy `Save summary` action to `Save draft` for clarity.
+
+**Phase B — Milestone consolidation**
+- Replaced 3 `Brief Review: {Phase}` milestone cards with a single `Discovery & Brief Sign-off` card whose description carries per-phase emoji chips (`⏳ Design Language · 👀 Functionality · 💬 Company Background · ✅ …`). Status only flips to `complete` when all 3 phases are approved, then `Design Language` (next standard milestone) auto-activates `in_progress`. Legacy per-phase rows are hard-archived idempotently on first sync. `_seed_milestones_from_brief` rewritten with per-title idempotency.
+- New `project_brief_routes.py::_build_discovery_description`, `_archive_legacy_review_milestones`, and rewritten `_ensure_review_milestone`/`_sync_review_milestone`.
+
+**Phase C — Onboarding wizard Step 3-3 redesign**
+- Removed `Budget` field from `OnboardingWizard.jsx::Phase3Form` + backend `_process_phase3` + `generate_company_prompt`.
+- New **Company logo upload** via Publit.io CDN (PNG/JPG/SVG/WebP up to 5MB) — new `publitio_client.py` (signed-request httpx client, SHA1 timestamp+nonce+secret) + `publitio_routes.py` (POST `/api/clients/me/uploads/logo` + `/api/admin/uploads/logo`) with magic-byte validation + 400/413/415 rejections. Wizard shows uploaded thumbnail with a Remove (X) button.
+- New **Phone** input + structured **Best time to call** dropdown (Morning 9-12 / Afternoon 12-5 / Evening 5-8 / Anytime) + 10-option **Timezone** select (PT/MT/CT/ET/GMT/CET/IST/SGT/JST/AEST + Other).
+- Admin Phase 3 view renders the logo thumbnail + phone + best time inline.
+
+**Phase D — Project Mode Focus Shell**
+- `/admin/project-mode/{projectId}` now mounts a dedicated focus shell (`admin-layout-focus`) — slim 48px topbar with `Back to Admin` + `FOCUS MODE` chip + sign-out. The 6-group admin sidebar is hidden. List URL `/admin/project-mode` keeps the regular layout.
+- Removed the auto-redirect that used to bounce `/admin/project-mode` → first project (broke the exit-focus mental model).
+- Added a `Kanban | Files` view toggle inside Project Mode. Files panel (`ProjectFilesPanel`) is scoped to the project's `client_email` and supports upload + download + delete.
+
+**Phase E — Google Drive Mirror Sync (backend scaffold complete, OAuth pending)**
+- `google_drive_routes.py` exposes `/admin/google-drive/{status,connect,disconnect,projects/{id}/toggle,projects/{id}/sync-now}` + public `/admin/google-drive/oauth/callback`.
+- Per-project schema fields added: `sync_to_drive`, `drive_folder_id`, `drive_folder_link`, `last_sync_at`.
+- `project_files_routes.upload_file` now best-effort mirrors via `mirror_file_bytes_to_drive` after the primary object-storage upload succeeds. Failures are logged and never block the upload.
+- Frontend `IntegrationsAdmin.jsx::GoogleDriveCard` — Connect/Disconnect, per-project Sync checkbox + `Sync now` button + folder link. Shows `Setup required` notice with the 3 env var names while `GOOGLE_CLIENT_ID` is empty.
+- **Pending user action**: create OAuth Web client in Google Cloud Console, paste `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, redirect `https://wave1-cleanups.preview.emergentagent.com/api/admin/google-drive/oauth/callback` (preview) + `https://bybloomlabs.com/api/admin/google-drive/oauth/callback` (prod) into `backend/.env` and restart backend. Then click `Connect Google Drive` in Admin → Integrations.
+
+**Tests**: `/app/backend/tests/test_iteration_27.py` (11 tests — Publit.io upload rejections + Drive 503/400 guards + integrations health regression). `/app/backend/tests/test_brief_per_phase.py` rewritten to assert single Discovery card + emoji chips.
+
+**Decommissioned**: BreezeDocs MSA auto-injection parked in backlog until BreezeDocs custom-field API is confirmed by their support.
+
+
+
   {task description (AI-authored Emergent-ready prompt)}
   ---
   **House rules:** /api prefix · MONGO_URL/DB_NAME from .env · REACT_APP_BACKEND_URL · data-testid · shadcn primitives
