@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 # Public endpoint from frontend/.env
-BASE_URL = "https://agency-suite-23.preview.emergentagent.com/api"
+BASE_URL = "https://ai-scope-builder.preview.emergentagent.com/api"
 
 # Test credentials from backend/.env
 TEST_EMAIL = "founder@thesalvador.group"

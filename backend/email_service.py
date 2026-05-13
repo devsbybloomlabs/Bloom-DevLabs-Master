@@ -437,3 +437,70 @@ async def send_refund_issued(
             f"PayPal refund id: {paypal_refund_id or '—'}."
         ),
     )
+
+
+
+async def send_brief_for_approval(
+    emailit,
+    *,
+    to: str,
+    name: str,
+    project_name: str,
+    portal_url: str,
+    note: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Phase D: tell the client their project brief is ready for approval."""
+    note_block = _p(note) if note else ""
+    body = (
+        _h1(f"Your project brief is ready, {name}")
+        + _p(
+            f"We've put together the full brief for <strong>{project_name}</strong>. "
+            "It captures the design direction, key functionality, and the why "
+            "behind your project — all in plain English."
+        )
+        + note_block
+        + f'<p style="margin:24px 0;">{_button(portal_url, "Review & approve brief")}</p>'
+        + _p(
+            "Take a moment to read it through. Anything off? Just reply to this "
+            "email and we'll iterate. Once you hit Approve, we kick off Design."
+        )
+    )
+    html = _frame(
+        preheader=f"Project brief ready for {project_name}.",
+        body_html=body,
+    )
+    return await _safe_send(
+        emailit,
+        to=to,
+        subject=f"Project brief ready · {project_name} · {BRAND_NAME}",
+        html=html,
+        text=f"Your project brief for {project_name} is ready: {portal_url}",
+    )
+
+
+async def send_brief_approved_to_founder(
+    emailit,
+    *,
+    to: str,
+    project_name: str,
+    client_email: str,
+    approved_at: str,
+) -> Dict[str, Any]:
+    """Internal: tell the founder a brief just got approved."""
+    body = (
+        _h1(f"✅ Brief approved — {project_name}")
+        + _p(f"<strong>{client_email}</strong> just approved the project brief.")
+        + _p(f"Stamped: <em>{approved_at}</em>")
+        + _p("Next step: kick off Design Phase. The brief is locked and will appear in their Orders accordion.")
+    )
+    html = _frame(
+        preheader=f"Brief approved by {client_email}.",
+        body_html=body,
+    )
+    return await _safe_send(
+        emailit,
+        to=to,
+        subject=f"✅ Brief approved · {project_name}",
+        html=html,
+        text=f"{client_email} approved the brief for {project_name} at {approved_at}.",
+    )

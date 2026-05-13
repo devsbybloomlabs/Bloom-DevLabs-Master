@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAdminApi } from "@/lib/auth";
+import ProjectBriefDialog from "@/components/admin/ProjectBriefDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,7 @@ import {
   Loader2,
   Eye,
   FileText,
+  Wand2,
 } from "lucide-react";
 
 const PHASE_LABEL = {
@@ -84,6 +86,7 @@ export default function OnboardingAdmin() {
   const [newForm, setNewForm] = useState({ client_email: "", client_name: "" });
   const [viewOb, setViewOb] = useState(null); // { onboarding, focusPhase? }
   const [viewErrors, setViewErrors] = useState(null); // onboarding doc
+  const [briefOb, setBriefOb] = useState(null); // onboarding for AI Brief dialog
   const [health, setHealth] = useState(null); // {nifty_connected, onboardings_with_errors, blocked_by_disconnect}
   const [retrying, setRetrying] = useState(false);
 
@@ -337,6 +340,16 @@ export default function OnboardingAdmin() {
                       >
                         <Copy className="h-3.5 w-3.5 mr-1.5" />
                         Copy link
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setBriefOb(ob)}
+                        title="Generate AI prompts + write project brief"
+                        data-testid={`onboarding-ai-brief-${ob.id}`}
+                      >
+                        <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                        AI Brief
                       </Button>
                       <Button
                         size="sm"
@@ -630,6 +643,14 @@ export default function OnboardingAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Phase D — AI Project Brief dialog */}
+      <ProjectBriefDialog
+        open={Boolean(briefOb)}
+        onboarding={briefOb}
+        api={api}
+        onClose={() => setBriefOb(null)}
+      />
     </div>
   );
 }

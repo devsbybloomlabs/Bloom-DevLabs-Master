@@ -1,57 +1,67 @@
 <analysis>**original_problem_statement**: 
-The user originally requested integration of AgencyHandy API, removal of the Emergent badge, mobile responsiveness, and SEO optimizations. Over time, the scope has expanded massively to include end-to-end PayPal REST integrations, an authenticated Client Portal, Nifty PM automation & two-way sync, Lead Magnets, and an Integrations Dashboard. 
-PRODUCT REQUIREMENTS: 
-In this session, the user added requirements for a robust 3rd-party Support & Review loop:
-1. Approval Studio ↔ Nifty design review synchronization (currently Mocked).
-2. ThriveDesk Support Ticket ↔ Nifty Escalation Loop.
-3. Client Portal Contact Us Form sending tickets to ThriveDesk (with attachments).
-4. Google Calendar OAuth Sync.
-5. Public Sandbox Tour () with A/B testing on CTAs, Lead Scoring, and Multi-workspace Nifty support.
-6. **LATEST REQUEST**: Update the Get Started pricing modal to allow clients to choose between a 50% upfront / 50% pre-launch split (normal pricing) OR 100% upfront (with a 00 discount).
+The user provided a large feature request list to massively upgrade the application. Key requirements included: 
+1. Interactive, animated milestone timelines with dynamic fun statuses.
+2. AI-generated Project Briefs (Admin uses Claude to summarize onboarding phases, clients approve, moves to Orders).
+3. PayPal partial/full refunds from the admin dashboard.
+4. Redesigning desktop navigation to a full-width Mega Menu.
+5. Implementing a VIP Support Clearance system (Support UIDs, tiers, SLAs).
+6. Complete removal of obsolete integrations (Approval Studio, ThriveDesk API, AgencyHandy).
+7. Migrating the client structure into a robust Companies + Contacts model with an Activity Log.
+8. Addressing the failing Nifty PM integration (fix or build an in-house Project Mode).
+9. Breakcold-style Pipeline (CRM Kanban).
 
 **User's preferred language**: English (INSTRUCT next agent to respond in English only)
 
 **what currently exists?**: 
-A highly complex, production-grade B2B SaaS application (React/Tailwind/FastAPI/MongoDB). It features public landing/blog/tour pages, an Admin Dashboard (with integration health checks, lead scoring, and AB stats), and a secure Client Portal (with invoices, Nifty-synced milestones, and a ThriveDesk-backed contact form). 3rd-party integrations are extensively built out: Nifty PM (OAuth), Google Calendar (OAuth), PayPal, AgencyHandy, ThriveDesk, Approval Studio, and Slack notifications.
+A robust B2B SaaS React/FastAPI/MongoDB platform. In this session, the codebase underwent a massive data layer upgrade to a / model with centralized  tracking. It features a VIP Support Clearance system, one-click PayPal refunds, an animated frontend Milestone Timeline, and clean removal of legacy integrations (AgencyHandy, Approval Studio, ThriveDesk API). The codebase is highly tested and currently midway through implementing the AI Project Brief flow.
 
 **Last working item**: 
-    - Last item agent was working: Implementing the payment split and discount logic on the Pricing Get Started checkout flow. The user wants the client to be able to select either a 50/50 payment split or a 100% upfront payment which grants a 00 discount. The agent just finished reading , , and  to scope the work.
-    - Status: NOT STARTED
+    - Last item agent was working: Implementing Phase D part 2: AI Project Brief flow. The agent successfully created the backend routes (), updated the email service, built the admin UI (), wired it into , and created the client-facing . The agent was just about to wire  into  and perform end-to-end testing.
+    - Status: IN PROGRESS
     - Agent Testing Done: N
-    - Which testing method agent to use? testing_agent_v3_fork (Backend & Frontend) after the pricing feature is completed.
+    - Which testing method agent to use? testing_agent_v3_fork (once the brief flow is wired and a smoke screenshot is captured).
     - User Testing Done: N
 
 **All Pending/In progress Issue list**: 
-  Issue 1: Update Checkout flow to support 50% vs 100% payment splits and a 00 discount. (P0)
-
-  Issues Detail:
-  - Issue 1: Update Checkout flow to support 50% vs 100% payment splits and a 00 discount.
-     - Attempted fixes: Agent mapped the file structure but no code has been written yet. 
-     - Next debug checklist: Modify  to show radio buttons or a toggle for payment terms. Update  and  to dynamically adjust the order total and line items based on the selected payment structure.
-     - Why fix this issue and what will be achieved with the fix? It fulfills the user's latest request and enables flexible pricing configurations, increasing conversion rates.
-     - Status: NOT STARTED
-     - Is recurring issue? N
-     - Should Test frontend/backend/both after fix? Both (Requires ensuring PayPal orders are generated with the exact correct mathematical totals).
-     - Blocked on other issue: None.
+  None actively broken in the codebase. All existing code is completely green. (Nifty PM sync is technically failing, but it is tracked as a designated upcoming Feature Task below to either fix or replace).
 
 **In progress Task List**: 
-None.
+  Task 1: Complete AI Project Brief Flow (Phase D part 2) (P0)
+
+ Task Detail:
+  - Task 1: Complete AI Project Brief Flow
+     - Where to resume: Wire  into the Client Portal tabs (ensure it only shows when a brief is pending/approved). Test the E2E flow: Admin clicks wand icon in OnboardingAdmin -> submits brief -> Client sees in Portal -> clicks Approve -> Brief marked approved -> stored in Orders.
+     - What will be achieved with this? Closes out Phase D. Automates the translation of lengthy client onboarding answers into a signed scope-of-work.
+     - Status: IN PROGRESS
+     - Should Test frontend/backend/both after fix? Both (Use testing_agent_v3_fork)
+     - Blocked on something: N/A
 
 **Upcoming and Future Tasks**
-  Future Tasks:
-  - Task 1 (P2): Project Files tab in the client portal where designers can share final deliverables securely (potentially utilizing Google Drive).
+    Upcoming Tasks:
+    - Task 1 (P0): Phase F — Nifty retry / Enter Project Mode fallback. Either fix Nifty OAuth or build an in-house mini PM suite (Kanban, tasks, comments) to feed the timeline.
+    - Task 2 (P1): Phase G — Breakcold-style Pipeline. Rich Kanban CRM with LinkedIn-style cards, activity streams, and AI-suggested next actions.
+    - Task 3 (P1): Phase H — Mega Menu Nav redesign. Full-width public-site nav with 3-4 main categories.
+    - Task 4 (P2): Phase I — Ticket numbering. Auto ticket-number prefix () on emails/chats and a simplified Support Triage lookup tool.
+    
+    Future Tasks:
+    - Task 5 (P2): Project Files tab in the client portal for final deliverables (from previous fork).
+    - Task 6 (P2): Connect Client Portal Contact Us attachments to object storage (from previous fork).
 
 **Completed work in this session**
-- Phase 11: Approval Studio Mock Client, UI, Webhooks, Integrations Health Strip, AgencyHandy HMAC verification, SVG->PNG fallback. (DONE)
-- Phase 12: DB-stored credentials store, Slack notifier, ThriveDesk Client, Escalation Admin UI. (DONE)
-- Phase 13: ThriveDesk Live scope fallback, Demo Mode seeded data, Escalation Timeline Dialog. (DONE)
-- Phase 14: Public Sandbox Tour () with sticky variant. (DONE)
-- Phase 15: Client Portal Contact Us Form (w/ aiofiles disk storage), A/B testing logic for CTA on , Lead Scoring inside LeadMagnetsAdmin, Approval Annotations Preview Dialog, Multi-workspace Nifty panel. (DONE)
-- Phase 16: Google Calendar OAuth Integration, Credential setups. (DONE)
-- Test Client generation: created  test client. (DONE)
+- Bug Fix: View invoices in portal email button white screen + invisible email logo (DONE)
+- Phase 18: BreezeDocs completed -> auto-invoice generation (DONE)
+- Phase A: Cleanup: Stripped AgencyHandy, Approval Studio, and ThriveDesk API. Inlined logos as data URI in emails. (DONE)
+- Phase B: Companies/Contacts Foundation: Migrated clients to , created , built . (DONE)
+- Phase C: VIP Support Clearance: Support UIDs (), SLA matrix, manual/auto tier upgrades, Admin UI. (DONE)
+- Phase D part 1: PayPal Refunds: Admin partial/full refunds, credit note invoice generation, deep linking to PayPal. (DONE)
+- Phase E: Animated Milestone Timeline: Built vertical timeline with dynamic/fun rotating statuses. (DONE)
 
 **Earlier issues found/mentioned but not fixed**
-None. (Note: ThriveDesk API write endpoints are returning 405 Method Not Allowed due to the provided token having public scope. The agent gracefully added a scope-limited fallback in the code to handle this without crashing, so it is handled structurally, but the user is aware they need to update their token).
+   Issue 1: Nifty PM Sync Failure
+   - Debug checklist: Nifty OAuth frequently disconnects or fails. User requested we try one more time to fix it, and if it fails, abandon it and build Project Mode (Phase F).
+   - Why to solve this issue and what will be achieved with this? Needed to track internal task progress for the milestones timeline.
+   - Should Test frontend/backend/both after fix: Both
+   - Is recurring issue? Y
 
 **Known issue recurrence from previous fork**
   - Issue recurrence in previous fork: None
@@ -62,89 +72,76 @@ None. (Note: ThriveDesk API write endpoints are returning 405 Method Not Allowed
 
 
 **Key Technical Concepts**
-React, Tailwind CSS, FastAPI, MongoDB, Multi-tenant JWT Authentication, 3rd Party OAuth2 Flows (Nifty, Google), Webhooks with HMAC verification, A/B Testing, Cron/APScheduler Background tasks.
+React, FastAPI, MongoDB, VIP Support Tiering, Activity/Audit Logging, PayPal API (Orders, Captures, Refunds), CSS Animations (Timeline).
 
 **key DB schema**
-  - : {provider, fields, updated_at}
-  - : {ticket_id, ticket_url, nifty_task_id, status, classification, slack_ts}
-  - : {workspace_id, name, token_data, active}
-  - : {experiment_id, variant, impressions, conversions}
+  - : {id, slug, name, support_uid, support_tier}
+  - : {id, company_id, email, is_primary}
+  - : {company_id, type, details, timestamp}
+  - : {id, company_id, content, status, approved_at}
 
 **changes in tech stack**
-- Added  for asynchronous disk storage of uploaded contact form files.
-- Added  /  for server-side SVG to PNG conversion.
+  - COMPLETELY REMOVED: ThriveDesk API, Approval Studio, AgencyHandy.
 
 **All files of reference** 
--  (Target for P0 UI edits)
--  (Target for P0 Backend edits)
--  (Target for P0 Backend edits)
--  (Crucial for test accounts)
+-  (Created this session, contains endpoints for AI Brief)
+-  (Created this session)
+-  (Created this session, needs wiring)
+-  (Target for wiring the Brief tab)
+-  (Updated with phases)
 
 **Areas that need refactoring**
-None. Code is highly modularized into feature-specific files and extensively tested.
+- None. Codebase is clean, highly modular, and well-tested (234/234 passing tests before the Project Brief addition).
 
 **key api endpoints**
 - 
--  (New: Client Portal Contact)
--  (New: Sandbox Tour data)
--  (New: Google Calendar OAuth)
+- 
+- 
+-  (WIP)
 
 **Critical Info for New Agent**
-- **Production vs Preview Deployment**: The user has deployed the app to production (). Any changes you make only apply to the **preview environment**. If the user reports a bug, always verify if it's on preview or production. Do not provide deployment URLs or preview URLs in your summary.
-- **Testing Standard**: The previous agent utilized  extensively across phases 11 through 16, resulting in a test suite of 63 green backend tests and 100% frontend coverage. **You MUST maintain this standard**. Run backend pytest before offloading UI tests to the testing agent.
-- **ThriveDesk Fallback**: ThriveDesk live mode works, but write endpoints return 405 Method Not Allowed due to the user's token scope. A fallback  is in place. Do not attempt to fix ThriveDesk API 405 errors; this is a user-side token limitation.
+- **Data Model Shift**: The system no longer uses  as standalone individuals. Everything relies on  with nested .
+- **Integrations**: Do NOT attempt to integrate or reference AgencyHandy, Approval Studio, or ThriveDesk API. They have been intentionally scrubbed from the app per the user's request. (ThriveDesk chat snippet widget remains, but no backend API).
+- **Email Logos**: WeasyPrint PDF and HTML emails now use a base64 encoded data URI to bypass Gmail image blocking.
+- **Production Environment Note**: The user has deployed the app to production (). Only test using the PREVIEW .
 
-**documents and test reports created in this job**
+**documents and test reports created in this job** 
   - 
   - 
-  -  through 
+  - 
 
 **Last 10 User Messages and any pending HUMAN messages** 
- - *User*: When a client clicks on the Get Started button, I need the option to select if I want to pay 50% upfront, and 50% before launch... (PENDING - P0)
- - *User*: Asked to generate a test client account. (COMPLETED)
- - *User*: Provided Google Calendar Client ID/Secret and Slack Webhook URL. Asked how to upgrade ThriveDesk scope. (COMPLETED)
- - *User*: Detailed specs for Part 6 (Client Portal Contact Us), A/B testing on , lead scoring, Approval Studio preview, Google Calendar sync. (COMPLETED)
- - *User*: Answered  confirming preference for local disk storage over Google Drive for support file uploads. (COMPLETED)
- - *User*: Repeated request for Part 6 with specific fields and ThriveDesk/Nifty/Slack mapping. (COMPLETED)
- - *User*: Instructed to implement P3 (Public Sandbox Tour) and provided Slack webhook URL. (COMPLETED)
- - *User*: Noted ThriveDesk API had full access and provided Slack Webhook URL. Instructed to implement P3. (COMPLETED)
- - *User*: Provided ThriveDesk API Key via JWT token. (COMPLETED)
- - *User*: Instructed to implement Part 4 (ThriveDesk Support Ticket -> Nifty Escalation). (COMPLETED)
+ - *User*: Proceed (Approval given to continue the 9-phase execution plan. Agent paused amidst Phase D part 2).
 
 **Project Health Check:**
-Healthy. No Mocked components (except where API scope enforces fallback logic, like Approval Studio and ThriveDesk write endpoints). All test suites pass.
+Healthy. 234/234 tests passing prior to Phase D part 2.
 
 **3rd Party Integrations** 
-  • OpenAI/OpenRouter (AI Routines) — requires User API Key
-  • Emailit (Transactional Emails) — requires User API Key
-  • AgencyHandy (CRM) — requires User API Key
-  • PayPal (Payments) — requires User API Key
-  • Nifty PM (Task Sync) — requires User API Key (OAuth2)
-  • ThriveDesk (Support) — requires User API Key
-  • Approval Studio (Design) — requires User API Key
-  • Slack (Alerts) — requires Webhook URL
-  • Google Calendar — requires User API Key (OAuth2)
-  • TidyCal (Booking Widget) — Embed/Webhook
-  • Google Analytics (GA4) — requires User Measurement ID
+	• OpenAI/OpenRouter (AI Routines & Brief Generation) — requires User API Key
+	• Emailit (Transactional Emails) — requires User API Key
+	• PayPal (Payments) — requires User API Key
+	• Google Calendar — requires User API Key (OAuth2)
+	• Slack (Alerts) — requires Webhook URL
+	• BreezeDocs (Proposals) — requires User API Key
+	• Nifty PM (Task Sync) — requires User API Key (OAuth2) [Currently Unstable]
 
 **Testing status**
-  - Testing agent used after significant changes: YES
+  - Testing agent used after significant changes: YES (Used for Phase 18 and 18.5)
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: [ through ]
+  - Test files created: , , 
   - Known regressions: None.
 
 **Credentials to test flow:**
-Check  (Contains Founder/Admin login, Nifty test user, newly generated client user:  / )
+Check .
 
 **What agent forgot to execute**
-None. All tasks prior to the very last message were completely implemented and tested.
+The agent paused work while executing Phase D part 2: AI Project Brief. The backend routes and frontend component files exist, but  still needs to be imported and wired into the tabs inside .
 
 **Debugging checklist for current issue**
-    Issue: Update Checkout flow to support 50% vs 100% payment splits and a 00 discount.
+    Issue: Wire and Finish Phase D part 2 (Project Briefs)
 
     Frontend files to check: 
-    -  (Look at the Get Started modal logic, lines ~240-295. Add radio selection state for 50/50 vs 100% split).
+    -  (Import  and add a new Tab trigger/content for Project Brief).
   
     Backend files to check:
-    -  (Update the endpoint that handles order creation to accept the  split choice).
-    -  (Update the line items and total calculations. If 50/50, order total should be half the base price. If 100%, total should be full base price minus 00).</analysis>
+    -  (Ensure AI prompt endpoints handle the Emergent LLM key logic seamlessly).</analysis>
