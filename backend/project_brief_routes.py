@@ -1316,6 +1316,12 @@ async def _finalize_brief_approval(
         brief["status"] = "approved"
 
     seeded = await _seed_build_milestones(db, brief)
+    # Phase J: flag the brief so the admin UI shows a "Send contract & invoice"
+    # CTA. Actual dispatch happens via the admin-review gate (single click).
+    await db.project_briefs.update_one(
+        {"id": brief["id"]},
+        {"$set": {"awaiting_contract_dispatch": True, "updated_at": now}},
+    )
 
     if brief.get("company_id"):
         await log_activity(

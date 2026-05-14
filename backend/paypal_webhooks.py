@@ -233,6 +233,17 @@ async def _process_paypal_event(
                     )
             except Exception as exc:  # pragma: no cover
                 log.warning("Support tier auto-upgrade failed: %s", exc)
+            # Phase H (Feb 2026): if this is a support subscription, supersede
+            # the bundled free row + insert an active_paid record.
+            try:
+                from support_subscription_routes import (
+                    activate_paid_support_subscription,
+                )
+
+                if sub_id and sub_record.get("is_support_plan"):
+                    await activate_paid_support_subscription(db, sub_id)
+            except Exception as exc:  # pragma: no cover
+                log.warning("Paid support subscription activation failed: %s", exc)
         return
 
     if event_type == "PAYMENT.SALE.COMPLETED" and resource.get("billing_agreement_id"):

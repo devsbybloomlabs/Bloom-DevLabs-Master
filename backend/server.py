@@ -82,6 +82,13 @@ from google_drive_routes import (  # noqa: E402
     gdrive_admin_router,
     gdrive_oauth_router,
 )
+from support_subscription_routes import (  # noqa: E402
+    support_sub_client_router,
+    support_sub_admin_router,
+    seed_support_plans,
+    expire_overdue_subscriptions,
+)
+from brief_contract_routes import brief_contract_router  # noqa: E402
 from ab_test_routes import public_ab_router, ab_admin_router  # noqa: E402
 from nifty_workspaces_routes import nifty_workspaces_router  # noqa: E402
 from google_calendar_client import GoogleCalendarClient  # noqa: E402
@@ -222,6 +229,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("BreezeDocs sync cron failed: %s", exc)
 
+    async def support_subscription_expiry_cron() -> None:
+        try:
+            count = await expire_overdue_subscriptions(app.state.db)
+            if count:
+                log.info("Support subscription expiry: %d row(s) flipped", count)
+        except Exception as exc:
+            log.exception("Support subscription expiry cron failed: %s", exc)
+
     # Hourly drip ticks
     scheduler.add_job(drip_cron, CronTrigger(minute=15))
     # Every 5 min Nifty comment poll
@@ -230,6 +245,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.add_job(nifty_timeline_cron, CronTrigger(hour=8, minute=0))
     # Every 10 min BreezeDocs status sync (no webhooks in their API)
     scheduler.add_job(breezedocs_sync_cron_wrapper, CronTrigger(minute="*/10"))
+    # Daily 3am UTC — flip expired bundled support subscriptions to "expired"
+    scheduler.add_job(support_subscription_expiry_cron, CronTrigger(hour=3, minute=0))
 
     app.state.scheduler = scheduler
 
@@ -249,6 +266,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 log.info("Companies migration: %s", mig_res)
             # Phase C: backfill support UIDs for all companies missing one.
             await backfill_support_uids(db)
+            # Phase H (Feb 2026): seed 6 support subscription plans
+            try:
+                pp = getattr(app.state, "paypal", None)
+                await seed_support_plans(db, pp)
+            except Exception as exc:
+                log.warning("Support plan seed failed: %s", exc)
         except Exception as exc:
             log.exception("Startup seed failed: %s", exc)
         try:
@@ -363,6 +386,9 @@ api.include_router(publitio_client_router)
 api.include_router(publitio_admin_router)
 api.include_router(gdrive_admin_router)
 api.include_router(gdrive_oauth_router)
+api.include_router(support_sub_client_router)
+api.include_router(support_sub_admin_router)
+api.include_router(brief_contract_router)
 api.include_router(public_ab_router)
 api.include_router(ab_admin_router)
 api.include_router(nifty_workspaces_router)

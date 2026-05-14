@@ -116,7 +116,10 @@ class TestLogoUpload:
 # ---- Phase E: Google Drive routes ----------------------------------------
 
 class TestGoogleDrive:
-    def test_drive_status_unconfigured(self, admin_token):
+    def test_drive_status_returns_configured_shape(self, admin_token):
+        # Phase F (Feb 2026): Google OAuth creds were added to backend/.env so
+        # the endpoint now reports `configured=True`. The shape contract is
+        # what we assert — actual values depend on whether admin clicked Connect.
         r = requests.get(
             f"{BASE_URL}/api/admin/google-drive/status",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -124,18 +127,30 @@ class TestGoogleDrive:
         )
         assert r.status_code == 200
         d = r.json()
-        assert d.get("configured") is False
-        assert d.get("connected") is False
+        assert isinstance(d.get("configured"), bool)
+        assert isinstance(d.get("connected"), bool)
+        assert "account_email" in d
 
-    def test_drive_connect_returns_503_when_not_configured(self, admin_token):
+    def test_drive_connect_returns_authorization_url_when_configured(self, admin_token):
+        # Once GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI are set, /connect returns
+        # the OAuth start URL. (Previously asserted 503 when env was empty.)
         r = requests.get(
             f"{BASE_URL}/api/admin/google-drive/connect",
             headers={"Authorization": f"Bearer {admin_token}"},
             timeout=15,
             allow_redirects=False,
         )
-        assert r.status_code == 503, f"expected 503 got {r.status_code} {r.text[:200]}"
-        assert "not configured" in r.text.lower()
+        # Two valid shapes:
+        #   200 + {authorization_url: "https://accounts.google.com/..."} → configured
+        #   503 with detail "not configured" → env vars missing
+        assert r.status_code in (200, 503), f"got {r.status_code} {r.text[:200]}"
+        if r.status_code == 200:
+            body = r.json()
+            assert body.get("authorization_url", "").startswith(
+                "https://accounts.google.com/"
+            )
+        else:
+            assert "not configured" in r.text.lower()
 
     def test_drive_toggle_400_when_not_connected(self, admin_token):
         r = requests.post(

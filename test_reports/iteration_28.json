@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 28 — Phases F/G/H/I/J backend coverage. 18/19 new + existing backend tests PASS (9/9 test_iteration_28 baseline + 9/10 new test_iteration_28b). 1 FAILURE reveals a real backend bug in Phase J dispatch-contract happy path: brief_contract_routes._resolve_template_id crashes with AttributeError when BreezeDocs list_templates returns string items instead of dicts. Phase F connect URL, Phase G invoice PDF render+address, Phase H plan_id=P-* / pricing / upgrade-only guard / provision shape / expire cron flip, Phase I VIP→vipsupport routing+X-Bloom-Routed-Tier header, Phase J 404+auth+preview+milestone-flip-on-signed all VERIFIED.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/admin/briefs/{id}/dispatch-contract",
+        "issue": "500 Internal Server Error on happy path. Root cause: brief_contract_routes.py:241 _resolve_template_id() does `t.get('title')` but BreezeDocs list_templates() returns items that are strings (titles), not dicts. AttributeError: 'str' object has no attribute 'get'. Blocks entire Phase J brief-approval→contract-dispatch flow when BreezeDocs is in LIVE mode.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_28.py",
+    "/app/backend/tests/test_iteration_28b.py",
+    "/app/test_reports/pytest/iteration_28b.xml"
+  ],
+  "action_items": [
+    "Fix brief_contract_routes._resolve_template_id (~line 241) to handle BreezeDocs templates that come back as plain strings. Suggested: `title = (t if isinstance(t, str) else (t.get('title') or '')).lower()` and `return int(t['id']) if isinstance(t, dict) else None`. Or better — fix BreezeDocsClient.list_templates() to always normalize each row to {id, title, ...}. After fix, rerun test_iteration_28b::test_phase_j_dispatch_happy_path_and_idempotency to confirm: project_files contract row + 'Contract & Invoice Sent' milestone + breezedocs_proposals row with linked_brief_id all get created; second POST returns the cached result without dupes.",
+    "Frontend Phase H Subscriptions tab + Phase J ContractDispatchBanner were NOT exercised by Playwright in this run (token budget). Main agent should self-test or rerun frontend pass after the dispatch bug is fixed."
+  ],
+  "critical_code_review_comments": [
+    "Phase F: GET /api/admin/google-drive/connect returns 200 + authorization_url that starts with https://accounts.google.com/ — env wiring is correct.",
+    "Phase G: invoice_service.BUSINESS_DEFAULTS carries the Makati / Chino Roces / 1229 / Pio del Pilar lines; Albuquerque is gone. render_invoice_pdf() produces valid %PDF bytes containing the new address (verified via pypdf text extraction, not raw byte grep — PDF stream is FlateDecode-compressed).",
+    "Phase H: All 6 catalog plans return real PayPal plan_ids starting with 'P-' (not LOCAL-). Per-month prices match spec (29/49/89 annual; 39/59/99 quarterly). Upgrade-only guard fires correctly when company.support_tier=premium and client tries support_standard_annual → 400 'upgrade'. Unknown plan_key → 404. Auth-less GET → 401. provision_bundled_support_subscription writes source='bundled', status='active_free', tier=premium for package_tier='custom', expires_at ≈ +365d. Calling twice is a no-op (count stays at 1). expire_overdue_subscriptions flips active_free→expired AND companies.support_tier→none when no paid row exists.",
+    "Phase I: _email_founder_notification routes primary `to` to vipsupport@bybloomlabs.com when company.support_tier=='vip' else support@bybloomlabs.com. extra_headers['X-Bloom-Routed-Tier'] matches the tier exactly ('vip' / 'standard' / 'none'). Verified by injecting a mocked emailit + fake-DB SimpleNamespace and reading captured kwargs.",
+    "Phase J: 404-on-missing-brief, 401-without-auth, contract-preview returns application/pdf with %PDF- header, and the _maybe_close_contract_milestone helper flips a sample 'Contract & Invoice Sent' milestone from in_progress→complete + sets completion_date when a proposal with linked_milestone_title hits 'signed'. Happy-path dispatch BLOCKED by the _resolve_template_id bug above.",
+    "Lint/code-quality nits: brief_contract_routes.py:241 is the immediate culprit; recommend adding defensive isinstance checks across BreezeDocs response handlers and a typed Pydantic schema for list_templates row to keep this from regressing."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_28b.py (new — 10 tests covering items 1, 2, 3, 5, 6, 7, 8, 9, 11-12 (partial), 13, 14)"
+  ],
+  "success_rate": {
+    "backend": "95% (18/19 PASS — 9/9 existing test_iteration_28 + 9/10 new test_iteration_28b; 1 failure is the real Phase J dispatch bug)",
+    "frontend": "not tested in this iteration"
+  },
+  "test_credentials": "Admin: founder@thesalvador.group / admin123. Client: testclient@bybloomlabs.com / clientpass123. Test client's company id (via primary_email lookup): f00883fe-f25f-41ca-9192-3fa29ff8ebf7 — currently on support_tier='premium'.",
+  "seed_data_creation": "test_iteration_28b creates and cleans up: (a) a temporary support_subscriptions row per company for provision_helper test (deleted in same test), (b) a temporary active_free support_subscriptions row + temp companies.support_tier flip for expire-cron test (restored), (c) per-test TESTBRIEF-* project_briefs + project_files/contract + 'Contract & Invoice Sent' milestone + breezedocs_proposals rows (all cleaned in finally blocks). The premium-tier upgrade-guard test temporarily forces company.support_tier=premium and restores the original value. NO production data is mutated permanently.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Rerun: `cd /app && export REACT_APP_BACKEND_URL=https://wave1-cleanups.preview.emergentagent.com && pytest backend/tests/test_iteration_28.py backend/tests/test_iteration_28b.py -v` (~5s, expects 19/19 PASS after the _resolve_template_id fix). Frontend acceptance items #15 and #16 (Portal Subscriptions tab data-testids + Admin ProjectBriefDialog ContractDispatchBanner) were NOT covered by Playwright this iteration — please add them next pass. Note: BreezeDocs is actually LIVE (not mock) per /app/memory/test_credentials.md §BreezeDocs — that's why _resolve_template_id is hitting the real /templates endpoint and tripping on the response shape.",
+  "rca of the issue": "Phase J dispatch-contract 500: in /app/backend/brief_contract_routes.py line 234-244 (`_resolve_template_id`), the code does `for t in res.get('data') or []: title = (t.get('title') or '').lower()` assuming every row is a dict. BreezeDocs LIVE returns rows where at least one element is a plain string, triggering `AttributeError: 'str' object has no attribute 'get'`. Reproduction: seed an approved brief (`status='approved'`, `awaiting_contract_dispatch=True`) and POST /api/admin/briefs/{id}/dispatch-contract as founder → 500. Fix: normalize each template row, e.g. `title = (t.get('title') if isinstance(t, dict) else t) or ''; tid = t.get('id') if isinstance(t, dict) else None; if tid is not None and (needle in title.lower()): return int(tid)`. Equivalently fix it at the BreezeDocsClient.list_templates() layer so all callers get a consistent [{id, title, ...}] list."
+}

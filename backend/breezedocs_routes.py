@@ -295,6 +295,13 @@ async def sync_proposal(
         invoice_id = await _maybe_auto_invoice_on_completion(db, request, saved)
         if invoice_id:
             saved["linked_invoice_id"] = invoice_id
+    # Phase J: if this proposal is linked to a brief, flip the
+    # "Contract & Invoice Sent" milestone to complete on signed/completed.
+    if saved.get("status") in ("signed", "completed") and prev_status not in (
+        "signed",
+        "completed",
+    ):
+        await _maybe_close_contract_milestone(db, saved)
     saved.pop("raw", None)
     return {"ok": True, "proposal": saved, "invoice_created": invoice_id}
 
@@ -393,6 +400,34 @@ async def _email_proposal_sent(
         subject=f"Your proposal is ready · {email_service.BRAND_NAME}",
         html=html,
         text=f"Your proposal is ready — review & sign: {sign_url}",
+    )
+
+
+async def _maybe_close_contract_milestone(
+    db: AsyncIOMotorDatabase, proposal: Dict[str, Any]
+) -> None:
+    """Flip the brief-linked 'Contract & Invoice Sent' milestone to complete
+    when the BreezeDocs proposal hits signed/completed."""
+    title = proposal.get("linked_milestone_title")
+    if not title:
+        return
+    client_email = (proposal.get("client_email") or "").lower()
+    if not client_email:
+        return
+    now = _now_iso()
+    await db.milestones.update_many(
+        {
+            "title": title,
+            "client_email": client_email,
+            "status": {"$ne": "complete"},
+        },
+        {
+            "$set": {
+                "status": "complete",
+                "completion_date": now,
+                "last_updated": now,
+            }
+        },
     )
 
 
@@ -521,6 +556,12 @@ async def breezedocs_sync_cron(db: AsyncIOMotorDatabase, bd: BreezeDocsClient) -
             inv_id = await _maybe_auto_invoice_on_completion(db, None, new_local)
             if inv_id:
                 invoices_created.append(inv_id)
+        # Phase J: also flip the contract milestone on signed/completed.
+        if new_local.get("status") in ("signed", "completed") and prev_status not in (
+            "signed",
+            "completed",
+        ):
+            await _maybe_close_contract_milestone(db, new_local)
     return {
         "ok": True,
         "synced": synced,

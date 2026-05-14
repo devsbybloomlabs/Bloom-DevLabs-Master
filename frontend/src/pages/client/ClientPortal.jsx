@@ -158,7 +158,27 @@ function OrdersList({ data, loading, approvedBriefs }) {
 function SubscriptionsList({ activeSubs, plans, loading, api, reload }) {
   const [busyId, setBusyId] = useState(null);
   const [subscribing, setSubscribing] = useState(null);
-  if (loading) return <Skeleton className="h-32 w-full" />;
+  // Support subscription state (Phase H, Feb 2026) — fetched in parallel.
+  const [supportData, setSupportData] = useState(null);
+  const [supportLoading, setSupportLoading] = useState(true);
+
+  const loadSupport = useCallback(async () => {
+    setSupportLoading(true);
+    try {
+      const r = await api.get("/clients/me/support-subscription");
+      setSupportData(r.data);
+    } catch {
+      setSupportData(null);
+    } finally {
+      setSupportLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    loadSupport();
+  }, [loadSupport]);
+
+  if (loading || supportLoading) return <Skeleton className="h-32 w-full" />;
   const subs = Array.isArray(activeSubs) ? activeSubs : [];
   const catalog = Array.isArray(plans) ? plans : [];
 
@@ -166,6 +186,21 @@ function SubscriptionsList({ activeSubs, plans, loading, api, reload }) {
     setSubscribing(plan.plan_key);
     try {
       const r = await api.post("/clients/subscriptions/subscribe", {
+        plan_key: plan.plan_key,
+      });
+      if (r.data?.approval_url) {
+        window.location.href = r.data.approval_url;
+      }
+    } catch (e) {
+      window.alert(e?.response?.data?.detail || "Could not start subscription");
+      setSubscribing(null);
+    }
+  };
+
+  const onSubscribeSupport = async (plan) => {
+    setSubscribing(plan.plan_key);
+    try {
+      const r = await api.post("/clients/me/support-subscription/subscribe", {
         plan_key: plan.plan_key,
       });
       if (r.data?.approval_url) {
@@ -191,13 +226,21 @@ function SubscriptionsList({ activeSubs, plans, loading, api, reload }) {
   };
 
   return (
-    <div className="space-y-6" data-testid="portal-subscriptions-list">
+    <div className="space-y-8" data-testid="portal-subscriptions-list">
+      {/* ---- Support entitlement (auto-provisioned per package) ---- */}
+      <SupportSubscriptionSection
+        supportData={supportData}
+        onSubscribe={onSubscribeSupport}
+        subscribingKey={subscribing}
+      />
+
+      {/* ---- Other recurring add-ons (legacy paypal_subscriptions catalog) ---- */}
       <div>
-        <h3 className="font-display text-lg font-medium mb-2.5">Active subscriptions</h3>
+        <h3 className="font-display text-lg font-medium mb-2.5">Other subscriptions</h3>
         {subs.length === 0 ? (
           <Card className="border-border">
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              You don&apos;t have any active subscriptions yet.
+            <CardContent className="py-6 text-center text-sm text-muted-foreground">
+              No other recurring subscriptions.
             </CardContent>
           </Card>
         ) : (
@@ -263,7 +306,7 @@ function SubscriptionsList({ activeSubs, plans, loading, api, reload }) {
         <div>
           <h3 className="font-display text-lg font-medium mb-2.5">Add-ons & retainers</h3>
           <div className="grid gap-3 sm:grid-cols-2">
-            {catalog.map((plan) => (
+            {catalog.filter(p => !p.is_support_plan).map((plan) => (
               <Card
                 key={plan.plan_key}
                 className="border-border hover:border-[#1E3A8A]/40 transition-colors"
@@ -296,6 +339,146 @@ function SubscriptionsList({ activeSubs, plans, loading, api, reload }) {
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SupportSubscriptionSection — bundled-free entitlement + upgrade catalog.
+// ---------------------------------------------------------------------------
+const TIER_LABEL = { standard: "Standard", premium: "Premium", vip: "VIP", none: "No plan" };
+const TIER_COLOR = {
+  standard: "bg-slate-100 text-slate-800 border-slate-300",
+  premium: "bg-amber-100 text-amber-900 border-amber-300",
+  vip: "bg-violet-100 text-violet-900 border-violet-300",
+  none: "bg-rose-100 text-rose-900 border-rose-300",
+};
+
+function SupportSubscriptionSection({ supportData, onSubscribe, subscribingKey }) {
+  if (!supportData) return null;
+  const { current, current_tier: currentTier, days_remaining, available_plans, exclusions_note } = supportData;
+  const tier = currentTier || "none";
+  const isBundled = current?.source === "bundled";
+  // "Expired/no-plan" only when there's truly no entitlement AND no tier on the
+  // company. An admin-set tier without a row is treated as the active tier.
+  const isExpired = !current && tier === "none";
+
+  const grouped = (available_plans || []).reduce((acc, p) => {
+    const c = p.support_cadence || "annual";
+    acc[c] = acc[c] || [];
+    acc[c].push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-3" data-testid="portal-support-subscription">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <h3 className="font-display text-lg font-medium">Support plan</h3>
+        <p className="text-xs text-muted-foreground">{exclusions_note}</p>
+      </div>
+
+      {/* Current entitlement card */}
+      <Card
+        className={`border ${tier === "none" ? "border-rose-200 bg-rose-50/40" : "border-border"}`}
+        data-testid="portal-support-current-card"
+      >
+        <CardContent className="p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${TIER_COLOR[tier]}`}
+                data-testid="portal-support-current-tier"
+              >
+                {TIER_LABEL[tier] || tier}
+              </span>
+              {current && (
+                <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {isBundled ? "Bundled — 1 year free" : "Paid"}
+                </span>
+              )}
+              {isExpired && (
+                <span className="text-[11px] uppercase tracking-wider text-rose-700">
+                  Expired
+                </span>
+              )}
+            </div>
+            {current ? (
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {days_remaining != null && days_remaining > 0
+                  ? `${days_remaining} day${days_remaining === 1 ? "" : "s"} remaining · expires ${new Date(current.expires_at).toLocaleDateString()}`
+                  : "Expiring soon"}
+                {current.package_tier && (
+                  <span className="ml-1">· comes with your {current.package_tier} package</span>
+                )}
+              </p>
+            ) : (
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                You don&apos;t have an active support plan. Purchase one below to get
+                an SLA-backed channel for any production issues.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Upgrade / purchase catalog */}
+      {available_plans && available_plans.length > 0 && (
+        <div className="space-y-4">
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            {tier === "none" ? "Purchase a support plan" : "Upgrade your support"}
+          </p>
+          {["annual", "quarterly"].map((cadence) =>
+            grouped[cadence]?.length ? (
+              <div key={cadence}>
+                <p className="text-xs font-medium text-muted-foreground mb-2 capitalize">
+                  Paid {cadence}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {grouped[cadence].map((plan) => (
+                    <Card
+                      key={plan.plan_key}
+                      className="border-border hover:border-[#1E3A8A]/40 transition-colors"
+                      data-testid={`portal-support-plan-${plan.plan_key}`}
+                    >
+                      <CardContent className="p-5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${TIER_COLOR[plan.support_tier] || ""}`}
+                          >
+                            {TIER_LABEL[plan.support_tier] || plan.support_tier}
+                          </span>
+                        </div>
+                        <p className="font-display text-base font-semibold mt-2">{plan.name}</p>
+                        <p className="mt-3 font-display text-2xl font-semibold tabular-nums">
+                          ${plan.price_per_month}
+                          <span className="text-xs font-normal text-muted-foreground"> /mo</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {fmt(plan.price, plan.currency)} billed {cadence}
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={() => onSubscribe(plan)}
+                          disabled={subscribingKey === plan.plan_key}
+                          className="mt-4 w-full bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+                          data-testid={`portal-support-subscribe-${plan.plan_key}`}
+                        >
+                          {subscribingKey === plan.plan_key ? "Redirecting…" : "Subscribe"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ) : null
+          )}
+        </div>
+      )}
+      {tier === "vip" && (
+        <p className="text-xs text-muted-foreground italic">
+          You&apos;re on the highest support tier — nothing to upgrade.
+        </p>
       )}
     </div>
   );

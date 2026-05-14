@@ -250,6 +250,34 @@ export default function ProjectBriefDialog({ open, onClose, onboarding, api }) {
           </div>
         ) : !bundle || !brief ? null : (
           <Tabs value={activePhase} onValueChange={setActivePhase}>
+            {brief?.awaiting_contract_dispatch && !brief?.contract_dispatched_at && (
+              <ContractDispatchBanner
+                brief={brief}
+                api={api}
+                onDispatched={(updated) => setBrief(updated)}
+              />
+            )}
+            {brief?.contract_dispatched_at && (
+              <div
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 mb-4 text-sm text-emerald-900"
+                data-testid="brief-contract-sent-banner"
+              >
+                <strong>Contract sent.</strong> Sent {new Date(brief.contract_dispatched_at).toLocaleString()}
+                {brief?.contract_dispatch_result?.sign_url && (
+                  <>
+                    {" · "}
+                    <a
+                      href={brief.contract_dispatch_result.sign_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      View signing link
+                    </a>
+                  </>
+                )}
+              </div>
+            )}
             <TabsList className="grid grid-cols-3 w-full">
               {Object.entries(PHASE_META).map(([k, m]) => {
                 const st = STATUS_META[phaseStatuses[k]] || STATUS_META.draft;
@@ -544,4 +572,75 @@ export default function ProjectBriefDialog({ open, onClose, onboarding, api }) {
 
 function FileBadge() {
   return <CheckCircle2 className="h-4 w-4 text-slate-400" />;
+}
+
+
+function ContractDispatchBanner({ brief, api, onDispatched }) {
+  const [busy, setBusy] = useState(false);
+
+  const dispatch = async () => {
+    if (
+      !window.confirm(
+        "Dispatch the Master Services Agreement to the client?\n\nThis will:\n• Compile the brief + onboarding + paid invoice into one PDF\n• Send for e-signature via BreezeDocs\n• Email the signing link to the client\n• Add a 'Contract & Invoice Sent' milestone"
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await api.post(`/admin/briefs/${brief.id}/dispatch-contract`);
+      toast.success("Contract sent for signing");
+      onDispatched && onDispatched(r.data.brief);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Dispatch failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const preview = async () => {
+    setBusy(true);
+    try {
+      const r = await api.get(`/admin/briefs/${brief.id}/contract-preview`, {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(r.data);
+      window.open(url, "_blank");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Preview failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-3"
+      data-testid="brief-contract-dispatch-banner"
+    >
+      <div className="text-sm text-amber-900">
+        <strong>Brief fully approved.</strong> Ready to compile contract + invoice and send for signing.
+      </div>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={preview}
+          disabled={busy}
+          data-testid="brief-contract-preview"
+        >
+          Preview PDF
+        </Button>
+        <Button
+          size="sm"
+          onClick={dispatch}
+          disabled={busy}
+          data-testid="brief-contract-dispatch-btn"
+          className="bg-amber-600 hover:bg-amber-700 text-white"
+        >
+          {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
+          Send contract + invoice
+        </Button>
+      </div>
+    </div>
+  );
 }

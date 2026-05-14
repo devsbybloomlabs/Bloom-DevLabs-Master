@@ -333,6 +333,26 @@ async def capture_order(
                 source="paypal_order",
                 source_id=order_id,
             )
+            # Phase H: auto-provision 1-yr free support subscription based on package tier.
+            try:
+                from support_subscription_routes import (
+                    provision_bundled_support_subscription,
+                )
+
+                fresh_txn = await db.paypal_transactions.find_one(
+                    {"id": order_id}, {"_id": 0}
+                ) or {}
+                package_tier = (fresh_txn.get("tier") or "").lower()
+                if package_tier:
+                    company = await db.companies.find_one(
+                        {"primary_email": payer_email.lower()}, {"_id": 0}
+                    )
+                    if company:
+                        await provision_bundled_support_subscription(
+                            db, company, package_tier
+                        )
+            except Exception as exc:
+                log.exception("Support subscription auto-provision failed: %s", exc)
         except Exception as exc:
             log.exception("Auto-provision client/onboarding failed: %s", exc)
 

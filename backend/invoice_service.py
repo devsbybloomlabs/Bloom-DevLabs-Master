@@ -65,9 +65,9 @@ BUSINESS_DEFAULTS: Dict[str, Any] = {
     "legal_name": "Bloom Development Labs Corp.",
     "trading_name": "Bloom Labs",
     "address_lines": [
-        "1209 Mountain Road Pl NE Ste H",
-        "Albuquerque, NM 87110",
-        "United States",
+        "2153 Chino Roces Ave.",
+        "Brgy. Pio del Pilar, Makati City",
+        "1229 Philippines",
     ],
     "email": "billing@bybloomlabs.com",
     "website": "bybloomlabs.com",

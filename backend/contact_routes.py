@@ -52,6 +52,7 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB
 ALLOWED_PRIORITIES = {"low", "medium", "high"}
 FOUNDER_EMAIL = os.environ.get("FOUNDER_EMAIL", "founder@thesalvador.group")
 SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@bybloomlabs.com")
+SUPPORT_VIP_EMAIL = os.environ.get("SUPPORT_VIP_EMAIL", "vipsupport@bybloomlabs.com")
 
 
 def _ensure_upload_dir() -> Path:
@@ -500,8 +501,12 @@ async def _email_founder_notification(
     if company_doc.get("name"):
         extra_headers["X-Bloom-Company"] = company_doc["name"]
 
-    primary_to = SUPPORT_EMAIL
-    cc_list = [FOUNDER_EMAIL] if FOUNDER_EMAIL and FOUNDER_EMAIL != SUPPORT_EMAIL else None
+    # Phase I (Feb 2026): tier-aware routing. VIP tickets go to a dedicated
+    # inbox; Standard / Premium / no-plan stays on the general support inbox.
+    company_tier = (company_doc.get("support_tier") or "none").lower()
+    primary_to = SUPPORT_VIP_EMAIL if company_tier == "vip" else SUPPORT_EMAIL
+    extra_headers["X-Bloom-Routed-Tier"] = company_tier
+    cc_list = [FOUNDER_EMAIL] if FOUNDER_EMAIL and FOUNDER_EMAIL != primary_to else None
 
     try:
         await emailit.send_email(
