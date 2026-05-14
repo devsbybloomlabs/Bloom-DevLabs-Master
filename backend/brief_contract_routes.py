@@ -232,15 +232,33 @@ async def _build_contract_pdf(
 # Dispatch
 # -------------------------------------------------------------------------
 async def _resolve_template_id(bd: BreezeDocsClient, name_hint: str) -> Optional[int]:
-    """Best-effort template ID lookup — case-insensitive substring match."""
+    """Best-effort template ID lookup — case-insensitive substring match.
+
+    BreezeDocs' /templates response is loosely typed — some rows come back as
+    full {id, title, ...} dicts, others as bare title strings. We defend
+    against both shapes and only return when we have BOTH an id and a title.
+    """
     res = await bd.list_templates()
     if not res.get("success"):
         return None
     needle = name_hint.lower()
     for t in res.get("data") or []:
-        title = (t.get("title") or "").lower()
+        if isinstance(t, dict):
+            title = (t.get("title") or t.get("name") or "").lower()
+            tid = t.get("id")
+        elif isinstance(t, str):
+            # Bare-string row — we have a name match but no ID to act on.
+            title = t.lower()
+            tid = None
+        else:
+            continue
+        if not title or tid is None:
+            continue
         if needle in title or title in needle:
-            return int(t["id"])
+            try:
+                return int(tid)
+            except (TypeError, ValueError):
+                continue
     return None
 
 

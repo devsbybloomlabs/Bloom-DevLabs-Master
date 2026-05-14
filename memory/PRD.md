@@ -121,6 +121,47 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 **Backend touch:** none — admin milestone-list endpoint already exists (`GET /admin/milestones`) and is now fetched once per page-load to enrich the prompt with milestone titles.
 
+
+### ✅ Phases F · G · H · I · J — Subscriptions + Contract Automation (Feb 2026)
+**Verified — testing agent (iteration_28.json) + 19/19 backend pytest (test_iteration_28*.py) + full regression 297/298 + frontend Playwright smoke + manual UI screenshot.**
+
+**Phase F — Google Drive Mirror Sync OAuth completed**
+- Pasted founder's `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` into `backend/.env`. `/api/admin/google-drive/status` reports `configured:true`; `/connect` returns the real Google OAuth start URL. Founder still needs to click **Connect Google Drive** in Admin → Integrations to authorize once.
+
+**Phase G — Invoice address fix**
+- `invoice_service.BUSINESS_DEFAULTS.address_lines` → `["2153 Chino Roces Ave.", "Brgy. Pio del Pilar, Makati City", "1229 Philippines"]`. Albuquerque line removed. Verified via WeasyPrint PDF + pypdf text extraction in pytest.
+
+**Phase H — Package → 1-yr free support subscription auto-provision + paid upgrade**
+- New `support_subscription_routes.py`. Catalog: 6 PayPal-backed plans (Std/Premium/VIP × Annual/Quarterly) with real `plan_id`s starting with `P-`. Pricing: Annual $29/$49/$89·mo (= $348/$588/$1,068/yr) · Quarterly $39/$59/$99·mo (= $117/$177/$297/qtr).
+- Mapping: `express → standard`, `custom → premium`, `enterprise → vip`. On PayPal package capture, `provision_bundled_support_subscription` inserts a `support_subscriptions` row with `source=bundled`, `status=active_free`, `expires_at = now + 365d`. Idempotent — never duplicates an existing active row.
+- `/api/clients/me/support-subscription` GET returns the current entitlement + `available_plans` (server-side filtered to upgrade-only) + exclusions note.
+- `/subscribe` POST guards `new_tier > current_tier` (returns 400 on equal-or-lower) + reuses a pending PayPal approval URL if one exists. Webhook hook in `paypal_webhooks.BILLING.SUBSCRIPTION.ACTIVATED` calls `activate_paid_support_subscription` which supersedes the bundled free row + inserts `active_paid` + flips `company.support_tier`.
+- Daily 3am UTC `support_subscription_expiry_cron`: flips overdue `active_free` rows to `expired` and (if no paid replacement) flips `company.support_tier→none`.
+- Client portal **Subscriptions tab** rewritten — `SupportSubscriptionSection` shows the current tier card + Annual/Quarterly upgrade catalog with per-plan testids (`portal-support-plan-{key}`, `portal-support-subscribe-{key}`). Exclusions note rendered prominently.
+
+**Phase I — Tier-aware support email routing**
+- `contact_routes._email_founder_notification` now routes primary `to:` to `SUPPORT_VIP_EMAIL` (= `vipsupport@bybloomlabs.com`) when `company.support_tier=='vip'`, else `SUPPORT_EMAIL`. Adds `X-Bloom-Routed-Tier` header. Founder stays cc'd in all cases.
+
+**Phase J — Brief approval → contract & invoice automation (admin-review gate)**
+- On 3rd-phase approval, `_finalize_brief_approval` flips `brief.awaiting_contract_dispatch=true`. Admin sees an amber **Contract Dispatch Banner** in `ProjectBriefDialog` with Preview + Send buttons.
+- New `brief_contract_routes.py`:
+  - `_build_contract_pdf` (WeasyPrint) compiles cover + 3 approved phase summaries + onboarding kickoff (project name / story / goals / scenarios / phone / best time / logo) + appendix page with the original PayPal package invoice.
+  - `POST /api/admin/briefs/{id}/dispatch-contract` — idempotent. Side effects: saves PDF to `project_files` (category=contract), creates BreezeDocs document from the configurable template (default `test contract template.docx`), sends signing email, writes `breezedocs_proposals` row tagged with `linked_brief_id` + `linked_milestone_title`, creates `Contract & Invoice Sent` milestone (status=in_progress), emails client.
+  - `GET /api/admin/briefs/{id}/contract-preview` — returns the compiled PDF inline.
+- BreezeDocs sync (`sync_proposal` + `breezedocs_sync_cron`) now flips the `Contract & Invoice Sent` milestone to `complete` when the proposal transitions to `signed` or `completed`.
+- Defensive fix on `_resolve_template_id` — BreezeDocs `/templates` rows can be dict OR bare string; both shapes handled.
+
+**Decommissioned**
+- BreezeDocs custom-field MSA stays parked. We sidestepped the custom-field requirement entirely by self-generating the PDF and using BreezeDocs purely for the signing workflow (Option J-a).
+
+**Backlog (P2)**
+- BreezeDocs custom-field templating (switch behind `USE_BREEZEDOCS_NATIVE_TEMPLATE` flag once their support confirms).
+- The two pre-existing console warnings (Radix DialogTitle, TipTap duplicate-link).
+- `server.py` router refactor.
+- "Restore archived contact" undo.
+- Flaky `test_project_files_and_triage.py::test_upload_admin_download_client_download` in full-suite parallel (passes standalone — likely a fixture race).
+
+
 **Tests** (`emergentBridge.test.js`): 7 Jest unit tests covering title heading, context block, description pass-through, always-true house rules, missing-description fallback, null-task safety, no-context graceful degradation. **All green.**
 
 ### ✅ Phase D part 3 — Per-phase AI Project Brief rewrite (Feb 2026)
