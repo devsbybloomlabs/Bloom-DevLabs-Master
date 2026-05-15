@@ -795,19 +795,14 @@ function GoogleDriveCard() {
           When enabled, every project file you upload is mirrored into a
           "Bloom Labs — {`{Project Name}`}" folder inside your Google Drive.
         </p>
-        {!isConfigured && (
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm">
-            <p className="font-medium text-amber-900">Setup required</p>
-            <p className="text-amber-900/80 mt-1">
-              Add <code className="bg-amber-100 px-1 rounded text-xs">GOOGLE_CLIENT_ID</code>,{" "}
-              <code className="bg-amber-100 px-1 rounded text-xs">GOOGLE_CLIENT_SECRET</code>,
-              and{" "}
-              <code className="bg-amber-100 px-1 rounded text-xs">GOOGLE_DRIVE_REDIRECT_URI</code>{" "}
-              to <code className="bg-amber-100 px-1 rounded text-xs">backend/.env</code>.
-              See the setup checklist in your last agent summary.
-            </p>
-          </div>
-        )}
+
+        {/* OAuth credentials form — Phase F (Feb 2026) */}
+        <DriveCredentialsForm
+          api={api}
+          credentials={status?.credentials}
+          onSaved={load}
+        />
+
         {isConfigured && !isConnected && (
           <Button onClick={connect} disabled={busy} data-testid="gdrive-connect-btn">
             {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Link2 className="h-4 w-4 mr-2" />}
@@ -902,5 +897,209 @@ function GoogleDriveCard() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+
+// ============================================================================
+// DriveCredentialsForm — admin can paste/rotate OAuth Client ID + Secret +
+// Redirect URI without redeploying. Saves to the `google_drive_oauth_config`
+// settings row; backend prefers this over env vars.
+// ============================================================================
+function DriveCredentialsForm({ api, credentials, onSaved }) {
+  const [open, setOpen] = useState(!credentials?.client_id);
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [redirectUri, setRedirectUri] = useState("");
+  const [saving, setSaving] = useState(false);
+  const isConfigured = Boolean(credentials?.client_id);
+
+  // Seed inputs from existing config so the admin can tweak one field without
+  // re-entering everything. client_secret is intentionally NOT pre-filled
+  // (we only have the redacted preview).
+  useEffect(() => {
+    if (credentials) {
+      setClientId(credentials.client_id || "");
+      setRedirectUri(credentials.redirect_uri || "");
+    }
+  }, [credentials]);
+
+  const save = async () => {
+    if (!clientId.trim() || !clientSecret.trim() || !redirectUri.trim()) {
+      toast.error("Fill all three fields");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post("/admin/google-drive/credentials", {
+        client_id: clientId.trim(),
+        client_secret: clientSecret.trim(),
+        redirect_uri: redirectUri.trim(),
+      });
+      toast.success("Drive credentials saved");
+      setClientSecret("");
+      setOpen(false);
+      onSaved && onSaved();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearStored = async () => {
+    if (!window.confirm("Clear stored Drive credentials? You'll need to re-enter them to use Drive sync.")) return;
+    setSaving(true);
+    try {
+      await api.delete("/admin/google-drive/credentials");
+      toast.success("Stored credentials cleared");
+      setClientId("");
+      setClientSecret("");
+      setRedirectUri("");
+      onSaved && onSaved();
+    } catch {
+      toast.error("Clear failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open && isConfigured) {
+    return (
+      <div
+        className="rounded-lg bg-secondary/40 border border-border p-3 text-xs"
+        data-testid="gdrive-credentials-summary"
+      >
+        <p className="font-medium text-foreground">OAuth credentials</p>
+        <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+          <p>
+            <strong>Client ID:</strong>{" "}
+            <span className="font-mono break-all">
+              {credentials.client_id?.slice(0, 18)}…{credentials.client_id?.slice(-18)}
+            </span>
+          </p>
+          <p>
+            <strong>Secret:</strong>{" "}
+            <span className="font-mono">{credentials.client_secret_preview || "—"}</span>
+          </p>
+          <p className="sm:col-span-2">
+            <strong>Redirect URI:</strong>{" "}
+            <span className="font-mono break-all">{credentials.redirect_uri}</span>
+          </p>
+          <p className="sm:col-span-2 text-[10px] uppercase tracking-wider opacity-70">
+            Source: client_id={credentials.source_client_id} · secret={credentials.source_client_secret} · redirect={credentials.source_redirect_uri}
+            {credentials.updated_at &&
+              ` · updated ${new Date(credentials.updated_at).toLocaleString()}`}
+          </p>
+        </div>
+        <div className="mt-2.5 flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setOpen(true)}
+            data-testid="gdrive-credentials-edit"
+          >
+            Edit credentials
+          </Button>
+          {credentials.source_client_id === "db" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearStored}
+              disabled={saving}
+              data-testid="gdrive-credentials-clear"
+              className="text-rose-600 hover:bg-rose-50"
+            >
+              Clear & use env vars
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-lg border border-border bg-card p-4 space-y-3"
+      data-testid="gdrive-credentials-form"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-medium text-sm">Google OAuth credentials</p>
+        {isConfigured && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            data-testid="gdrive-credentials-cancel"
+          >
+            Cancel
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Paste the values from your Google Cloud Console OAuth 2.0 Client.
+        Stored credentials override any env vars set at deploy time.
+      </p>
+      <div>
+        <Label className="text-xs">Client ID</Label>
+        <Input
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          placeholder="123456789-abc...apps.googleusercontent.com"
+          autoComplete="off"
+          spellCheck={false}
+          data-testid="gdrive-credentials-client-id"
+          className="mt-1 font-mono text-xs"
+        />
+      </div>
+      <div>
+        <Label className="text-xs">
+          Client Secret
+          {credentials?.client_secret_set && (
+            <span className="ml-1.5 text-[10px] text-muted-foreground">
+              (current: {credentials.client_secret_preview} — re-enter to save changes)
+            </span>
+          )}
+        </Label>
+        <Input
+          type="password"
+          value={clientSecret}
+          onChange={(e) => setClientSecret(e.target.value)}
+          placeholder="GOCSPX-…"
+          autoComplete="off"
+          spellCheck={false}
+          data-testid="gdrive-credentials-client-secret"
+          className="mt-1 font-mono text-xs"
+        />
+      </div>
+      <div>
+        <Label className="text-xs">Authorized Redirect URI</Label>
+        <Input
+          value={redirectUri}
+          onChange={(e) => setRedirectUri(e.target.value)}
+          placeholder="https://yourdomain.com/api/admin/google-drive/oauth/callback"
+          autoComplete="off"
+          spellCheck={false}
+          data-testid="gdrive-credentials-redirect-uri"
+          className="mt-1 font-mono text-xs"
+        />
+        <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+          Must match EXACTLY one of the Authorized redirect URIs in your Google
+          Cloud Console OAuth Client.
+        </p>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <Button
+          size="sm"
+          onClick={save}
+          disabled={saving}
+          data-testid="gdrive-credentials-save"
+          className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white"
+        >
+          {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+          Save credentials
+        </Button>
+      </div>
+    </div>
   );
 }

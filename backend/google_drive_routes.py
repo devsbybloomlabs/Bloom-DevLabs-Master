@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, Field
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -42,34 +43,49 @@ def get_db(request: Request) -> AsyncIOMotorDatabase:
 
 GDRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 GDRIVE_CREDS_KEY = "google_drive_credentials"
+GDRIVE_OAUTH_CONFIG_KEY = "google_drive_oauth_config"
 
 
 # -------------------------------------------------------------------------
 # OAuth helpers
 # -------------------------------------------------------------------------
-def _client_config() -> Dict[str, Any]:
-    cid = os.environ.get("GOOGLE_CLIENT_ID")
-    secret = os.environ.get("GOOGLE_CLIENT_SECRET")
-    redirect = os.environ.get("GOOGLE_DRIVE_REDIRECT_URI")
-    if not (cid and secret and redirect):
+async def _resolve_oauth_settings(db: AsyncIOMotorDatabase) -> Dict[str, str]:
+    """Return {client_id, client_secret, redirect_uri}.
+
+    Priority: DB-stored settings (set via admin UI) → env vars. DB wins so
+    founders can rotate credentials without redeploying.
+    """
+    cfg = await get_setting(db, GDRIVE_OAUTH_CONFIG_KEY) or {}
+    return {
+        "client_id": cfg.get("client_id") or os.environ.get("GOOGLE_CLIENT_ID", ""),
+        "client_secret": cfg.get("client_secret") or os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+        "redirect_uri": cfg.get("redirect_uri") or os.environ.get("GOOGLE_DRIVE_REDIRECT_URI", ""),
+    }
+
+
+async def _client_config(db: AsyncIOMotorDatabase) -> Dict[str, Any]:
+    s = await _resolve_oauth_settings(db)
+    if not (s["client_id"] and s["client_secret"] and s["redirect_uri"]):
         raise HTTPException(
             503,
-            "Google Drive not configured — set GOOGLE_CLIENT_ID, "
-            "GOOGLE_CLIENT_SECRET, GOOGLE_DRIVE_REDIRECT_URI in backend/.env",
+            "Google Drive not configured — enter Client ID, Secret, and "
+            "Redirect URI in Admin → Integrations.",
         )
     return {
         "web": {
-            "client_id": cid,
-            "client_secret": secret,
+            "client_id": s["client_id"],
+            "client_secret": s["client_secret"],
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [redirect],
+            "redirect_uris": [s["redirect_uri"]],
         }
     }
 
 
-def _build_flow(scopes: Optional[List[str]] = None) -> Flow:
-    cfg = _client_config()
+async def _build_flow(
+    db: AsyncIOMotorDatabase, scopes: Optional[List[str]] = None
+) -> Flow:
+    cfg = await _client_config(db)
     return Flow.from_client_config(
         cfg,
         scopes=scopes if scopes is not None else GDRIVE_SCOPES,
@@ -223,10 +239,10 @@ async def drive_status(
         creds = await _load_creds(db)
     except Exception as exc:  # noqa: BLE001
         err = str(exc)
+    settings = await _resolve_oauth_settings(db)
+    cfg_blob = await get_setting(db, GDRIVE_OAUTH_CONFIG_KEY) or {}
     configured = bool(
-        os.environ.get("GOOGLE_CLIENT_ID")
-        and os.environ.get("GOOGLE_CLIENT_SECRET")
-        and os.environ.get("GOOGLE_DRIVE_REDIRECT_URI")
+        settings["client_id"] and settings["client_secret"] and settings["redirect_uri"]
     )
     blob = await get_setting(db, GDRIVE_CREDS_KEY) or {}
     return {
@@ -236,19 +252,84 @@ async def drive_status(
         "scopes": blob.get("scopes"),
         "last_refresh_at": blob.get("updated_at"),
         "error": err,
+        # Surface where each credential value is coming from + a redacted
+        # snapshot so the admin form can render confirmation copy without
+        # leaking the secret to the browser.
+        "credentials": {
+            "client_id": settings["client_id"],
+            "redirect_uri": settings["redirect_uri"],
+            "client_secret_set": bool(settings["client_secret"]),
+            "client_secret_preview": (
+                f"…{settings['client_secret'][-4:]}" if settings["client_secret"] else ""
+            ),
+            "source_client_id": "db" if cfg_blob.get("client_id") else ("env" if os.environ.get("GOOGLE_CLIENT_ID") else "none"),
+            "source_client_secret": "db" if cfg_blob.get("client_secret") else ("env" if os.environ.get("GOOGLE_CLIENT_SECRET") else "none"),
+            "source_redirect_uri": "db" if cfg_blob.get("redirect_uri") else ("env" if os.environ.get("GOOGLE_DRIVE_REDIRECT_URI") else "none"),
+            "updated_at": cfg_blob.get("updated_at"),
+        },
     }
 
 
 @gdrive_admin_router.get("/connect")
-async def drive_connect(_user=Depends(get_current_user)) -> Dict[str, str]:
+async def drive_connect(
+    _user=Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, str]:
     """Return the OAuth URL the admin should visit to grant Drive access."""
-    flow = _build_flow()
+    flow = await _build_flow(db)
     auth_url, _state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
     )
     return {"authorization_url": auth_url}
+
+
+class DriveOAuthConfigRequest(BaseModel):
+    """Admin-supplied OAuth client credentials."""
+
+    client_id: str = Field(..., min_length=10)
+    client_secret: str = Field(..., min_length=10)
+    redirect_uri: str = Field(..., min_length=10)
+
+
+@gdrive_admin_router.post("/credentials")
+async def save_drive_credentials(
+    req: DriveOAuthConfigRequest,
+    _user=Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Save Google OAuth Client ID/Secret/Redirect URI to the DB.
+
+    Stored values take precedence over env vars. Use this so credential rotation
+    doesn't require redeploying — admin pastes the new creds, clicks save, then
+    re-runs the OAuth connect flow.
+    """
+    redirect = req.redirect_uri.strip()
+    if not redirect.startswith(("http://", "https://")):
+        raise HTTPException(400, "Redirect URI must start with http:// or https://")
+    payload = {
+        "client_id": req.client_id.strip(),
+        "client_secret": req.client_secret.strip(),
+        "redirect_uri": redirect,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await set_setting(db, GDRIVE_OAUTH_CONFIG_KEY, payload)
+    log.info("Google Drive OAuth credentials updated via admin UI")
+    return {"ok": True, "saved": True}
+
+
+@gdrive_admin_router.delete("/credentials")
+async def clear_drive_credentials(
+    _user=Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, bool]:
+    """Clear DB-stored creds so the integration falls back to env vars (if any)."""
+    await set_setting(db, GDRIVE_OAUTH_CONFIG_KEY, None)
+    # Also clear any cached OAuth tokens — they were issued against the old
+    # client_id and would fail on refresh anyway.
+    await set_setting(db, GDRIVE_CREDS_KEY, None)
+    return {"ok": True}
 
 
 # Public callback (no admin auth — Google's redirect won't carry our JWT).
@@ -272,7 +353,7 @@ async def drive_callback(
     if not code:
         return RedirectResponse(f"{frontend}/admin/integrations?drive_error=missing_code")
     # Accept any scopes Google chose to grant (Google may add userinfo.email/openid).
-    flow = _build_flow(scopes=None)
+    flow = await _build_flow(db, scopes=None)
     try:
         flow.fetch_token(code=code)
     except Exception as exc:  # noqa: BLE001
