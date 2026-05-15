@@ -346,8 +346,25 @@ async def drive_callback(
     error: Optional[str] = Query(None),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
-    """Receive the OAuth code from Google and exchange it for tokens."""
-    frontend = os.environ.get("FRONTEND_URL", "https://wave1-cleanups.preview.emergentagent.com")
+    """Receive the OAuth code from Google and exchange it for tokens.
+
+    Post-callback redirect is built from whatever domain Google sent the user
+    back to (i.e. the saved redirect_uri's origin). This guarantees production
+    OAuth never accidentally lands the user back on the preview URL.
+    """
+    # Derive frontend origin from the saved redirect URI — Google would only
+    # call us if the redirect URI was registered, so this is the canonical
+    # "current environment" URL. Falls back to FRONTEND_URL env var, then to
+    # the request's own base URL.
+    settings = await _resolve_oauth_settings(db)
+    saved_redirect = settings.get("redirect_uri") or ""
+    if saved_redirect.startswith("http"):
+        from urllib.parse import urlparse
+
+        parts = urlparse(saved_redirect)
+        frontend = f"{parts.scheme}://{parts.netloc}"
+    else:
+        frontend = os.environ.get("FRONTEND_URL") or str(request.base_url).rstrip("/")
     if error:
         return RedirectResponse(f"{frontend}/admin/integrations?drive_error={error}")
     if not code:
