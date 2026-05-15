@@ -87,14 +87,57 @@ async def _client_config(db: AsyncIOMotorDatabase) -> Dict[str, Any]:
 
 
 async def _build_flow(
-    db: AsyncIOMotorDatabase, scopes: Optional[List[str]] = None
+    db: AsyncIOMotorDatabase,
+    scopes: Optional[List[str]] = None,
+    code_verifier: Optional[str] = None,
 ) -> Flow:
     cfg = await _client_config(db)
-    return Flow.from_client_config(
+    flow = Flow.from_client_config(
         cfg,
         scopes=scopes if scopes is not None else GDRIVE_SCOPES,
         redirect_uri=cfg["web"]["redirect_uris"][0],
+        # If a verifier from the original /connect request is supplied, use it
+        # so PKCE round-trips. Otherwise the lib auto-generates one on
+        # authorization_url() and stores it on flow.code_verifier.
+        code_verifier=code_verifier,
+        autogenerate_code_verifier=code_verifier is None,
     )
+    return flow
+
+
+GDRIVE_PKCE_KEY = "google_drive_pkce_verifiers"
+
+
+async def _store_pkce_verifier(
+    db: AsyncIOMotorDatabase, state: str, verifier: str
+) -> None:
+    """Persist the PKCE code_verifier so the /callback request can retrieve
+    it. Keyed by OAuth state. Old entries (>30 min) are purged on write."""
+    now = datetime.now(timezone.utc)
+    blob = await get_setting(db, GDRIVE_PKCE_KEY) or {}
+    # Purge anything older than 30 minutes
+    cutoff = now.timestamp() - 30 * 60
+    blob = {
+        k: v
+        for k, v in blob.items()
+        if isinstance(v, dict) and v.get("ts", 0) >= cutoff
+    }
+    blob[state] = {"verifier": verifier, "ts": now.timestamp()}
+    await set_setting(db, GDRIVE_PKCE_KEY, blob)
+
+
+async def _consume_pkce_verifier(
+    db: AsyncIOMotorDatabase, state: str
+) -> Optional[str]:
+    """Pop the saved PKCE verifier for this state (one-shot use)."""
+    if not state:
+        return None
+    blob = await get_setting(db, GDRIVE_PKCE_KEY) or {}
+    entry = blob.pop(state, None)
+    if entry:
+        await set_setting(db, GDRIVE_PKCE_KEY, blob)
+        return entry.get("verifier")
+    return None
 
 
 async def _load_creds(db: AsyncIOMotorDatabase) -> Optional[Credentials]:
@@ -281,11 +324,17 @@ async def drive_connect(
 ) -> Dict[str, str]:
     """Return the OAuth URL the admin should visit to grant Drive access."""
     flow = await _build_flow(db)
-    auth_url, _state = flow.authorization_url(
+    auth_url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
     )
+    # google-auth-oauthlib auto-generates a PKCE code_verifier on the flow
+    # object during authorization_url(). We need that exact value at the
+    # /callback step, but that runs in a separate request → separate Flow
+    # instance. Persist it keyed by OAuth state.
+    if flow.code_verifier:
+        await _store_pkce_verifier(db, state, flow.code_verifier)
     return {"authorization_url": auth_url}
 
 
@@ -347,6 +396,7 @@ gdrive_oauth_router = APIRouter(
 async def drive_callback(
     request: Request,
     code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
@@ -377,8 +427,14 @@ async def drive_callback(
     # oauthlib's strict scope check rejects this — relax it so the exchange
     # accepts whatever Google grants.
     os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
-    # Accept any scopes Google chose to grant.
-    flow = await _build_flow(db, scopes=None)
+    # Retrieve the PKCE code_verifier we stashed during /connect (keyed by
+    # state). Without it Google rejects the exchange with
+    # "invalid_grant: Missing code verifier" because the auth URL carried a
+    # code_challenge.
+    verifier = await _consume_pkce_verifier(db, state or "")
+    # Accept any scopes Google chose to grant. Pass the saved verifier so
+    # PKCE round-trips correctly.
+    flow = await _build_flow(db, scopes=None, code_verifier=verifier)
     try:
         flow.fetch_token(code=code)
     except Exception as exc:  # noqa: BLE001
