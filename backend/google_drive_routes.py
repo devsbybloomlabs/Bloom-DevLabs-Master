@@ -21,6 +21,10 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+# Relax oauthlib's scope check — Google often adds openid/userinfo scopes
+# beyond what we requested, which would otherwise raise during fetch_token.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
@@ -369,13 +373,24 @@ async def drive_callback(
         return RedirectResponse(f"{frontend}/admin/integrations?drive_error={error}")
     if not code:
         return RedirectResponse(f"{frontend}/admin/integrations?drive_error=missing_code")
-    # Accept any scopes Google chose to grant (Google may add userinfo.email/openid).
+    # Google adds openid/email scopes when the user has multiple apps linked.
+    # oauthlib's strict scope check rejects this — relax it so the exchange
+    # accepts whatever Google grants.
+    os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+    # Accept any scopes Google chose to grant.
     flow = await _build_flow(db, scopes=None)
     try:
         flow.fetch_token(code=code)
     except Exception as exc:  # noqa: BLE001
         log.warning("Drive token exchange failed: %s", exc)
-        return RedirectResponse(f"{frontend}/admin/integrations?drive_error=exchange_failed")
+        # Surface a short error code in the URL so the admin form can show
+        # something more useful than 'exchange_failed'.
+        from urllib.parse import quote_plus
+
+        msg = str(exc)[:80]
+        return RedirectResponse(
+            f"{frontend}/admin/integrations?drive_error=exchange_failed&detail={quote_plus(msg)}"
+        )
     creds = flow.credentials
     # Required scope check (with subset semantics, per playbook).
     granted = set(creds.scopes or [])

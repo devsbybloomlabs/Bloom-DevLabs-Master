@@ -70,7 +70,11 @@ export default function IntegrationsAdmin() {
     }
     const err = params.get("drive_error");
     if (err) {
-      toast.error(`Google Drive: ${err}`);
+      const detail = params.get("detail");
+      toast.error(
+        `Google Drive: ${err}${detail ? ` — ${detail}` : ""}`,
+        { duration: 12000 }
+      );
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -907,12 +911,14 @@ function GoogleDriveCard() {
 // settings row; backend prefers this over env vars.
 // ============================================================================
 function DriveCredentialsForm({ api, credentials, onSaved }) {
-  const [open, setOpen] = useState(!credentials?.client_id);
+  // Track whether the credentials API has resolved yet so we don't render an
+  // empty form before we know if creds exist.
+  const isConfigured = Boolean(credentials?.client_id);
+  const [userOpened, setUserOpened] = useState(false);
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [redirectUri, setRedirectUri] = useState("");
   const [saving, setSaving] = useState(false);
-  const isConfigured = Boolean(credentials?.client_id);
 
   // Seed inputs from existing config so the admin can tweak one field without
   // re-entering everything. client_secret is intentionally NOT pre-filled
@@ -923,6 +929,11 @@ function DriveCredentialsForm({ api, credentials, onSaved }) {
       setRedirectUri(credentials.redirect_uri || "");
     }
   }, [credentials]);
+
+  // The form is "open" (editable) when either (a) there are no saved creds
+  // OR (b) the admin explicitly clicked Edit. After save, we reset userOpened
+  // so the next refresh shows the collapsed summary.
+  const open = !isConfigured || userOpened;
 
   const save = async () => {
     if (!clientId.trim() || !clientSecret.trim() || !redirectUri.trim()) {
@@ -938,7 +949,7 @@ function DriveCredentialsForm({ api, credentials, onSaved }) {
       });
       toast.success("Drive credentials saved");
       setClientSecret("");
-      setOpen(false);
+      setUserOpened(false);
       onSaved && onSaved();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Save failed");
@@ -996,7 +1007,7 @@ function DriveCredentialsForm({ api, credentials, onSaved }) {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setOpen(true)}
+            onClick={() => setUserOpened(true)}
             data-testid="gdrive-credentials-edit"
           >
             Edit credentials
@@ -1029,7 +1040,7 @@ function DriveCredentialsForm({ api, credentials, onSaved }) {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => setOpen(false)}
+            onClick={() => setUserOpened(false)}
             data-testid="gdrive-credentials-cancel"
           >
             Cancel
