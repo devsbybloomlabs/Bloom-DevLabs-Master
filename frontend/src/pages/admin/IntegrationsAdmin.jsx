@@ -705,18 +705,23 @@ function GoogleDriveCard() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    let statusOk = false;
     try {
-      const [s, p] = await Promise.all([
-        api.get("/admin/google-drive/status"),
-        api.get("/admin/pm/projects"),
-      ]);
+      const s = await api.get("/admin/google-drive/status");
       setStatus(s.data);
+      statusOk = true;
+    } catch (e) {
+      const detail = e?.response?.data?.detail || e?.message || "Could not load Google Drive status";
+      toast.error(`Drive status: ${detail}`, { duration: 8000 });
+    }
+    try {
+      const p = await api.get("/admin/pm/projects");
       setProjects(p.data || []);
     } catch {
-      // tolerate — show whatever loaded
-    } finally {
-      setLoading(false);
+      // PM projects list is optional for the Drive card — silently tolerate.
     }
+    setLoading(false);
+    return statusOk;
   }, [api]);
 
   useEffect(() => {

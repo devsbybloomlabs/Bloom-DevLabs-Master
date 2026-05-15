@@ -145,11 +145,13 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 **Phase J — Brief approval → contract & invoice automation (admin-review gate)**
 - On 3rd-phase approval, `_finalize_brief_approval` flips `brief.awaiting_contract_dispatch=true`. Admin sees an amber **Contract Dispatch Banner** in `ProjectBriefDialog` with Preview + Send buttons.
 - New `brief_contract_routes.py`:
-  - `_build_contract_pdf` (WeasyPrint) compiles cover + 3 approved phase summaries + onboarding kickoff (project name / story / goals / scenarios / phone / best time / logo) + appendix page with the original PayPal package invoice.
+  - `_build_contract_pdf` (WeasyPrint) compiles cover + 3 approved phase summaries + onboarding kickoff (project name / story / goals / scenarios / phone / best time / logo) + appendix cover for the original PayPal package invoice.
+  - **(Feb 2026 update)** — the rendered paid-invoice PDF (via `invoice_service.render_invoice_pdf`) is now merged into the final contract PDF via `pypdf` so the actual branded invoice appears as the closing pages of the MSA bundle. New `tests/test_contract_invoice_merge.py` proves the page count increases when a paid invoice exists.
   - `POST /api/admin/briefs/{id}/dispatch-contract` — idempotent. Side effects: saves PDF to `project_files` (category=contract), creates BreezeDocs document from the configurable template (default `test contract template.docx`), sends signing email, writes `breezedocs_proposals` row tagged with `linked_brief_id` + `linked_milestone_title`, creates `Contract & Invoice Sent` milestone (status=in_progress), emails client.
   - `GET /api/admin/briefs/{id}/contract-preview` — returns the compiled PDF inline.
 - BreezeDocs sync (`sync_proposal` + `breezedocs_sync_cron`) now flips the `Contract & Invoice Sent` milestone to `complete` when the proposal transitions to `signed` or `completed`.
 - Defensive fix on `_resolve_template_id` — BreezeDocs `/templates` rows can be dict OR bare string; both shapes handled.
+- **(Feb 2026 update)** — `IntegrationsAdmin.GoogleDriveCard.load()` no longer silently swallows fetch errors; surfaces a toast so the founder sees a real reason if the status endpoint fails instead of perceiving "credentials disappeared".
 
 **Decommissioned**
 - BreezeDocs custom-field MSA stays parked. We sidestepped the custom-field requirement entirely by self-generating the PDF and using BreezeDocs purely for the signing workflow (Option J-a).
