@@ -49,6 +49,10 @@ import PublicSandboxTour from "@/pages/PublicSandboxTour";
 import PayInvoice from "@/pages/PayInvoice";
 import AnalyticsTracker from "@/components/Analytics";
 import AuthCallback from "@/pages/AuthCallback";
+import GymHeroPage from "@/pages/gym/GymHeroPage";
+import GymHowItWorksPage from "@/pages/gym/GymHowItWorksPage";
+import GymProcessPage from "@/pages/gym/GymProcessPage";
+import GymResultsPage from "@/pages/gym/GymResultsPage";
 
 function App() {
   return (
@@ -63,6 +67,10 @@ function App() {
               <Route path="/blog" element={<PublicBlog />} />
               <Route path="/blog/:slug" element={<PublicBlogPost />} />
               <Route path="/tour" element={<PublicSandboxTour />} />
+              <Route path="/gym-owners" element={<GymHeroPage />} />
+              <Route path="/gym-owners/how-it-works" element={<GymHowItWorksPage />} />
+              <Route path="/gym-owners/process" element={<GymProcessPage />} />
+              <Route path="/gym-owners/results" element={<GymResultsPage />} />
               <Route path="/pay/invoice/:invoiceId" element={<PayInvoice />} />
 
               {/* Client (public-facing) auth + portal */}
