@@ -45,12 +45,13 @@ function Hero() {
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent" />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-10">
         <h1 className="font-display text-4xl md:text-6xl font-bold leading-[1.05] max-w-3xl">
-          How your custom <span className="text-emerald-400">gym system</span> works.
+          How we prevent <span className="text-emerald-400">member churn</span><br />
+          (even if you've tried everything else).
         </h1>
         <p className="mt-6 text-lg text-slate-300 max-w-2xl leading-relaxed">
           Three connected pieces — a member dashboard, an automated follow-up engine,
           and a real-analytics layer. Built around <em>your</em> workflow, not a
-          template. Here's exactly what each one does.
+          template. Here's exactly what each one does and how they compound to keep members.
         </p>
       </div>
     </section>
@@ -368,7 +369,7 @@ function CTASection() {
             to="/gym-owners/process"
             className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-semibold px-7 py-3.5 rounded-md text-base transition"
           >
-            See the 4-week build process
+            See the 3-week build process
           </Link>
         </div>
       </div>

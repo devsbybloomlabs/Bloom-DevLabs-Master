@@ -7,7 +7,6 @@ import {
   Calendar,
   ArrowRight,
   Compass,
-  Layers,
   Hammer,
   Rocket,
   Clock,
@@ -43,12 +42,12 @@ function Hero() {
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent" />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-10">
         <h1 className="font-display text-4xl md:text-6xl font-bold leading-[1.05] max-w-3xl">
-          From discovery to launch in <span className="text-emerald-400">4 weeks</span>.
+          From discovery to launch in <span className="text-emerald-400">3 weeks</span>.
         </h1>
         <p className="mt-6 text-lg text-slate-300 max-w-2xl leading-relaxed">
-          A predictable 4-week build with two checkpoints, one launch, and
-          roughly an hour a week of your time. Here's exactly what each
-          week looks like.
+          A predictable 3-week build with two checkpoints, one launch, and
+          roughly an hour a week of your time. <strong className="text-white">You stay in
+          control. We build the system.</strong>
         </p>
       </div>
     </section>
@@ -61,32 +60,22 @@ function TimelineSection() {
     {
       icon: Compass,
       tone: "emerald",
-      title: "Discovery & Design",
+      title: "Discovery & Requirements",
       duration: "5 days",
       commit: "One 60-min discovery call",
-      what: "You walk us through your gym. We learn: how you sign up members, how you run classes, what data matters, which processes feel broken.",
+      what: "You walk us through your gym. We learn: how you sign up members, how you run classes, your current churn patterns, which processes feel broken. We turn that into a custom spec.",
       gets: "Custom system spec tailored to YOUR workflow.",
       deliverable: "Detailed written specification document.",
     },
     {
-      icon: Layers,
+      icon: Hammer,
       tone: "blue",
-      title: "Skeleton & Feedback",
+      title: "Skeleton Build & Your Feedback",
       duration: "7 days",
       commit: "One 45-min feedback session",
-      what: "We build a working skeleton with the core features — dashboard, automated emails, analytics. You click around. You tell us what to change.",
-      gets: "Hands-on preview of your system.",
-      deliverable: "Interactive prototype, live URL.",
-    },
-    {
-      icon: Hammer,
-      tone: "orange",
-      title: "Full Build",
-      duration: "7 days",
-      commit: "One 30-min check-in (optional)",
-      what: "Heavy development week. Payment processing, member mobile app, advanced features, every integration goes in.",
-      gets: "Near-complete system.",
-      deliverable: "Full system 90% complete + staging URL.",
+      what: "We build a working skeleton with the core features — dashboard, automated emails, analytics. You click around. You tell us what to change. We finish the full build in parallel.",
+      gets: "Hands-on preview + complete system 90% done.",
+      deliverable: "Live prototype URL + staging environment.",
     },
     {
       icon: Rocket,
@@ -94,8 +83,8 @@ function TimelineSection() {
       title: "Launch & Training",
       duration: "7 days",
       commit: "Final 60-min training call",
-      what: "Final testing. Go live on your domain. Train your team. Hand-over the playbook.",
-      gets: "Live system + trained team + 60-day support starts.",
+      what: "Final testing. Go live on your domain. Train your team. Hand-over the playbook. 60-day support clock starts.",
+      gets: "Live system + trained team + 60 days of dedicated support.",
       deliverable: "Production system live. Team owns it.",
     },
   ];
@@ -178,21 +167,21 @@ function CommitmentSection() {
               Your time
             </div>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-slate-900 leading-tight">
-              Total investment: <span className="text-emerald-600">~3 hours over 4 weeks.</span>
+              Total investment: <span className="text-emerald-600">~2.5 hours over 3 weeks.</span>
             </h2>
             <p className="mt-5 text-base text-slate-600 leading-relaxed">
               That's less than 1 hour per week. We handle every technical
-              decision, every integration, every line of code. You bring the
-              gym-owner perspective.
+              decision, every integration, every line of code.{" "}
+              <strong className="text-slate-900">You stay in control. We
+              build the system. You manage the business.</strong>
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-7">
             <div className="space-y-3">
               {[
                 { week: "Week 1", time: "60 min", purpose: "Discovery call" },
-                { week: "Week 2", time: "45 min", purpose: "Prototype feedback" },
-                { week: "Week 3", time: "30 min", purpose: "Optional check-in" },
-                { week: "Week 4", time: "60 min", purpose: "Launch training" },
+                { week: "Week 2", time: "45 min", purpose: "Skeleton feedback" },
+                { week: "Week 3", time: "60 min", purpose: "Launch training" },
               ].map((r, i) => (
                 <div key={i} className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-slate-50 border border-slate-100">
                   <div className="font-semibold text-slate-900">{r.week}</div>
@@ -202,7 +191,7 @@ function CommitmentSection() {
               ))}
               <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200">
                 <div className="font-bold text-emerald-900">Total</div>
-                <div className="text-sm font-bold text-emerald-700 tabular-nums">3 hours, 15 min</div>
+                <div className="text-sm font-bold text-emerald-700 tabular-nums">2 hours, 45 min</div>
               </div>
             </div>
           </div>

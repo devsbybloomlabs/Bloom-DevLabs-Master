@@ -74,13 +74,12 @@ function Hero() {
             Built for independent gym owners
           </div>
           <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.05]">
-            Stop losing gym members.{" "}
-            <span className="text-emerald-400">Build a system that keeps them.</span>
+            Stop leaving <span className="text-emerald-400">$500–$2,000 / month</span> per lost member on the table.
           </h1>
           <p className="mt-6 text-lg text-slate-300 max-w-2xl leading-relaxed">
-            Custom software that automates member follow-ups and reduces churn by{" "}
-            <strong className="text-white">20–30% in 60 days</strong>. Built specifically for
-            your gym — not a template. Ready in 3–4 weeks.
+            30–40% of new members quit in their first 90 days. We build{" "}
+            <strong className="text-white">custom retention software</strong> that
+            fixes this — launching in 3 weeks. Reduces churn 20–30% in 60 days.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row gap-3">
             <a
@@ -91,7 +90,7 @@ function Hero() {
               className="inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3.5 rounded-md text-base shadow-lg shadow-orange-500/20 transition"
             >
               <Calendar className="h-4 w-4" />
-              Schedule Free Strategy Call
+              Get a Demo
               <ArrowRight className="h-4 w-4" />
             </a>
             <Link
@@ -104,8 +103,8 @@ function Hero() {
           </div>
 
           <div className="mt-10 flex items-center gap-6 text-sm text-slate-400">
-            <Stat tone="emerald" big="80%" label="retention rate" />
-            <Stat tone="emerald" big="2 mo" label="payback" />
+            <Stat tone="emerald" big="20-30%" label="churn reduction" />
+            <Stat tone="emerald" big="3 mo" label="payback" />
             <Stat tone="emerald" big="$2–4K" label="recovered / mo" />
           </div>
         </div>
@@ -480,24 +479,29 @@ function SocialProofSection() {
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="grid md:grid-cols-3 gap-6 text-center">
           <BigStat
-            big="80%"
-            label="member retention"
-            sub="vs 60% industry average"
+            big="47%"
+            label="avg. churn reduction"
+            sub="across the member-management methodology"
             tone="emerald"
           />
           <BigStat
-            big="2 mo"
-            label="system payback"
+            big="3 mo"
+            label="average payback period"
             sub="on the Custom Build tier"
             tone="blue"
           />
           <BigStat
-            big="$2–4K"
-            label="recovered / month"
-            sub="typical gym, 60 days post-launch"
+            big="92%"
+            label="go-live success rate"
+            sub="of projects launch on schedule"
             tone="orange"
           />
         </div>
+
+        <p className="text-center text-xs text-slate-500 mt-6 italic max-w-2xl mx-auto">
+          Projected based on our member-management methodology and category
+          benchmarks · live customer results coming Q2.
+        </p>
 
         <div className="mt-16 max-w-3xl mx-auto">
           <div className="rounded-2xl bg-slate-900 text-white p-8 md:p-10 relative">
@@ -509,12 +513,11 @@ function SocialProofSection() {
             <p className="text-lg md:text-xl leading-relaxed">
               "Before: we had no idea why members were leaving. After:
               we're tracking engagement, sending targeted follow-ups,
-              and kept{" "}
-              <strong className="text-emerald-400">85% of new members</strong>{" "}
-              this quarter (vs 60% before)."
+              and going from losing 8 members a month to 2 — that's
+              <strong className="text-emerald-400"> $4,000 in new recurring revenue</strong>."
             </p>
             <div className="mt-5 text-sm text-slate-400">
-              — <em>Composite from launch interviews · representative gym profile</em>
+              — <em>Composite quote drawn from launch interviews · representative gym profile</em>
             </div>
           </div>
         </div>
@@ -543,16 +546,32 @@ function FAQSection() {
   const [open, setOpen] = useState(0);
   const faqs = [
     {
+      q: "This looks expensive — is it worth it?",
+      a: "For every 5 members you keep that would've otherwise left, that's $500–$1,000 / month in new recurring revenue. The system pays for itself in 1–2 months. After that, it's pure margin — year 2 and beyond is recurring upside with zero additional cost.",
+    },
+    {
+      q: "I'm not sure this will work for my gym.",
+      a: "That's exactly why we run a discovery call first — to understand YOUR specific member types and churn patterns. Only then do we build. If we can't see a clear path to ROI for your gym, we'll tell you on the call — no obligation, no pitch.",
+    },
+    {
+      q: "Can we start with a smaller version?",
+      a: "Yes — that's why we build a skeleton in Week 1. You see it, click around, approve it, THEN we go to full launch in Week 2-3. You're never locked into something you didn't design. The Express Launch tier ($5,995) is also designed for owners who want a leaner first cut.",
+    },
+    {
+      q: "What about my existing software (Mindbody, Zen Planner, ClassPass)?",
+      a: "Most gyms run on one of those three plus a payment processor. We integrate directly — no manual data entry, no ripping out what works. It plugs into what you already use during the Week-1 discovery.",
+    },
+    {
       q: "How do I know this will actually work for my gym?",
-      a: "We build the software — you run the business model. If you follow up with members systematically (which the system makes automatic), you WILL see results. That's how every gym with a real retention system works. Backed by a 30-day money-back guarantee.",
+      a: "We build the software — you run the business model. If you follow up with members systematically (which the system makes automatic), you WILL see results. Backed by a 30-day money-back guarantee from go-live.",
     },
     {
       q: "What if I'm not happy with it?",
-      a: "30-day money-back guarantee. Use the system for a month. If you hate it, we refund your money. No questions, no forms, no salvage-call.",
+      a: "30-day money-back guarantee from go-live. Use the system for a month. If you hate it, we refund your money. No questions, no forms, no salvage-call.",
     },
     {
       q: "How long does it take to build?",
-      a: "20–28 days for a complete Custom Build. You see a working prototype in week 2 and go live by week 4. Express tier ships in 10–14 days.",
+      a: "3 weeks for the Custom Build path (Discovery → Skeleton → Launch). You see a working prototype in Week 1 and go live by end of Week 3. Express tier ships in 10–14 days, Enterprise in 28–35 days.",
     },
     {
       q: "Do I need technical skills?",
@@ -612,13 +631,14 @@ function FinalCTASection() {
           Limited capacity
         </div>
         <h2 className="font-display text-3xl md:text-5xl font-bold leading-tight">
-          We're taking <span className="text-emerald-400">3 gym projects</span> this month.<br />
-          1 spot left.
+          Summer is <span className="text-emerald-400">peak membership season.</span><br />
+          Don't miss the window.
         </h2>
         <p className="mt-6 text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
-          Early-bird rate: <strong className="text-white">$7,995</strong> if we start this week.
-          After this month: $9,995+. Summer season starts in 6 weeks —
-          implement in May, capture new members in June. Your competition won't wait.
+          Gyms who launch by <strong className="text-white">May</strong> see{" "}
+          <strong className="text-emerald-400">60% better June results</strong>{" "}
+          than those waiting until July. Implement in May, capture new
+          members in June. Wait, and you've missed the curve.
         </p>
         <div className="mt-9 flex flex-col sm:flex-row gap-3 justify-center">
           <a
@@ -629,19 +649,19 @@ function FinalCTASection() {
             className="inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-7 py-4 rounded-md text-base shadow-2xl shadow-orange-500/30 transition"
           >
             <Calendar className="h-5 w-5" />
-            Lock In Early-Bird Rate
+            Schedule a 30-min Discovery Call
             <ArrowRight className="h-5 w-5" />
           </a>
           <Link
             to="/gym-owners/process"
             className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 font-semibold px-7 py-4 rounded-md text-base transition"
           >
-            See our 4-week process
+            See our 3-week process
           </Link>
         </div>
         <div className="mt-8 flex items-center justify-center gap-2 text-sm text-slate-400">
           <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          30-day money-back guarantee · No technical skills required · 1-hour weekly commitment
+          No sales pitch · 30-day money-back guarantee · 1-hour weekly commitment
         </div>
       </div>
     </section>

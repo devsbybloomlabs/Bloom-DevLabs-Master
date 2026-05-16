@@ -145,7 +145,7 @@ export function GymFooter() {
               <span className="text-white font-semibold">Bloom DevLabs · For Gym Owners</span>
             </div>
             <p className="text-sm text-slate-400 max-w-md leading-relaxed">
-              Custom member-management software for gym owners — built in 3-4 weeks,
+              Custom member-management software for gym owners — built in 3 weeks,
               automates follow-ups, and recovers $2K-$4K/month in would-be cancellations.
             </p>
           </div>

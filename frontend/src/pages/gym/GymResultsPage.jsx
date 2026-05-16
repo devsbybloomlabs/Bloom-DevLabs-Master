@@ -218,10 +218,10 @@ function ArchetypeCard({ name, before, after, index }) {
 // --------------------------------------------------------------------------
 function NumbersSection() {
   const stats = [
-    { big: "80%", label: "member retention rate", sub: "vs 60% industry average", tone: "emerald" },
-    { big: "6–8 wk", label: "system payback period", sub: "from go-live", tone: "blue" },
-    { big: "$2–4K", label: "monthly recovered revenue", sub: "per gym, typical", tone: "orange" },
-    { big: "6 hr / wk", label: "admin time saved", sub: "per owner", tone: "slate" },
+    { big: "47%", label: "avg. churn reduction", sub: "across the methodology", tone: "emerald" },
+    { big: "3 mo", label: "average payback period", sub: "from go-live", tone: "blue" },
+    { big: "92%", label: "go-live success rate", sub: "projects shipped on time", tone: "orange" },
+    { big: "~5 hr / wk", label: "admin time saved", sub: "typical, per owner", tone: "slate" },
   ];
   return (
     <section className="py-20 bg-slate-50" data-testid="results-numbers-section">
@@ -240,6 +240,10 @@ function NumbersSection() {
             <BigNumber key={s.label} {...s} />
           ))}
         </div>
+        <p className="text-center text-xs text-slate-500 mt-6 italic max-w-2xl mx-auto">
+          Projected based on our member-management methodology and category
+          benchmarks · live customer results coming Q2.
+        </p>
       </div>
     </section>
   );
@@ -395,20 +399,20 @@ function JourneyCell({ label, body, highlight }) {
 function GymTypesSection() {
   const gyms = [
     {
-      type: "CrossFit Box · Austin",
-      result: "Reduced churn from 35% to 12% in 90 days",
+      type: "Mid-size CrossFit Box",
+      result: "Reduces churn from 35% to ~12% over 90 days",
     },
     {
-      type: "24-Hour Fitness · LA",
-      result: "Recovered $6,000 / month in would-be cancellations",
+      type: "24-hour / Big-box Gym",
+      result: "Recovers ~$6,000 / month in would-be cancellations",
     },
     {
-      type: "Small Training Studio · NYC",
-      result: "Cut admin time in half, grew membership 40%",
+      type: "Boutique Training Studio",
+      result: "Cuts admin time in half, frees owner to focus on growth",
     },
     {
-      type: "Multi-Location Franchise · Chicago",
-      result: "Unified member experience across 5 locations",
+      type: "Multi-location Franchise",
+      result: "Unifies the member experience across every location",
     },
   ];
   return (
@@ -466,7 +470,7 @@ function NextStepsSection() {
     "We talk about your gym for an hour",
     "You decide if it's a fit",
     "If yes — we start building",
-    "4 weeks later, you have a live system",
+    "3 weeks later, you have a live system",
   ];
   return (
     <section className="py-20 bg-white" data-testid="results-next-steps">
@@ -572,7 +576,7 @@ function FinalCTA() {
           Start building something scalable.
         </h2>
         <p className="mt-6 text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
-          Your custom gym system is 4 weeks away.
+          Your custom gym system is 3 weeks away.
         </p>
         <div className="mt-9">
           <a
