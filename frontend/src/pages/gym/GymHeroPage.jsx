@@ -36,9 +36,11 @@ export default function GymHeroPage() {
   return (
     <GymLayout breadcrumb="Overview">
       <Hero />
+      <PreQualSection />
       <ProblemSection />
       <SolutionSection />
       <OfferSection />
+      <ReferralSection />
       <ROISection />
       <SocialProofSection />
       <FAQSection />
@@ -74,32 +76,50 @@ function Hero() {
             Built for independent gym owners
           </div>
           <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.05]">
-            Stop leaving <span className="text-emerald-400">$500–$2,000 / month</span> per lost member on the table.
+            Stop losing <span className="text-emerald-400">$500–$2,000/month</span> to member churn.
           </h1>
           <p className="mt-6 text-lg text-slate-300 max-w-2xl leading-relaxed">
-            30–40% of new members quit in their first 90 days. We build{" "}
-            <strong className="text-white">custom retention software</strong> that
-            fixes this — launching in 3 weeks. Reduces churn 20–30% in 60 days.
+            Choose your path: <strong className="text-white">test-drive in 1 day</strong> or{" "}
+            <strong className="text-white">full system in 3 weeks</strong>. Built specifically
+            for your gym — not a template.
           </p>
-          <div className="mt-9 flex flex-col sm:flex-row gap-3">
+
+          {/* Dual-path mini cards */}
+          <div className="mt-7 grid sm:grid-cols-2 gap-3 max-w-2xl">
+            <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4" data-testid="gym-hero-path-prototype">
+              <div className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">Path A · prototype</div>
+              <div className="text-xl font-bold text-white tabular-nums mt-1">$2,995</div>
+              <div className="text-xs text-slate-300 mt-0.5">See it in 24 hours</div>
+            </div>
+            <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4" data-testid="gym-hero-path-full">
+              <div className="text-[10px] uppercase tracking-wider text-blue-300 font-bold">Path B · full build</div>
+              <div className="text-xl font-bold text-white tabular-nums mt-1">$8,995</div>
+              <div className="text-xs text-slate-300 mt-0.5">Launch in 3 weeks</div>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-slate-400">
+            → or start with the prototype, upgrade later (we credit $1,000 if you do, within 14 days).
+          </p>
+
+          <div className="mt-7 flex flex-col sm:flex-row gap-3">
+            <a
+              href="#offer"
+              data-testid="gym-hero-cta-primary"
+              className="inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-3.5 rounded-md text-base shadow-lg shadow-emerald-500/20 transition"
+            >
+              See the prototype first
+              <ArrowRight className="h-4 w-4" />
+            </a>
             <a
               href={TIDYCAL}
               target="_blank"
               rel="noopener noreferrer"
-              data-testid="gym-hero-cta-primary"
-              className="inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3.5 rounded-md text-base shadow-lg shadow-orange-500/20 transition"
+              data-testid="gym-hero-cta-secondary"
+              className="inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-3.5 rounded-md text-base shadow-lg shadow-orange-500/20 transition"
             >
               <Calendar className="h-4 w-4" />
-              Get a Demo
-              <ArrowRight className="h-4 w-4" />
+              Build full system — book call
             </a>
-            <Link
-              to="/gym-owners/how-it-works"
-              data-testid="gym-hero-cta-secondary"
-              className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 font-semibold px-6 py-3.5 rounded-md text-base transition"
-            >
-              See how it works
-            </Link>
           </div>
 
           <div className="mt-10 flex items-center gap-6 text-sm text-slate-400">
@@ -312,31 +332,74 @@ function SolutionSection() {
 }
 
 // --------------------------------------------------------------------------
+function PreQualSection() {
+  const items = [
+    "You're losing $1K+ monthly to member churn (real, recoverable revenue)",
+    "You're ready to launch a system by end of May",
+    "You're willing to invest $2,995–$8,995 depending on your needs",
+  ];
+  return (
+    <section className="py-16 bg-white" data-testid="gym-prequal-section">
+      <div className="max-w-4xl mx-auto px-6 lg:px-10">
+        <div className="rounded-3xl border-2 border-slate-200 bg-gradient-to-br from-white to-slate-50 p-8 md:p-12">
+          <h2 className="font-display text-2xl md:text-3xl font-bold text-slate-900 leading-tight">
+            Before we go further — is this right for you?
+          </h2>
+          <p className="mt-3 text-base text-slate-600">
+            This system works best if you check all three boxes:
+          </p>
+          <ul className="mt-6 space-y-3">
+            {items.map((it, i) => (
+              <li
+                key={i}
+                className="flex gap-3 items-start text-slate-800"
+                data-testid={`gym-prequal-item-${i}`}
+              >
+                <div className="h-6 w-6 rounded-full bg-emerald-100 grid place-items-center flex-shrink-0">
+                  <Check className="h-3.5 w-3.5 text-emerald-700" strokeWidth={3} />
+                </div>
+                <span className="text-base leading-relaxed pt-0.5">{it}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 text-sm text-slate-500 italic leading-relaxed">
+            If that's you, keep reading. If not — no hard feelings, good luck
+            with your gym. We'd rather you find the right tool than burn
+            your time.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// --------------------------------------------------------------------------
 function OfferSection() {
   const [checkoutTier, setCheckoutTier] = useState(null);
   const tiers = [
     {
-      key: "gym_express",
-      name: "Express Launch",
-      price: "$5,995",
-      timeline: "10–14 days",
-      sub: "Perfect for quick wins",
+      key: "gym_prototype",
+      name: "Prototype",
+      price: "$2,995",
+      timeline: "24 hours",
+      sub: "Test-drive risk-free",
       features: [
-        "Member management dashboard",
-        "Automated email sequences",
-        "Basic analytics",
-        "30-day support",
+        "Working dashboard (member tracking)",
+        "1 automated-email template",
+        "Discovery call + demo session",
+        "$1,000 credit toward full build if upgrading within 14 days",
       ],
       featured: false,
     },
     {
       key: "gym_custom",
-      name: "Custom Build",
+      name: "Full Build",
       price: "$8,995",
-      timeline: "20–28 days",
+      timeline: "3 weeks",
       sub: "Complete solution · most popular",
       features: [
-        "Everything in Express",
+        "Custom member-management dashboard",
+        "Full email automation engine",
         "Lead-capture funnel",
         "Payment integration (Stripe/Square)",
         "Member mobile app",
@@ -349,10 +412,10 @@ function OfferSection() {
       key: "gym_enterprise",
       name: "Enterprise",
       price: "$14,995",
-      timeline: "28–35 days",
+      timeline: "4–5 weeks",
       sub: "For multi-location operators",
       features: [
-        "Everything in Custom Build",
+        "Everything in Full Build",
         "Multi-location support",
         "Predictive analytics + cohort modelling",
         "White-label option",
@@ -362,7 +425,7 @@ function OfferSection() {
     },
   ];
   return (
-    <section className="py-20 bg-white" data-testid="gym-offer-section">
+    <section id="offer" className="py-20 bg-white" data-testid="gym-offer-section">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-4">
@@ -370,10 +433,13 @@ function OfferSection() {
             Investment
           </div>
           <h2 className="font-display text-3xl md:text-5xl font-bold text-slate-900 leading-tight">
-            Three ways to start. All ship in under 5 weeks.
+            Choose your path. Both launch by end of May.
           </h2>
           <p className="mt-5 text-lg text-slate-600">
-            Pick the scope. Pay securely via PayPal. Payback in 1–2 months on every tier.
+            Start with the <strong>prototype</strong> ($2,995) to see it work in
+            your gym — then upgrade with a <strong className="text-emerald-700">$1,000 credit</strong>.
+            Or go straight to the <strong>full build</strong> ($8,995). Both
+            include Year 1 build + training + 60-day support.
           </p>
         </div>
 
@@ -447,6 +513,74 @@ function OfferSection() {
           onOpenChange={(o) => !o && setCheckoutTier(null)}
           tierKey={checkoutTier}
         />
+
+        {/* Year-1 / Year-2+ callout */}
+        <div className="mt-14 grid md:grid-cols-2 gap-4 max-w-4xl mx-auto" data-testid="gym-year-model">
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-6">
+            <div className="text-[10px] uppercase tracking-wider text-blue-700 font-bold">Year 1 — what's included</div>
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" /> Custom build + deployment</li>
+              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" /> Team training session</li>
+              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" /> 60-day optimisation + support</li>
+              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" /> 12 months of system access</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6">
+            <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Year 2+ — maintenance retainer</div>
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" /> System stays live + updated</li>
+              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" /> Access to every feature you built</li>
+              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" /> Dashboard-based feature upgrades</li>
+              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" /> Ongoing support, no surprises</li>
+            </ul>
+            <p className="text-xs text-slate-500 italic mt-3">Retainer is a fraction of Year-1 build cost. Cancel anytime.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// --------------------------------------------------------------------------
+function ReferralSection() {
+  return (
+    <section className="py-20 bg-gradient-to-br from-emerald-50 via-white to-blue-50" data-testid="gym-referral-section">
+      <div className="max-w-4xl mx-auto px-6 lg:px-10">
+        <div className="rounded-3xl bg-white border-2 border-emerald-200 p-8 md:p-12 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 grid place-items-center text-white flex-shrink-0">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Referral program</div>
+              <h2 className="font-display text-2xl md:text-3xl font-bold text-slate-900 leading-tight mt-1">
+                Refer a gym. Get <span className="text-emerald-600">$1,000 credit</span>.
+              </h2>
+              <p className="mt-4 text-base text-slate-600 leading-relaxed">
+                Once your system launches, you'll know 2–3 other gym owners with
+                the same churn problem. Here's the deal:
+              </p>
+              <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                <li className="flex gap-2"><span className="text-emerald-600 font-bold">1.</span> You mention us. That's it.</li>
+                <li className="flex gap-2"><span className="text-emerald-600 font-bold">2.</span> They book a discovery call.</li>
+                <li className="flex gap-2"><span className="text-emerald-600 font-bold">3.</span> If they sign this month, we credit your next month's fee <strong>$1,000</strong>.</li>
+              </ul>
+              <div className="mt-5 grid sm:grid-cols-2 gap-3">
+                <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Prototype path</div>
+                  <div className="text-sm text-slate-800 mt-1">$2,995 → <strong>basically free</strong> with one referral</div>
+                </div>
+                <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Full Build path</div>
+                  <div className="text-sm text-slate-800 mt-1">$8,995 → <strong>$7,995</strong> per referral</div>
+                </div>
+              </div>
+              <p className="mt-4 text-xs text-slate-500 italic">
+                No limits. Refer as many as you want. We'll track it for you.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -546,36 +680,36 @@ function FAQSection() {
   const [open, setOpen] = useState(0);
   const faqs = [
     {
+      q: "Why is the prototype so cheap?",
+      a: "We use that 1 day to understand your gym. You see how we work. Most say yes to the full build because they see it works — it's a proof-of-concept, not the full product. Think of it as paid due diligence on both sides.",
+    },
+    {
+      q: "Can I upgrade from the prototype to the full system later?",
+      a: "Yes — and we'll credit $1,000 toward the full build if you upgrade within 14 days of receiving the prototype. After that, full price ($8,995). So decide fast if you want the discount.",
+    },
+    {
+      q: "What if the prototype doesn't work for my gym?",
+      a: "Then you've spent $2,995 to find out. You still keep the prototype — it does basic member tracking + email automations, which is more than most gyms have. But realistically, if the prototype doesn't earn its keep, the full build won't either, and we'll tell you on the upgrade call.",
+    },
+    {
+      q: "What if I do the prototype and don't upgrade?",
+      a: "No pressure. You keep the prototype system. It still tracks members and sends automated emails. Just less powerful than the full build. Many gyms run on just the prototype and get decent results — but most see enough potential to upgrade.",
+    },
+    {
       q: "This looks expensive — is it worth it?",
-      a: "For every 5 members you keep that would've otherwise left, that's $500–$1,000 / month in new recurring revenue. The system pays for itself in 1–2 months. After that, it's pure margin — year 2 and beyond is recurring upside with zero additional cost.",
+      a: "For every 5 members you keep that would've otherwise left, that's $500–$1,000 / month in new recurring revenue. The prototype pays back in <1 month, the full build in 1–2 months. After that, it's pure margin — year 2+ is recurring upside on a small maintenance retainer.",
     },
     {
-      q: "I'm not sure this will work for my gym.",
-      a: "That's exactly why we run a discovery call first — to understand YOUR specific member types and churn patterns. Only then do we build. If we can't see a clear path to ROI for your gym, we'll tell you on the call — no obligation, no pitch.",
+      q: "What happens after Year 1?",
+      a: "Your system stays live. You pay an annual maintenance retainer (a fraction of the Year-1 build cost) which keeps it updated + gives you access to dashboard-based feature upgrades. Many clients add features as their gym grows — multi-location, advanced analytics, marketing automation.",
     },
     {
-      q: "Can we start with a smaller version?",
-      a: "Yes — that's why we build a skeleton in Week 1. You see it, click around, approve it, THEN we go to full launch in Week 2-3. You're never locked into something you didn't design. The Express Launch tier ($5,995) is also designed for owners who want a leaner first cut.",
-    },
-    {
-      q: "What about my existing software (Mindbody, Zen Planner, ClassPass)?",
-      a: "Most gyms run on one of those three plus a payment processor. We integrate directly — no manual data entry, no ripping out what works. It plugs into what you already use during the Week-1 discovery.",
-    },
-    {
-      q: "How do I know this will actually work for my gym?",
-      a: "We build the software — you run the business model. If you follow up with members systematically (which the system makes automatic), you WILL see results. Backed by a 30-day money-back guarantee from go-live.",
+      q: "Will this work with my existing software (Mindbody, Zen Planner, ClassPass)?",
+      a: "Most gyms run on one of those plus a payment processor. We integrate directly — no manual data entry, no ripping out what works. It plugs into what you already use during the Week-1 discovery.",
     },
     {
       q: "What if I'm not happy with it?",
-      a: "30-day money-back guarantee from go-live. Use the system for a month. If you hate it, we refund your money. No questions, no forms, no salvage-call.",
-    },
-    {
-      q: "How long does it take to build?",
-      a: "3 weeks for the Custom Build path (Discovery → Skeleton → Launch). You see a working prototype in Week 1 and go live by end of Week 3. Express tier ships in 10–14 days, Enterprise in 28–35 days.",
-    },
-    {
-      q: "Do I need technical skills?",
-      a: "No. We handle every line of code, every integration, every deployment. Your only job is to show us how your gym actually works and give feedback at two checkpoints. Roughly 1 hour per week of your time.",
+      a: "30-day money-back guarantee from go-live on the full build. The prototype is single-payment by nature, but we'll roll that $2,995 into a full-build refund if you upgrade and then bail within 30 days. You're never trapped.",
     },
   ];
   return (
@@ -631,14 +765,13 @@ function FinalCTASection() {
           Limited capacity
         </div>
         <h2 className="font-display text-3xl md:text-5xl font-bold leading-tight">
-          Summer is <span className="text-emerald-400">peak membership season.</span><br />
-          Don't miss the window.
+          We're taking only <span className="text-emerald-400">3–4 gym projects</span> this month.
         </h2>
         <p className="mt-6 text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
-          Gyms who launch by <strong className="text-white">May</strong> see{" "}
-          <strong className="text-emerald-400">60% better June results</strong>{" "}
-          than those waiting until July. Implement in May, capture new
-          members in June. Wait, and you've missed the curve.
+          Early-bird rate locked in if we start this week. After{" "}
+          <strong className="text-white">May 31</strong>, pricing increases.
+          Summer's coming — gyms that launch by end of May are ready for peak
+          season. Those waiting until July miss the window.
         </p>
         <div className="mt-9 flex flex-col sm:flex-row gap-3 justify-center">
           <a

@@ -19,6 +19,18 @@ import { PayPalCheckoutButton } from "@/components/payment/PayPalCheckoutButton"
 import { Check, ShieldCheck, Clock, AlertCircle } from "lucide-react";
 
 const TIER_META = {
+  gym_prototype: {
+    name: "Gym Prototype",
+    price: "2,995",
+    timeline: "24 hours",
+    inclusions: [
+      "Working dashboard (member tracking)",
+      "1 automated-email template",
+      "Discovery call + demo session",
+      "$1,000 credit toward full build if upgrading within 14 days",
+    ],
+    skipSplit: true, // single-payment only — $2,995 is the low-friction entry
+  },
   gym_express: {
     name: "Gym Express Launch",
     price: "5,995",
@@ -67,9 +79,14 @@ export default function GymCheckoutDialog({ open, onOpenChange, tierKey }) {
 
   if (!meta) return null;
 
-  const chargeNow = plan === "full_upfront"
-    ? (parseFloat(meta.price.replace(/,/g, "")) - 500).toLocaleString()
-    : (parseFloat(meta.price.replace(/,/g, "")) / 2).toLocaleString();
+  // Prototype tier is single-payment only (no $500 discount, no split).
+  const effectivePlan = meta.skipSplit ? "full_upfront" : plan;
+  const basePrice = parseFloat(meta.price.replace(/,/g, ""));
+  const chargeNow = meta.skipSplit
+    ? basePrice.toLocaleString()
+    : effectivePlan === "full_upfront"
+      ? (basePrice - 500).toLocaleString()
+      : (basePrice / 2).toLocaleString();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -146,33 +163,35 @@ export default function GymCheckoutDialog({ open, onOpenChange, tierKey }) {
             </div>
           </div>
 
-          {/* Payment plan */}
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">
-              Payment plan
+          {/* Payment plan — hide for prototype (single payment only) */}
+          {!meta.skipSplit && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">
+                Payment plan
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <PlanOption
+                  active={plan === "split_50_50"}
+                  onClick={() => setPlan("split_50_50")}
+                  title="50 / 50"
+                  sub="Half today, half at launch"
+                  testid="gym-checkout-plan-split"
+                />
+                <PlanOption
+                  active={plan === "full_upfront"}
+                  onClick={() => setPlan("full_upfront")}
+                  title="Full upfront"
+                  sub="Save $500"
+                  testid="gym-checkout-plan-full"
+                  accent
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <PlanOption
-                active={plan === "split_50_50"}
-                onClick={() => setPlan("split_50_50")}
-                title="50 / 50"
-                sub="Half today, half at launch"
-                testid="gym-checkout-plan-split"
-              />
-              <PlanOption
-                active={plan === "full_upfront"}
-                onClick={() => setPlan("full_upfront")}
-                title="Full upfront"
-                sub="Save $500"
-                testid="gym-checkout-plan-full"
-                accent
-              />
-            </div>
-            <p className="mt-2 text-xs text-slate-600">
-              You pay <strong className="text-slate-900">${chargeNow}</strong>{" "}
-              today via PayPal.
-            </p>
-          </div>
+          )}
+          <p className="text-xs text-slate-600">
+            You pay <strong className="text-slate-900">${chargeNow}</strong>{" "}
+            today via PayPal.
+          </p>
 
           {/* PayPal */}
           {ready ? (
@@ -180,7 +199,7 @@ export default function GymCheckoutDialog({ open, onOpenChange, tierKey }) {
               <PayPalCheckoutButton
                 mode="order"
                 tier={tierKey}
-                paymentPlan={plan}
+                paymentPlan={effectivePlan}
                 customerEmail={email}
                 customerName={name}
                 onSuccess={() => {

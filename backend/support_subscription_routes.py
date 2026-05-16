@@ -66,6 +66,7 @@ PACKAGE_TO_SUPPORT_TIER: Dict[str, str] = {
     "enterprise": "vip",
     # Niche-specific tiers map to the same support level as their generic
     # equivalents — gym owners still get standard/premium/vip support.
+    "gym_prototype": "standard",
     "gym_express": "standard",
     "gym_custom": "premium",
     "gym_enterprise": "vip",

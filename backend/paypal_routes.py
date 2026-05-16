@@ -41,6 +41,21 @@ PACKAGE_TIERS: Dict[str, Dict[str, Any]] = {
     "custom": {"name": "Custom Build", "price": "8995.00", "kind": "one_time"},
     "enterprise": {"name": "Enterprise", "price": "14995.00", "kind": "one_time"},
     # ---- Gym Owners niche (Feb 2026) ----
+    "gym_prototype": {
+        "name": "Gym Prototype",
+        "price": "2995.00",
+        "kind": "one_time",
+        "niche": "gym_owners",
+        "support_tier": "standard",
+        "timeline": "24 hours",
+        "full_upfront_discount": 0,
+        "inclusions": [
+            "Working dashboard (member tracking)",
+            "1 automated-email template",
+            "Discovery call + demo session",
+            "$1,000 credit toward full build (if upgrading within 14 days)",
+        ],
+    },
     "gym_express": {
         "name": "Gym Express Launch",
         "price": "5995.00",
@@ -116,15 +131,23 @@ def compute_charge(tier: str, payment_plan: str) -> Dict[str, Any]:
     """
     cfg = PACKAGE_TIERS[tier]
     base = float(cfg["price"])
+    # Allow tier-specific override of the full-upfront discount. The prototype
+    # tier (gym_prototype) sets this to 0 because it's already a low-friction
+    # entry price and the 50/50 split doesn't make sense either.
+    upfront_discount = float(cfg.get("full_upfront_discount", FULL_UPFRONT_DISCOUNT))
     if payment_plan == "full_upfront":
-        discount = FULL_UPFRONT_DISCOUNT
+        discount = upfront_discount
         charge_now = max(0.0, base - discount)
         return {
             "base_amount": _money(base),
             "charge_now": _money(charge_now),
             "charge_later": "0.00",
             "discount_applied": _money(discount),
-            "plan_label": "100% upfront — $500 discount applied",
+            "plan_label": (
+                "100% upfront"
+                if discount == 0
+                else f"100% upfront — ${int(discount)} discount applied"
+            ),
             "installment_index": 1,
         }
     # default: split_50_50

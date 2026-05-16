@@ -144,12 +144,20 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 **Phase K — Gym-Owners niche site + PayPal niche tiers + Who-We-Serve mega menu (Feb 2026)**
 - New public funnel at `/gym-owners` · `/how-it-works` · `/process` · `/results` — sticky 4-page nav, breadcrumb, mobile drawer, exit-intent modal mounted in `GymLayout.jsx`.
-- 3 niche package tiers (`gym_express` $5,995 / `gym_custom` $8,995 / `gym_enterprise` $14,995) added to `paypal_routes.PACKAGE_TIERS` carrying `niche="gym_owners"`, `inclusions[]`, `timeline`, `support_tier` — `create_order` persists these on the order doc so admin captures see the niche tag.
-- `support_subscription_routes.PACKAGE_TO_SUPPORT_TIER` extended (`gym_express→standard`, `gym_custom→premium`, `gym_enterprise→vip`) — bundled support auto-provisions exactly the same way as the generic tiers.
-- New `GymCheckoutDialog.jsx` (name/email/gym + 50-50 vs full-upfront plan toggle + reuse of `PayPalCheckoutButton`) mounted on the 3 tier cards — PayPal Smart Buttons render after the form is filled.
-- New `<WhoWeServe/>` homepage section between Solution and Pricing (2 industry cards: Gym Owners LIVE + Clinics & Wellness "Coming Soon") so anonymous visitors discover the niche from `/`.
-- `Header.jsx` mega menu gains a "Who We Serve" group with 5 entries + featured CTA card; mobile drawer adds "For Gym Owners"; mega item render now supports an optional `badge` field.
-- Tests: `tests/test_gym_tiers.py` (3) + testing-agent-authored `tests/test_iteration_29.py` (9) — all green; full regression 45/45.
+- **(V3 update, Feb 2026)** — 4 niche package tiers now: `gym_prototype` ($2,995, 24-hour test-drive, **no $500 upfront discount**, single-payment via `full_upfront_discount: 0` override) / `gym_express` ($5,995 — still in backend for legacy) / `gym_custom` ($8,995) / `gym_enterprise` ($14,995). Each carries `niche="gym_owners"`, `inclusions[]`, `timeline`, `support_tier`.
+- `compute_charge()` now respects per-tier `full_upfront_discount` override so the prototype doesn't accidentally get a 17%-off upfront credit.
+- `support_subscription_routes.PACKAGE_TO_SUPPORT_TIER` extended (`gym_prototype→standard`, `gym_express→standard`, `gym_custom→premium`, `gym_enterprise→vip`).
+- New `GymCheckoutDialog.jsx` — for `gym_prototype` the dialog **hides the payment-plan toggle** and forces full upfront (the prototype is a low-friction entry, not an installment product).
+- **(V3 update)** Pricing page restructured to **3 tiers** (Prototype / Full Build / Enterprise) per the dual-path V3 spec. Full Build tier shows "MOST POPULAR" badge.
+- **(V3 new)** `PreQualSection` — 3-checkbox qualifier ("Losing $1K+/mo, ready by May, $2,995-$8,995 budget") so tire-kickers self-select out before the offer.
+- **(V3 new)** `ReferralSection` — "Refer a gym, get $1,000 credit" with split-path math (prototype → basically free, full build → $7,995 after referral).
+- **(V3 new)** Year-1 / Year-2+ callout block below pricing — Year 1 = build + training + 60-day support; Year 2+ = maintenance retainer + dashboard-based feature upgrades.
+- **(V3 new)** Hero rewritten to dual-path positioning: "Stop losing $500-$2,000/month to member churn · Choose your path: test-drive in 1 day or full system in 3 weeks", with two visible mini-cards (Path A Prototype $2,995, Path B Full Build $8,995) + "$1,000 upgrade-credit if you upgrade within 14 days" copy. Primary CTA = "See the prototype first" (emerald, anchors to #offer), secondary = "Build full system — book call" (orange, TidyCal).
+- **(V3 new)** FAQ rewritten — 8 entries, 5 prototype-focused ("Why is the prototype so cheap?", "Can I upgrade later?", "What if the prototype doesn't work?", "What if I don't upgrade?", "What happens after Year 1?") + 3 carried over.
+- **(V3 new)** Final CTA → May 31 deadline urgency.
+- New `<WhoWeServe/>` homepage section between Solution and Pricing surfaces the niche to anonymous visitors.
+- `Header.jsx` mega menu gains "Who We Serve" group with 5 entries; mobile drawer adds "For Gym Owners".
+- Tests: `tests/test_gym_tiers.py` now 4 tests including a `test_gym_prototype_skips_full_upfront_discount` regression guard; testing-agent-authored `tests/test_iteration_29.py` (9) still green.
 
 **Phase J — Brief approval → contract & invoice automation (admin-review gate)**
 - On 3rd-phase approval, `_finalize_brief_approval` flips `brief.awaiting_contract_dispatch=true`. Admin sees an amber **Contract Dispatch Banner** in `ProjectBriefDialog` with Preview + Send buttons.
