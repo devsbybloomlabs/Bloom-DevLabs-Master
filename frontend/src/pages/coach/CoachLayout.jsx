@@ -3,7 +3,7 @@
  * Mirrors GymLayout but with coach-niche branding (deep teal + coral accent).
  */
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowRight, Menu, X, Calendar, Mail, Phone, ChevronRight, Headphones } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import ExitIntentModal from "../gym/components/ExitIntentModal";
@@ -142,9 +142,9 @@ export function CoachFooter() {
 
 export default function CoachLayout({ breadcrumb, children }) {
   const { pathname } = useLocation();
-  if (typeof window !== "undefined") {
-    setTimeout(() => window.scrollTo({ top: 0, behavior: "instant" }), 0);
-  }
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [pathname]);
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased" key={pathname}>
       <CoachHeader />

@@ -166,6 +166,21 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 - `Header.jsx` mega menu gains "Who We Serve" group with 5 entries; mobile drawer adds "For Gym Owners".
 - Tests: `tests/test_gym_tiers.py` now 4 tests including a `test_gym_prototype_skips_full_upfront_discount` regression guard; testing-agent-authored `tests/test_iteration_29.py` (9) still green.
 
+**Phase I.2 — Coaches & Consultants funnel ecosystem (Feb 2026)**
+- New 4-page funnel mirroring the gym structure with coach-specific copy and a deep-teal + amber/coral accent palette.
+  - `/coaches` (`CoachHeroPage.jsx`) — Hero "Your coaching skills are incredible. Your website isn't.", dual-path Starter $2,995 vs Premium $8,995 cards, pre-qual gate, problem (lost-bookings $1K–$3K/mo), solution (website / one-click booking / client dashboard), 3-tier offer with PayPal dialog, simple ROI calc (booking-conversion based), social proof, 5-item FAQ, final CTA.
+  - `/coaches/how-it-works` (`CoachHowItWorksPage.jsx`) — three feature blocks (website / booking / dashboard) with mock visuals, integration grid (Stripe/PayPal/Email/Google Calendar/iCal/Zoom), 8-step client journey, bank-level security, "your job / our job" split.
+  - `/coaches/process` (`CoachProcessPage.jsx`) — 24-hour 4-phase timeline (Discovery morning → Build afternoon → Review evening → Go-live next morning), 2h-15-min commitment table, support tiers, 30-day money-back guarantee, what's-included checklist, Starter→Premium upgrade-path card.
+  - `/coaches/results` (`CoachResultsPage.jsx`) — 3 coach archetypes (Solopreneur / Multi-offering / Consultant) before-vs-after, 4 big numbers, 8-step domino effect, 6 coach-type results cards, detailed ROI calc, 5-step "what happens next", 5-item FAQ, final CTA.
+- Shared `CoachLayout.jsx` (sticky header with NAV + Book-Discovery-Call CTA, breadcrumb, footer, ExitIntentModal reused from gym layout). Pure `useEffect`-based scroll-to-top (replaced the render-time `setTimeout` anti-pattern flagged by testing agent).
+- `CoachCheckoutDialog.jsx` — same shape as `GymCheckoutDialog` but with coach tier metadata; Starter tier honors `skipSplit=true` (no 50/50 toggle, full upfront only — like the gym prototype).
+- `CoachROICalculator.jsx` — booking-conversion focused (Simple + Detailed), assumes ~25-percentage-point lift from 40% → 65% lead-to-booking rate.
+- `Header.jsx` mega menu "Who We Serve" expanded to **3 columns** (Industries + Coach playbook + Gym-owner playbook); featured panel now promotes the coach funnel. MegaPanel grid now adapts (`sm:grid-cols-3` when ≥3 columns). Mobile drawer adds "For Coaches & Consultants".
+- `App.js` — 4 new routes: `/coaches`, `/coaches/how-it-works`, `/coaches/process`, `/coaches/results`.
+- Backend tiers (`coach_starter` $2,995 / `coach_premium` $8,995 / `coach_enterprise` $14,995) and generic self-serve upgrade with $1K credit were shipped earlier in the same session and validated in iteration 29.
+- Tests: iteration 30 — frontend testing agent verified 12/12 acceptance items (100%) including all sections, all 3 tier dialogs, ROI calculators, FAQ accordions, mega-menu, mobile drawer. Zero console errors.
+
+
 **Phase J — Brief approval → contract & invoice automation (admin-review gate)**
 - On 3rd-phase approval, `_finalize_brief_approval` flips `brief.awaiting_contract_dispatch=true`. Admin sees an amber **Contract Dispatch Banner** in `ProjectBriefDialog` with Preview + Send buttons.
 - New `brief_contract_routes.py`:
