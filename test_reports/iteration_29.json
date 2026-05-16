@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 29 — Gym-owners niche tiers + Who-We-Serve mega menu + GymCheckoutDialog + ExitIntentModal + homepage promo strip. ALL backend + frontend acceptance items PASS. 54/54 pytest cases green (including the 3 prior-iteration files plus 9 new test_iteration_29 tests). Frontend Playwright verified: Who-We-Serve section + 2 cards, mega menu with 4 gym-owners links, /gym-owners → /how-it-works → /process → /results all 200 + render their h1, 3 pricing tier PayPal buttons render, GymCheckoutDialog opens with prefill hint visible when empty + hides after valid fill, PayPal Smart Buttons iframes render after fill, payment plan toggle updates 'You pay $X today' (4,497.50 split → 8,495 full upfront, $500 discount applied), ROI calc input updates Monthly loss to $1,200 for 10 lost members @ $120, detailed ROI on /results has 3 inputs + 6 stat tiles and the churn slider updates the math, and the ExitIntentModal mounts and fires (radix dialog data-state=open) on mouseleave-top after 6s. Drive status regression: 200 OK for founder. Phase J dispatch-contract from iteration 28 is now also green (test_phase_j_dispatch_happy_path_and_idempotency PASSES — fix shipped).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_29.py",
+    "/app/backend/tests/test_gym_tiers.py",
+    "/app/backend/tests/test_iteration_28.py",
+    "/app/backend/tests/test_iteration_28b.py",
+    "/app/backend/tests/test_payment_plans.py",
+    "/app/backend/tests/test_drive_pkce_roundtrip.py",
+    "/app/backend/tests/test_contract_invoice_merge.py",
+    "/app/test_reports/pytest/iteration_29.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "paypal_routes.PACKAGE_TIERS correctly carries niche='gym_owners' + inclusions[]>=3 + timeline + support_tier mapping on all 3 gym tiers. NICHE_TIER_ALIASES collapses gym_* into their generic equivalents for legacy accounting paths.",
+    "create_order writes niche=cfg.get('niche') at the top level + nests {niche, inclusions, timeline} into metadata only when the tier has a niche — so generic 'custom' orders are unaffected (regression preserved).",
+    "compute_charge('gym_express','split_50_50') == 2997.50/2997.50, compute_charge('gym_enterprise','full_upfront') == 14495.00 with discount_applied=500.00. Math is correct.",
+    "support_subscription_routes.PACKAGE_TO_SUPPORT_TIER maps gym_express→standard, gym_custom→premium, gym_enterprise→vip — matches PRD.",
+    "Frontend WhoWeServe.jsx — both cards have data-testid, gym card navigates correctly, Coming Soon card is visually disabled but still discoverable.",
+    "Header.jsx mega-trigger-who-we-serve renders the panel on hover with 5 items (industries + 3 playbook links + featured CTA). All 4 expected /gym-owners* links present.",
+    "GymCheckoutDialog.jsx — proper progressive disclosure: prefill hint shown until name AND valid email present, then PayPal Smart Buttons iframe mounts. Plan toggle updates the 'You pay $X today' label correctly with the $500 discount on full_upfront.",
+    "ExitIntentModal mounts via GymLayout and only fires on mouseleave-top after the 6s arm window — non-annoying.",
+    "Minor: roi-calc-detailed insight tile elements don't carry a 'tile' or 'card' className/testid; they're visible as 6 stat blocks in the screenshot but harder to assert against in automation. Consider adding [data-testid=roi-detailed-tile-{name}] on each of the 6 stat cards for future regression coverage.",
+    "Minor nit (still present from earlier iteration): no /api/admin/login route — admin uses /api/auth/login. Not a bug, just worth noting that the request-prompt mentioned /api/admin/login and the actual endpoint is /api/auth/login."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_29.py (new — 9 tests: 5 compute_charge/niche-metadata, 1 drive-status regression, 3 PayPal create_order integration)"
+  ],
+  "success_rate": { "backend": "100% (54/54 PASS — including 9 new iteration_29 tests)", "frontend": "100% (all 13 acceptance items from the request verified via Playwright)" },
+  "test_credentials": "Admin: founder@thesalvador.group / admin123 via POST /api/auth/login (NOT /api/admin/login). Client: testclient@bybloomlabs.com / clientpass123. Used as documented in /app/memory/test_credentials.md.",
+  "seed_data_creation": "test_iteration_29 hits /api/paypal/orders with TEST_gym@example.com customer_email — these create real paypal_transactions rows in the preview Mongo (status=CREATED, no capture). Cleanup is not required since these orders are sandbox CREATED-only and tagged niche='gym_owners' for easy admin filtering.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 28's Phase J dispatch-contract bug is FIXED (test_phase_j_dispatch_happy_path_and_idempotency now passes). For iteration 30+, exercise: (1) actual PayPal capture happy path on a gym tier (sandbox buyer login), (2) admin /admin/paypal-orders filter-by-niche UI if/when added, (3) ExitIntentModal A/B variant CTAs once they're wired. Frontend tests in this run used 1920x1080 viewport and the public REACT_APP_BACKEND_URL.",
+  "rca of the issue": "No issues found."
+}

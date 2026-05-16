@@ -31,6 +31,9 @@ import {
   HelpCircle,
   Briefcase,
   ArrowRight,
+  Dumbbell,
+  Building2,
+  Users,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { useClientAuth } from "@/lib/clientAuth";
@@ -96,6 +99,71 @@ const MEGA_GROUPS = [
       cta: "See it live →",
       to: "/tour",
       testid: "mega-featured-tour",
+    },
+  },
+  {
+    id: "who-we-serve",
+    label: "Who We Serve",
+    columns: [
+      {
+        heading: "Industries",
+        items: [
+          {
+            id: "gym-owners",
+            icon: Dumbbell,
+            label: "Gym Owners",
+            description: "Custom member-management software · 3-4 week build.",
+            href: "/gym-owners",
+            type: "route",
+          },
+          {
+            id: "coming-soon-clinics",
+            icon: Building2,
+            label: "Clinics & Wellness",
+            description: "Coming soon — patient retention + booking.",
+            href: "/gym-owners",
+            type: "route",
+            badge: "Soon",
+          },
+        ],
+      },
+      {
+        heading: "Explore the gym-owner playbook",
+        items: [
+          {
+            id: "gym-how",
+            icon: Workflow,
+            label: "How it works",
+            description: "Three features, one custom platform.",
+            href: "/gym-owners/how-it-works",
+            type: "route",
+          },
+          {
+            id: "gym-process",
+            icon: PenLine,
+            label: "Our 4-week process",
+            description: "Discovery → Launch in 4 weeks. ~3 hrs of your time.",
+            href: "/gym-owners/process",
+            type: "route",
+          },
+          {
+            id: "gym-results",
+            icon: TrendingUp,
+            label: "Expected results",
+            description: "Interactive ROI calc + member-journey breakdown.",
+            href: "/gym-owners/results",
+            type: "route",
+          },
+        ],
+      },
+    ],
+    featured: {
+      eyebrow: "Built for gym owners",
+      title: "Stop losing members. Recover $2-4K / month.",
+      description: "Custom software that automates follow-ups + reduces churn 20-30% in 60 days.",
+      cta: "See the gym-owner site →",
+      to: "/gym-owners",
+      testid: "mega-featured-gym-owners",
     },
   },
   {
@@ -193,6 +261,7 @@ const MEGA_GROUPS = [
 const MOBILE_ITEMS = [
   { id: "problem", label: "Problem", type: "anchor" },
   { id: "solution", label: "Solution", type: "anchor" },
+  { id: "gym-owners", label: "For Gym Owners", type: "route", to: "/gym-owners" },
   { id: "pricing", label: "Pricing", type: "anchor" },
   { id: "case-studies", label: "Case Studies", type: "route", to: "/case-studies" },
   { id: "tour", label: "See it live", type: "route", to: "/tour" },
@@ -240,7 +309,14 @@ function MegaPanel({ group, onClose }) {
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium leading-snug">{item.label}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium leading-snug">{item.label}</p>
+                            {item.badge && (
+                              <span className="inline-flex items-center text-[9px] uppercase tracking-wider font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
                           {item.description && (
                             <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
                               {item.description}

@@ -64,6 +64,11 @@ PACKAGE_TO_SUPPORT_TIER: Dict[str, str] = {
     "express": "standard",
     "custom": "premium",
     "enterprise": "vip",
+    # Niche-specific tiers map to the same support level as their generic
+    # equivalents — gym owners still get standard/premium/vip support.
+    "gym_express": "standard",
+    "gym_custom": "premium",
+    "gym_enterprise": "vip",
 }
 
 # Catalog — 6 SKUs (3 tiers × 2 cadences). Prices below are PER MONTH, but

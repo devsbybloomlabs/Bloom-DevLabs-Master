@@ -2,6 +2,7 @@ import { Header } from "@/components/sections/Header";
 import { Hero } from "@/components/sections/Hero";
 import { PainPoints } from "@/components/sections/PainPoints";
 import { Solution } from "@/components/sections/Solution";
+import { WhoWeServe } from "@/components/sections/WhoWeServe";
 import { Pricing } from "@/components/sections/Pricing";
 import { CaseStudies } from "@/components/sections/CaseStudies";
 import { HowWeWork } from "@/components/sections/HowWeWork";
@@ -47,6 +48,7 @@ export default function Landing() {
       <Hero />
       <PainPoints />
       <Solution />
+      <WhoWeServe />
       <Pricing />
       <CaseStudies />
       <HowWeWork />

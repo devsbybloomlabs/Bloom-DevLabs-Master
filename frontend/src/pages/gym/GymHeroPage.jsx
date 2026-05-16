@@ -22,10 +22,12 @@ import {
   ChevronDown,
   Star,
   Flame,
+  CreditCard,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import GymLayout from "./GymLayout";
 import { SimpleROICalculator } from "./components/ROICalculator";
+import GymCheckoutDialog from "./components/GymCheckoutDialog";
 
 const TIDYCAL = BRAND.tidycal;
 
@@ -312,9 +314,10 @@ function SolutionSection() {
 
 // --------------------------------------------------------------------------
 function OfferSection() {
+  const [checkoutTier, setCheckoutTier] = useState(null);
   const tiers = [
     {
-      key: "express",
+      key: "gym_express",
       name: "Express Launch",
       price: "$5,995",
       timeline: "10–14 days",
@@ -328,7 +331,7 @@ function OfferSection() {
       featured: false,
     },
     {
-      key: "custom",
+      key: "gym_custom",
       name: "Custom Build",
       price: "$8,995",
       timeline: "20–28 days",
@@ -344,7 +347,7 @@ function OfferSection() {
       featured: true,
     },
     {
-      key: "enterprise",
+      key: "gym_enterprise",
       name: "Enterprise",
       price: "$14,995",
       timeline: "28–35 days",
@@ -371,7 +374,7 @@ function OfferSection() {
             Three ways to start. All ship in under 5 weeks.
           </h2>
           <p className="mt-5 text-lg text-slate-600">
-            Pick the scope. We handle every line of code. Payback in 1–2 months on every tier.
+            Pick the scope. Pay securely via PayPal. Payback in 1–2 months on every tier.
           </p>
         </div>
 
@@ -379,7 +382,7 @@ function OfferSection() {
           {tiers.map((t) => (
             <div
               key={t.key}
-              className={`rounded-2xl p-7 border-2 relative transition ${
+              className={`rounded-2xl p-7 border-2 relative transition flex flex-col ${
                 t.featured
                   ? "border-blue-700 bg-gradient-to-br from-blue-50 to-white shadow-xl scale-[1.02]"
                   : "border-slate-200 bg-white hover:border-slate-300"
@@ -402,7 +405,7 @@ function OfferSection() {
               </div>
               <p className="text-xs text-slate-500 mt-1">{t.sub}</p>
 
-              <ul className="mt-6 space-y-2.5">
+              <ul className="mt-6 space-y-2.5 flex-1">
                 {t.features.map((f, i) => (
                   <li key={i} className="flex gap-2 text-sm text-slate-700">
                     <Check className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
@@ -411,23 +414,40 @@ function OfferSection() {
                 ))}
               </ul>
 
-              <a
-                href={TIDYCAL}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid={`gym-tier-cta-${t.key}`}
-                className={`mt-7 inline-flex items-center justify-center gap-2 w-full px-5 py-3 rounded-md font-semibold text-sm transition ${
-                  t.featured
-                    ? "bg-blue-700 hover:bg-blue-800 text-white"
-                    : "bg-slate-900 hover:bg-slate-800 text-white"
-                }`}
-              >
-                Start with {t.name}
-                <ArrowRight className="h-4 w-4" />
-              </a>
+              <div className="mt-7 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setCheckoutTier(t.key)}
+                  data-testid={`gym-tier-pay-${t.key}`}
+                  className={`inline-flex items-center justify-center gap-2 w-full px-5 py-3 rounded-md font-semibold text-sm transition ${
+                    t.featured
+                      ? "bg-blue-700 hover:bg-blue-800 text-white"
+                      : "bg-slate-900 hover:bg-slate-800 text-white"
+                  }`}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Pay with PayPal · {t.price}
+                </button>
+                <a
+                  href={TIDYCAL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid={`gym-tier-cta-${t.key}`}
+                  className="inline-flex items-center justify-center gap-1.5 w-full px-5 py-2 rounded-md font-medium text-xs text-slate-600 hover:text-slate-900 transition"
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  Or talk first — book a call
+                </a>
+              </div>
             </div>
           ))}
         </div>
+
+        <GymCheckoutDialog
+          open={Boolean(checkoutTier)}
+          onOpenChange={(o) => !o && setCheckoutTier(null)}
+          tierKey={checkoutTier}
+        />
       </div>
     </section>
   );

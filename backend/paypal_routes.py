@@ -31,10 +31,70 @@ def _now() -> datetime:
 
 
 # Plan tier configuration. Prices in USD by default.
+#
+# Niche-specific tiers (e.g. gym_express) carry the same prices as the
+# generic packages but a different `description` + `niche` so the captured
+# order shows up tagged correctly in /admin/paypal-orders. Each niche tier
+# maps back to a generic support tier via PACKAGE_TO_SUPPORT_TIER.
 PACKAGE_TIERS: Dict[str, Dict[str, Any]] = {
     "express": {"name": "Express Launch", "price": "5995.00", "kind": "one_time"},
     "custom": {"name": "Custom Build", "price": "8995.00", "kind": "one_time"},
     "enterprise": {"name": "Enterprise", "price": "14995.00", "kind": "one_time"},
+    # ---- Gym Owners niche (Feb 2026) ----
+    "gym_express": {
+        "name": "Gym Express Launch",
+        "price": "5995.00",
+        "kind": "one_time",
+        "niche": "gym_owners",
+        "support_tier": "standard",
+        "timeline": "10-14 days",
+        "inclusions": [
+            "Member management dashboard",
+            "Automated email sequences",
+            "Basic analytics",
+            "30-day support",
+        ],
+    },
+    "gym_custom": {
+        "name": "Gym Custom Build",
+        "price": "8995.00",
+        "kind": "one_time",
+        "niche": "gym_owners",
+        "support_tier": "premium",
+        "timeline": "20-28 days",
+        "inclusions": [
+            "Everything in Gym Express",
+            "Lead-capture funnel",
+            "Payment integration (Stripe/Square)",
+            "Member mobile app",
+            "Advanced analytics + churn predictor",
+            "60-day support",
+        ],
+    },
+    "gym_enterprise": {
+        "name": "Gym Enterprise",
+        "price": "14995.00",
+        "kind": "one_time",
+        "niche": "gym_owners",
+        "support_tier": "vip",
+        "timeline": "28-35 days",
+        "inclusions": [
+            "Everything in Gym Custom Build",
+            "Multi-location support",
+            "Predictive analytics + cohort modelling",
+            "White-label option",
+            "Additional revenue-stream module",
+        ],
+    },
+}
+
+# Niche-tier → generic-tier alias so support-tier provisioning + invoice
+# auto-generation work unchanged. Order metadata still preserves the
+# niche tier for analytics + admin filtering.
+NICHE_TIER_ALIASES: Dict[str, str] = {
+    "gym_express": "express",
+    "gym_custom": "custom",
+    "gym_enterprise": "enterprise",
 }
 
 # Payment plan configuration
@@ -147,7 +207,10 @@ async def create_order(
         raise HTTPException(400, f"Invalid payment_plan. Use one of: {', '.join(PAYMENT_PLANS)}")
 
     charge: Optional[Dict[str, Any]] = None
+    niche: Optional[str] = None
     if tier and tier in PACKAGE_TIERS:
+        cfg = PACKAGE_TIERS[tier]
+        niche = cfg.get("niche")
         charge = compute_charge(tier, payment_plan or "split_50_50")
         amount = amount or charge["charge_now"]
         plan_suffix = (
@@ -155,7 +218,7 @@ async def create_order(
             if payment_plan == "split_50_50"
             else " — full upfront (save $500)"
         )
-        description = description or f"{PACKAGE_TIERS[tier]['name']}{plan_suffix}"
+        description = description or f"{cfg['name']}{plan_suffix}"
     if not amount:
         raise HTTPException(400, "amount or valid tier required")
 
@@ -179,12 +242,16 @@ async def create_order(
         "kind": "order",
         "status": order.get("status", "CREATED"),
         "tier": tier,
+        "niche": niche,
         "amount": amount,
         "currency": req.currency or pp.default_currency,
         "customer_email": req.customer_email,
         "customer_name": req.customer_name,
         "description": description,
-        "metadata": req.metadata or {},
+        "metadata": {
+            **(req.metadata or {}),
+            **({"niche": niche, "inclusions": PACKAGE_TIERS[tier].get("inclusions"), "timeline": PACKAGE_TIERS[tier].get("timeline")} if tier and tier in PACKAGE_TIERS and PACKAGE_TIERS[tier].get("niche") else {}),
+        },
         "raw": order,
         "created_at": _now().isoformat(),
         "updated_at": _now().isoformat(),
