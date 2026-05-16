@@ -26,6 +26,7 @@ export default function GymHowItWorksPage() {
   return (
     <GymLayout breadcrumb="How It Works">
       <Hero />
+      <DualPathSection />
       <FeaturesSection />
       <IntegrationsSection />
       <JourneySection />
@@ -57,6 +58,138 @@ function Hero() {
     </section>
   );
 }
+
+function DualPathSection() {
+  const paths = [
+    {
+      label: "Path A",
+      tag: "Prototype",
+      price: "$2,995",
+      timeline: "24 hours",
+      tone: "emerald",
+      flow: ["Discovery", "Mockup build", "Demo + feedback", "Done"],
+      bullets: [
+        "Working member-tracking dashboard",
+        "1 automated-email template",
+        "Discovery + demo session included",
+      ],
+      footer: "Next: decide to upgrade — we credit $1,000 if you do within 14 days.",
+    },
+    {
+      label: "Path B",
+      tag: "Full Build",
+      price: "$8,995",
+      timeline: "3 weeks",
+      tone: "blue",
+      flow: ["Discovery", "Skeleton", "Feedback loop", "Full launch", "Training"],
+      bullets: [
+        "Everything in Path A",
+        "Payment integration (Stripe / Square)",
+        "Member mobile app",
+        "Advanced analytics + churn predictor",
+        "60-day support",
+      ],
+      footer: "Launches in 3 weeks. 30-day money-back guarantee from go-live.",
+    },
+  ];
+  const tones = {
+    emerald: {
+      border: "border-emerald-300",
+      header: "from-emerald-500 to-teal-600",
+      chip: "bg-emerald-100 text-emerald-700",
+      arrow: "text-emerald-500",
+    },
+    blue: {
+      border: "border-blue-300",
+      header: "from-blue-600 to-indigo-700",
+      chip: "bg-blue-100 text-blue-700",
+      arrow: "text-blue-500",
+    },
+  };
+  return (
+    <section className="py-20 bg-slate-50" data-testid="how-dual-path-section">
+      <div className="max-w-6xl mx-auto px-6 lg:px-10">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-4">
+            Two paths · one outcome
+          </div>
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-slate-900 leading-tight">
+            Choose your risk level. Both paths start the same way.
+          </h2>
+          <p className="mt-4 text-base text-slate-600 leading-relaxed">
+            Want to see it work in your gym before committing? Start with the
+            prototype. Already sold? Skip straight to the full build.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-5">
+          {paths.map((p) => {
+            const t = tones[p.tone];
+            return (
+              <div
+                key={p.tag}
+                className={`rounded-2xl border-2 ${t.border} bg-white overflow-hidden shadow-sm`}
+                data-testid={`how-dual-path-${p.tag.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                <div className={`px-6 py-4 bg-gradient-to-r ${t.header} text-white`}>
+                  <div className="text-[10px] uppercase tracking-[0.18em] font-bold opacity-90">
+                    {p.label}
+                  </div>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <h3 className="font-display text-2xl font-bold">{p.tag}</h3>
+                    <span className="text-xl font-bold tabular-nums">{p.price}</span>
+                  </div>
+                  <div className={`inline-flex items-center gap-1 mt-2 text-[11px] uppercase tracking-wider font-bold ${t.chip} px-2 py-0.5 rounded`}>
+                    {p.timeline}
+                  </div>
+                </div>
+                <div className="px-6 py-5 border-b border-slate-100">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-3">Flow</div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {p.flow.map((step, idx) => (
+                      <span key={step} className="inline-flex items-center gap-1.5">
+                        <span className="text-sm font-medium text-slate-800 bg-slate-100 px-2 py-1 rounded">
+                          {step}
+                        </span>
+                        {idx < p.flow.length - 1 && (
+                          <ArrowRight className={`h-3.5 w-3.5 ${t.arrow}`} />
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="px-6 py-5">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-3">You get</div>
+                  <ul className="space-y-2">
+                    {p.bullets.map((b, idx) => (
+                      <li key={idx} className="flex gap-2 text-sm text-slate-700">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-slate-500 italic mt-4 leading-relaxed">{p.footer}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 rounded-xl bg-gradient-to-br from-emerald-50 to-blue-50 border-2 border-dashed border-slate-300 p-5 text-center">
+          <p className="text-sm text-slate-700">
+            <strong className="text-slate-900">Most owners start with the prototype.</strong>{" "}
+            ~90% upgrade to the full build within 2 weeks — and we credit{" "}
+            <strong className="text-emerald-700">$1,000</strong> off the full price when they do.
+          </p>
+          <p className="text-[11px] text-slate-500 italic mt-2">
+            Upgrade rate is projected based on our member-management methodology — live customer data coming Q2.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 
 function FeaturesSection() {
   const features = [

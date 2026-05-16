@@ -23,6 +23,7 @@ from emailit_client import EmailitClient  # noqa: E402
 from openrouter_client import OpenRouterClient  # noqa: E402
 from paypal_client import PayPalClient  # noqa: E402
 from paypal_routes import paypal_admin_router, paypal_router  # noqa: E402
+from gym_upgrade_routes import gym_upgrade_router  # noqa: E402
 from paypal_webhooks import paypal_webhook_router  # noqa: E402
 from nifty_client import NiftyClient  # noqa: E402
 from blog_routes import blog_admin_router, blog_public_router  # noqa: E402
@@ -237,8 +238,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("Support subscription expiry cron failed: %s", exc)
 
+    async def prototype_drip_cron() -> None:
+        try:
+            from gym_prototype_drip import prototype_drip_tick
+
+            res = await prototype_drip_tick(app.state.db, app)
+            if res.get("sent", 0) > 0 or res.get("failed", 0) > 0 or res.get("skipped", 0) > 0:
+                log.info("Prototype drip tick: %s", res)
+        except Exception as exc:
+            log.exception("Prototype drip cron failed: %s", exc)
+
     # Hourly drip ticks
     scheduler.add_job(drip_cron, CronTrigger(minute=15))
+    # Hourly prototype-buyer drip (offset by 5 min so it doesn't collide with
+    # the generic lead-magnet drip)
+    scheduler.add_job(prototype_drip_cron, CronTrigger(minute=20))
     # Every 5 min Nifty comment poll
     scheduler.add_job(nifty_comment_cron, CronTrigger(minute="*/5"))
     # Daily 8am Nifty timeline refresh
@@ -342,6 +356,7 @@ api.include_router(webhook_router)
 api.include_router(notification_router)
 api.include_router(sync_router)
 api.include_router(paypal_router)
+api.include_router(gym_upgrade_router)
 api.include_router(paypal_admin_router)
 api.include_router(paypal_webhook_router)
 api.include_router(client_auth_router)

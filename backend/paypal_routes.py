@@ -443,6 +443,19 @@ async def capture_order(
                         )
             except Exception as exc:
                 log.exception("Support subscription auto-provision failed: %s", exc)
+
+            # V3: kick off the 5-step prototype → full-build nurture drip on
+            # `gym_prototype` captures. Idempotent.
+            try:
+                fresh_order = await db.paypal.find_one(
+                    {"id": order_id, "kind": "order"}, {"_id": 0}
+                )
+                if fresh_order and (fresh_order.get("tier") or "").lower() == "gym_prototype":
+                    from gym_prototype_drip import enqueue_prototype_drip
+
+                    await enqueue_prototype_drip(db, fresh_order)
+            except Exception as exc:
+                log.exception("Prototype drip enqueue failed: %s", exc)
         except Exception as exc:
             log.exception("Auto-provision client/onboarding failed: %s", exc)
 

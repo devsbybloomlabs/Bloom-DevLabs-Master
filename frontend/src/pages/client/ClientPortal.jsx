@@ -4,6 +4,7 @@ import { useClientAuth, clientApi } from "@/lib/clientAuth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MilestoneTimeline from "@/components/MilestoneTimeline";
+import UpgradePrototypeBanner from "@/pages/client/components/UpgradePrototypeBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -83,7 +84,7 @@ function fmt(amount, currency = "USD") {
   }
 }
 
-function OrdersList({ data, loading, approvedBriefs }) {
+function OrdersList({ data, loading, approvedBriefs, upgradeEligibilityMap = {}, onUpgraded }) {
   if (loading) return <Skeleton className="h-32 w-full" />;
   const pp = data?.paypal || [];
   const ah = data?.agencyhandy || [];
@@ -102,32 +103,44 @@ function OrdersList({ data, loading, approvedBriefs }) {
   }
   return (
     <div className="space-y-3" data-testid="portal-orders-list">
-      {pp.map((o) => (
-        <Card key={o.id} className="border-border">
-          <CardContent className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wider text-[#1E3A8A]">PayPal</span>
-                <StatusPill status={o.status} />
+      {pp.map((o) => {
+        const eligibility = upgradeEligibilityMap[o.id];
+        return (
+          <Card key={o.id} className="border-border">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium uppercase tracking-wider text-[#1E3A8A]">PayPal</span>
+                    <StatusPill status={o.status} />
+                  </div>
+                  <p className="mt-1 font-display text-base font-medium truncate">
+                    {o.description || o.tier || "Service"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5 break-anywhere">
+                    Order #{o.id}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-display text-lg font-semibold tabular-nums">
+                    {fmt(o.amount, o.currency)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {o.created_at?.slice(0, 10) || ""}
+                  </p>
+                </div>
               </div>
-              <p className="mt-1 font-display text-base font-medium truncate">
-                {o.description || o.tier || "Service"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5 break-anywhere">
-                Order #{o.id}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="font-display text-lg font-semibold tabular-nums">
-                {fmt(o.amount, o.currency)}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {o.created_at?.slice(0, 10) || ""}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+              {eligibility?.eligible && (
+                <UpgradePrototypeBanner
+                  order={o}
+                  eligibility={eligibility}
+                  onUpgraded={onUpgraded}
+                />
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
       {ah.map((o, i) => (
         <Card key={`ah-${o._id || i}`} className="border-border">
           <CardContent className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
@@ -791,6 +804,7 @@ export default function ClientPortal() {
   const [pendingBrief, setPendingBrief] = useState(null);
   const [approvedBriefs, setApprovedBriefs] = useState([]);
   const [files, setFiles] = useState([]);
+  const [upgradeEligibilityMap, setUpgradeEligibilityMap] = useState({});
 
   // Tab state synced with `?tab=...` URL param so deep-links from emails work
   // (e.g. /portal?tab=invoices, /portal?tab=subscriptions).
@@ -844,7 +858,7 @@ export default function ClientPortal() {
     setLoading(true);
     const api = clientApi(token);
     try {
-      const [o, s, pl, i, p, ob, ms, sc, pb, ab, pf] = await Promise.allSettled([
+      const [o, s, pl, i, p, ob, ms, sc, pb, ab, pf, ue] = await Promise.allSettled([
         api.get("/clients/me/orders"),
         api.get("/clients/subscriptions"),
         api.get("/clients/subscriptions/plans"),
@@ -856,6 +870,7 @@ export default function ClientPortal() {
         api.get("/clients/me/briefs/pending"),
         api.get("/clients/me/briefs/approved"),
         api.get("/clients/me/project-files"),
+        api.get("/clients/orders/upgrade-eligibility"),
       ]);
       setOrders(o.status === "fulfilled" ? o.value.data : null);
       setSubs(s.status === "fulfilled" ? s.value.data : null);
@@ -868,6 +883,14 @@ export default function ClientPortal() {
       setPendingBrief(pb.status === "fulfilled" ? pb.value.data : null);
       setApprovedBriefs(ab.status === "fulfilled" ? (ab.value.data || []) : []);
       setFiles(pf.status === "fulfilled" ? (pf.value.data || []) : []);
+      // Map { order_id: eligibility-blob } for the prototype → full-build CTA.
+      const eligMap = {};
+      if (ue.status === "fulfilled") {
+        for (const row of ue.value.data?.orders || []) {
+          eligMap[row.order_id] = row;
+        }
+      }
+      setUpgradeEligibilityMap(eligMap);
     } finally {
       setLoading(false);
     }
@@ -1017,7 +1040,7 @@ export default function ClientPortal() {
             </div>
           </TabsContent>
           <TabsContent value="orders" className="mt-6">
-            <OrdersList data={orders} loading={loading} approvedBriefs={approvedBriefs} />
+            <OrdersList data={orders} loading={loading} approvedBriefs={approvedBriefs} upgradeEligibilityMap={upgradeEligibilityMap} onUpgraded={loadAll} />
           </TabsContent>
           <TabsContent value="subscriptions" className="mt-6">
             <SubscriptionsList
