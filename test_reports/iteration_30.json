@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only verification of the 4-page Coaches & Consultants funnel (/coaches, /coaches/how-it-works, /coaches/process, /coaches/results) plus mega-menu / mobile-drawer wiring. ALL acceptance items PASS. No console errors and no pageerror events on any of the 4 pages. CoachLayout header NAV testids correct (coach-nav-overview/how-it-works/our-process/results), breadcrumb renders 'Home > Coaches & Consultants > <label>' on each page. Hero page renders all 9 expected sections (coach-hero-section, coach-prequal-section, coach-problem-section, coach-solution-section, coach-offer-section, coach-roi-section, coach-social-proof, coach-faq-section, coach-final-cta). All 3 pricing tier cards (coach-tier-coach_starter / coach_premium / coach_enterprise) and 3 Pay-with-PayPal buttons present. CoachCheckoutDialog opens with correct tier name + price for each tier: Starter $2,995 (no split toggle — skipSplit honored), Premium $8,995 (split + full toggles render), Enterprise $14,995. coach-checkout-prefill-hint stays visible while email is invalid (e.g. 'invalid-email') and disappears once name+valid email entered. ROI simple calc (coach-roi-input-leads, coach-roi-input-value) accepts numeric input on /coaches. ROI detailed calc (coach-roi-detailed-leads, coach-roi-detailed-rate range, coach-roi-detailed-value) accepts input on /coaches/results. FAQ accordions on both /coaches (coach-faq-toggle-0..4) and /coaches/results (coach-results-faq-toggle-0..4) expand/collapse. /coaches/how-it-works has all 4 expected sections (coach-how-features, coach-how-integrations, coach-how-journey, coach-how-security). /coaches/process has all 6 expected sections. /coaches/results has all 7 expected sections. Header Who-We-Serve mega menu renders mega-link-coaches + mega-link-coach-how + mega-link-coach-process + mega-link-coach-results + mega-featured-coaches; clicking mega-link-coaches navigates to /coaches. Mobile drawer exposes 'For Coaches & Consultants' (data-testid mobile-nav-coaches-link) and the text matches.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "CoachLayout.jsx — scrollToTop is called inside render via setTimeout. That is a side-effect during render which is technically a React anti-pattern; should be wrapped in useEffect(() => { window.scrollTo(...); }, [pathname]). Currently it works but will log warnings under Strict Mode / future React. Low priority.",
+    "CoachCheckoutDialog.jsx — email validation appears to be a simple regex; consider also disabling the PayPal Smart Buttons mount until name+email are valid (rather than only swapping the hint), so users can't click through an unmounted-but-flashing PayPal area. Currently the request only asked for the hint behavior which works correctly.",
+    "CoachROICalculator detailed insight tiles still lack per-tile data-testid (same nit as iteration 29 for gym-owners). Adding [data-testid=coach-roi-detailed-tile-{name}] on the 6 stat cards would let future regression assert exact math output instead of only inputs.",
+    "Hero/Final-CTA backgrounds use unsplash hotlinks. Consider self-hosting for production reliability / CLS. Non-blocking.",
+    "Coach pages don't carry meta-tag SEO yet (title/description/og:image specific to coaches). bybloomlabs landing pages typically need these for paid traffic — flag for a follow-up.",
+    "ExitIntentModal is mounted inside CoachLayout (shared with gym layout). That is fine, but if A/B copy ever diverges by niche, the modal will need a niche prop. Not a bug today."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (frontend-only run)", "frontend": "100% (12/12 acceptance items verified)" },
+  "test_credentials": "n/a — no auth flows touched.",
+  "seed_data_creation": "None. CoachCheckoutDialog was opened but PayPal capture was NOT executed and no /api/paypal/orders POST was triggered.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 30 coach funnel is green. Next iteration should: (1) once a coach actually pays via PayPal sandbox, validate that the create_order metadata carries niche='coaches' or similar — confirm with backend team what the niche key should be on the order metadata; (2) add per-tile data-testid to coach-roi-detailed insight cards for math assertions; (3) confirm SEO meta tags / OG image when the coach pages go to production. Viewport used: 1920x1080 desktop + 390x844 mobile for drawer check. All testing done against public REACT_APP_BACKEND_URL.",
+  "rca of the issue": "No issues found."
+}

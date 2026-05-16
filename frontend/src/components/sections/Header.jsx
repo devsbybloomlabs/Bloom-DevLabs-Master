@@ -34,6 +34,7 @@ import {
   Dumbbell,
   Building2,
   Users,
+  Headphones,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { useClientAuth } from "@/lib/clientAuth";
@@ -117,6 +118,14 @@ const MEGA_GROUPS = [
             type: "route",
           },
           {
+            id: "coaches",
+            icon: Headphones,
+            label: "Coaches & Consultants",
+            description: "Pro website + booking + client dashboard · 24-hour build.",
+            href: "/coaches",
+            type: "route",
+          },
+          {
             id: "coming-soon-clinics",
             icon: Building2,
             label: "Clinics & Wellness",
@@ -128,7 +137,36 @@ const MEGA_GROUPS = [
         ],
       },
       {
-        heading: "Explore the gym-owner playbook",
+        heading: "Coach playbook",
+        items: [
+          {
+            id: "coach-how",
+            icon: Workflow,
+            label: "How it works",
+            description: "Website + booking + dashboard, in 24 hours.",
+            href: "/coaches/how-it-works",
+            type: "route",
+          },
+          {
+            id: "coach-process",
+            icon: PenLine,
+            label: "24-hour process",
+            description: "Discovery → live in a single day. ~2 hrs of your time.",
+            href: "/coaches/process",
+            type: "route",
+          },
+          {
+            id: "coach-results",
+            icon: TrendingUp,
+            label: "Expected results",
+            description: "3–5 extra bookings / mo + ROI calculator.",
+            href: "/coaches/results",
+            type: "route",
+          },
+        ],
+      },
+      {
+        heading: "Gym-owner playbook",
         items: [
           {
             id: "gym-how",
@@ -158,12 +196,12 @@ const MEGA_GROUPS = [
       },
     ],
     featured: {
-      eyebrow: "Built for gym owners",
-      title: "Stop losing members. Recover $2-4K / month.",
-      description: "Custom software that automates follow-ups + reduces churn 20-30% in 60 days.",
-      cta: "See the gym-owner site →",
-      to: "/gym-owners",
-      testid: "mega-featured-gym-owners",
+      eyebrow: "New · for coaches",
+      title: "Pro website + booking, live in 24 hours.",
+      description: "Stop losing $1K–$3K/mo in missed bookings. Starter from $2,995.",
+      cta: "See the coach funnel →",
+      to: "/coaches",
+      testid: "mega-featured-coaches",
     },
   },
   {
@@ -262,6 +300,7 @@ const MOBILE_ITEMS = [
   { id: "problem", label: "Problem", type: "anchor" },
   { id: "solution", label: "Solution", type: "anchor" },
   { id: "gym-owners", label: "For Gym Owners", type: "route", to: "/gym-owners" },
+  { id: "coaches", label: "For Coaches & Consultants", type: "route", to: "/coaches" },
   { id: "pricing", label: "Pricing", type: "anchor" },
   { id: "case-studies", label: "Case Studies", type: "route", to: "/case-studies" },
   { id: "tour", label: "See it live", type: "route", to: "/tour" },
@@ -281,7 +320,7 @@ function MegaPanel({ group, onClose }) {
       onMouseEnter={() => {}}
     >
       <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-12 gap-8">
-        <div className="col-span-12 lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
+        <div className={`col-span-12 lg:col-span-8 grid grid-cols-1 ${group.columns.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-x-8 gap-y-6`}>
           {group.columns.map((col, idx) => (
             <div key={`${group.id}-col-${idx}`}>
               <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-muted-foreground mb-3">

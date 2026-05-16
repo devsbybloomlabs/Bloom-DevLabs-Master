@@ -53,6 +53,10 @@ import GymHeroPage from "@/pages/gym/GymHeroPage";
 import GymHowItWorksPage from "@/pages/gym/GymHowItWorksPage";
 import GymProcessPage from "@/pages/gym/GymProcessPage";
 import GymResultsPage from "@/pages/gym/GymResultsPage";
+import CoachHeroPage from "@/pages/coach/CoachHeroPage";
+import CoachHowItWorksPage from "@/pages/coach/CoachHowItWorksPage";
+import CoachProcessPage from "@/pages/coach/CoachProcessPage";
+import CoachResultsPage from "@/pages/coach/CoachResultsPage";
 
 function App() {
   return (
@@ -71,6 +75,10 @@ function App() {
               <Route path="/gym-owners/how-it-works" element={<GymHowItWorksPage />} />
               <Route path="/gym-owners/process" element={<GymProcessPage />} />
               <Route path="/gym-owners/results" element={<GymResultsPage />} />
+              <Route path="/coaches" element={<CoachHeroPage />} />
+              <Route path="/coaches/how-it-works" element={<CoachHowItWorksPage />} />
+              <Route path="/coaches/process" element={<CoachProcessPage />} />
+              <Route path="/coaches/results" element={<CoachResultsPage />} />
               <Route path="/pay/invoice/:invoiceId" element={<PayInvoice />} />
 
               {/* Client (public-facing) auth + portal */}
