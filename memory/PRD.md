@@ -142,6 +142,15 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 **Phase I — Tier-aware support email routing**
 - `contact_routes._email_founder_notification` now routes primary `to:` to `SUPPORT_VIP_EMAIL` (= `vipsupport@bybloomlabs.com`) when `company.support_tier=='vip'`, else `SUPPORT_EMAIL`. Adds `X-Bloom-Routed-Tier` header. Founder stays cc'd in all cases.
 
+**Phase K — Gym-Owners niche site + PayPal niche tiers + Who-We-Serve mega menu (Feb 2026)**
+- New public funnel at `/gym-owners` · `/how-it-works` · `/process` · `/results` — sticky 4-page nav, breadcrumb, mobile drawer, exit-intent modal mounted in `GymLayout.jsx`.
+- 3 niche package tiers (`gym_express` $5,995 / `gym_custom` $8,995 / `gym_enterprise` $14,995) added to `paypal_routes.PACKAGE_TIERS` carrying `niche="gym_owners"`, `inclusions[]`, `timeline`, `support_tier` — `create_order` persists these on the order doc so admin captures see the niche tag.
+- `support_subscription_routes.PACKAGE_TO_SUPPORT_TIER` extended (`gym_express→standard`, `gym_custom→premium`, `gym_enterprise→vip`) — bundled support auto-provisions exactly the same way as the generic tiers.
+- New `GymCheckoutDialog.jsx` (name/email/gym + 50-50 vs full-upfront plan toggle + reuse of `PayPalCheckoutButton`) mounted on the 3 tier cards — PayPal Smart Buttons render after the form is filled.
+- New `<WhoWeServe/>` homepage section between Solution and Pricing (2 industry cards: Gym Owners LIVE + Clinics & Wellness "Coming Soon") so anonymous visitors discover the niche from `/`.
+- `Header.jsx` mega menu gains a "Who We Serve" group with 5 entries + featured CTA card; mobile drawer adds "For Gym Owners"; mega item render now supports an optional `badge` field.
+- Tests: `tests/test_gym_tiers.py` (3) + testing-agent-authored `tests/test_iteration_29.py` (9) — all green; full regression 45/45.
+
 **Phase J — Brief approval → contract & invoice automation (admin-review gate)**
 - On 3rd-phase approval, `_finalize_brief_approval` flips `brief.awaiting_contract_dispatch=true`. Admin sees an amber **Contract Dispatch Banner** in `ProjectBriefDialog` with Preview + Send buttons.
 - New `brief_contract_routes.py`:
