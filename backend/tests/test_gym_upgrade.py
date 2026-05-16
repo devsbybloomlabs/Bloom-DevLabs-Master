@@ -105,10 +105,21 @@ async def test_already_upgraded_is_ineligible(db):
 
 
 @pytest.mark.asyncio
-async def test_non_prototype_tier_is_ineligible(db):
+async def test_non_starter_tier_is_ineligible(db):
     from gym_upgrade_routes import _check_eligibility
 
     order = _seed_order(tier="gym_custom")
     verdict = await _check_eligibility(db, order, "buyer@example.com")
     assert verdict["eligible"] is False
-    assert any("not a prototype" in r for r in verdict["reasons"])
+    assert any("not an upgradeable starter" in r for r in verdict["reasons"])
+
+
+@pytest.mark.asyncio
+async def test_coach_starter_eligible_with_correct_target(db):
+    from gym_upgrade_routes import _check_eligibility
+
+    order = _seed_order(tier="coach_starter")
+    verdict = await _check_eligibility(db, order, "buyer@example.com")
+    assert verdict["eligible"] is True, verdict["reasons"]
+    assert verdict["target_tier"] == "coach_premium"
+    assert verdict["discounted_price"] == "7995.00"  # 8995 - 1000

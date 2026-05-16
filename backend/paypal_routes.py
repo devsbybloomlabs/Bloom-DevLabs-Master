@@ -101,6 +101,54 @@ PACKAGE_TIERS: Dict[str, Dict[str, Any]] = {
             "Additional revenue-stream module",
         ],
     },
+    # ---- Coaches & Consultants niche (Feb 2026) ----
+    "coach_starter": {
+        "name": "Coach Starter Website",
+        "price": "2995.00",
+        "kind": "one_time",
+        "niche": "coaches",
+        "support_tier": "standard",
+        "timeline": "24 hours",
+        "full_upfront_discount": 0,
+        "inclusions": [
+            "Professional custom website (mobile-optimized)",
+            "One-click booking system with calendar sync",
+            "Payment processing (Stripe/PayPal)",
+            "Basic client dashboard",
+            "30-day support + $1,000 credit toward Premium upgrade (14 days)",
+        ],
+    },
+    "coach_premium": {
+        "name": "Coach Premium Website",
+        "price": "8995.00",
+        "kind": "one_time",
+        "niche": "coaches",
+        "support_tier": "premium",
+        "timeline": "4 weeks",
+        "inclusions": [
+            "Everything in Coach Starter",
+            "Advanced customization + video intro section",
+            "Resource library + downloadable assets",
+            "Advanced analytics dashboard",
+            "Email automation (confirmations, reminders, follow-ups)",
+            "60-day support",
+        ],
+    },
+    "coach_enterprise": {
+        "name": "Coach Enterprise",
+        "price": "14995.00",
+        "kind": "one_time",
+        "niche": "coaches",
+        "support_tier": "vip",
+        "timeline": "5-6 weeks",
+        "inclusions": [
+            "Everything in Coach Premium",
+            "Multi-service offerings (1-on-1, group, workshops)",
+            "Advanced integrations (CRM, marketing automation)",
+            "White-label options",
+            "Dedicated account manager",
+        ],
+    },
 }
 
 # Niche-tier → generic-tier alias so support-tier provisioning + invoice

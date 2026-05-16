@@ -29,10 +29,19 @@ from paypal_routes import PACKAGE_TIERS, get_pp
 def get_db(request: Request) -> AsyncIOMotorDatabase:
     return request.app.state.db
 
-UPGRADE_TARGET_TIER = "gym_custom"
-PROTOTYPE_TIER = "gym_prototype"
 UPGRADE_WINDOW_DAYS = 14
 UPGRADE_CREDIT = 1000.00
+
+# Map starter tier → target upgrade tier. Each pair shares the $1,000 credit
+# offer + 14-day window.
+UPGRADE_PATHS: Dict[str, str] = {
+    "gym_prototype": "gym_custom",
+    "coach_starter": "coach_premium",
+}
+
+
+def _target_tier_for(starter_tier: str) -> Optional[str]:
+    return UPGRADE_PATHS.get(starter_tier)
 
 
 # ----------------------------------------------------------------------------
@@ -59,11 +68,13 @@ def _is_paid(status: str) -> bool:
 async def _check_eligibility(
     db: AsyncIOMotorDatabase, order: Dict[str, Any], client_email: str
 ) -> Dict[str, Any]:
-    """Return eligibility verdict for a single prototype order."""
+    """Return eligibility verdict for a single starter-tier order."""
     reasons: List[str] = []
+    starter_tier = (order.get("tier") or "").lower()
+    target_tier = _target_tier_for(starter_tier)
 
-    if (order.get("tier") or "").lower() != PROTOTYPE_TIER:
-        reasons.append(f"tier {order.get('tier')!r} is not a prototype")
+    if target_tier is None:
+        reasons.append(f"tier {order.get('tier')!r} is not an upgradeable starter")
     if (order.get("customer_email") or "").lower() != client_email.lower():
         reasons.append("order does not belong to this client")
     if not _is_paid(order.get("status", "")):
@@ -79,7 +90,7 @@ async def _check_eligibility(
         if elapsed > UPGRADE_WINDOW_DAYS:
             reasons.append(f"upgrade window expired ({elapsed:.1f} days since purchase)")
 
-    # Check we haven't already upgraded this order
+    # Already-upgraded guard
     existing = await db.paypal.find_one(
         {"metadata.upgrade_from": order["id"]},
         {"_id": 0, "id": 1, "status": 1},
@@ -88,13 +99,19 @@ async def _check_eligibility(
         reasons.append(f"already upgraded via order {existing.get('id')}")
 
     eligible = len(reasons) == 0
+    target_name = PACKAGE_TIERS[target_tier]["name"] if target_tier else None
+    target_price = PACKAGE_TIERS[target_tier]["price"] if target_tier else None
+    discounted = (
+        f"{float(target_price) - UPGRADE_CREDIT:.2f}" if target_price else None
+    )
     return {
         "eligible": eligible,
         "reasons": reasons,
         "days_remaining": days_remaining,
         "credit_amount": UPGRADE_CREDIT,
-        "discounted_price": "7995.00",
-        "target_tier_name": PACKAGE_TIERS[UPGRADE_TARGET_TIER]["name"],
+        "discounted_price": discounted or "0.00",
+        "target_tier": target_tier,
+        "target_tier_name": target_name,
     }
 
 
@@ -112,7 +129,7 @@ async def list_upgrade_eligible_orders(
     cursor = db.paypal.find(
         {
             "kind": "order",
-            "tier": PROTOTYPE_TIER,
+            "tier": {"$in": list(UPGRADE_PATHS.keys())},
             "customer_email": client_email,
         },
         {"_id": 0},
@@ -161,17 +178,18 @@ async def upgrade_prototype(
         )
 
     discounted = verdict["discounted_price"]
+    target_tier = verdict["target_tier"]
     description = (
-        f"Gym Full Build — prototype upgrade "
+        f"{verdict['target_tier_name']} — starter upgrade "
         f"(${int(UPGRADE_CREDIT):,} credit applied)"
     )
     metadata = {
-        "niche": "gym_owners",
+        "niche": PACKAGE_TIERS[target_tier].get("niche"),
         "upgrade_from": order_id,
-        "upgrade_to": UPGRADE_TARGET_TIER,
+        "upgrade_to": target_tier,
         "credit_applied": str(int(UPGRADE_CREDIT)),
-        "original_tier": PROTOTYPE_TIER,
-        "inclusions": PACKAGE_TIERS[UPGRADE_TARGET_TIER].get("inclusions"),
+        "original_tier": order.get("tier"),
+        "inclusions": PACKAGE_TIERS[target_tier].get("inclusions"),
     }
 
     pp_order = await pp.create_order(
@@ -185,8 +203,8 @@ async def upgrade_prototype(
         "id": pp_order["id"],
         "kind": "order",
         "status": pp_order.get("status", "CREATED"),
-        "tier": UPGRADE_TARGET_TIER,
-        "niche": "gym_owners",
+        "tier": target_tier,
+        "niche": PACKAGE_TIERS[target_tier].get("niche"),
         "amount": discounted,
         "currency": order.get("currency") or pp.default_currency,
         "customer_email": client_email,
@@ -209,4 +227,4 @@ async def upgrade_prototype(
     }
 
 
-__all__ = ["gym_upgrade_router", "_check_eligibility", "UPGRADE_WINDOW_DAYS"]
+__all__ = ["gym_upgrade_router", "_check_eligibility", "UPGRADE_WINDOW_DAYS", "UPGRADE_PATHS"]

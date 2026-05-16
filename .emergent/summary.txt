@@ -1,0 +1,136 @@
+<analysis>**original_problem_statement**: 
+The user requested the creation of a multi-page landing page ecosystem targeting Coaches and Consultants. The requirement mimics the recently built Gym Owners funnel and includes 4 pages:
+1. Hero/Sales Page ()
+2. How It Works Page ()
+3. Our Process Page ()
+4. Client Success/Results Page ()
+
+**PRODUCT REQUIREMENTS**:
+- **Pricing Tiers**: Starter Website (,995), Premium Website (,995), Enterprise (4,995+).
+- **Core Value Proposition**: Professional website + one-click booking system + client dashboard built in 24 hours to stop losing K-K/month in missed bookings.
+- **Features to highlight**: One-click booking, client dashboards, 24-hour turnaround, 30-day money-back guarantee, ,000 upgrade credit from Starter to Premium.
+
+**User's preferred language**: English (INSTRUCT next agent to respond in English only)
+
+**what currently exists?**: 
+A fully functional B2B SaaS React/FastAPI/MongoDB platform. The platform recently integrated a highly-converting Gym Owners niche funnel with dual-path checkout options, referral mechanics, and self-serve upgrade functionality. The backend has just been updated to support the new Coach vertical tiers, and the agent has just begun creating the Coach frontend layout and checkout dialog components.
+
+**Last working item**: 
+    - Last item agent was working: Building the frontend pages for the Coaches & Consultants landing page ecosystem. The backend tiers (, , ) and the generic upgrade logic are complete. The agent just created  and .
+    - Status: IN PROGRESS
+    - Agent Testing Done: N
+    - Which testing method agent to use? both (Frontend screenshot smoke test +  once the full Coach ecosystem is wired up)
+    - User Testing Done: N
+
+**All Pending/In progress Issue list**: 
+  Issue 1: Complete and Wire Coach Landing Pages Frontend (P0)
+     - Attempted fixes:  and  were created. The actual 4 pages (Hero, How It Works, Process, Results) still need to be built and populated with the user's provided copy.
+     - Next debug checklist: Create the 4 coach page components. Register their routes in . Add the Coach vertical to the Who We Serve mega menu in .
+     - Why fix this issue and what will be achieved with the fix? Fulfills the user's latest request to launch the Coach vertical funnel.
+     - Status: IN PROGRESS
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? Both
+     - Blocked on other issue: None
+
+**In progress Task List**: 
+  Task 1: Coach & Consultant Landing Page Ecosystem (P0)
+     - Where to resume: You are sitting right after the creation of . Create the remaining frontend pages based on the user's detailed copy from the last message.
+     - What will be achieved with this? A complete, conversion-optimized funnel for a new customer vertical.
+     - Status: IN PROGRESS
+     - Should Test frontend/backend/both after fix? Both
+     - Blocked on something: None
+
+**Upcoming and Future Tasks**:
+    Future Tasks:
+    - Task 1 (P2): A/B Testing headline buckets for the Gym and Coach funnels once conversion data starts coming in (Deferred from earlier plan).
+
+**Completed work in this session**:
+- Google Drive OAuth PKCE  bug fix (DONE)
+- Merged paid PayPal invoice into BreezeDocs contract PDF (DONE)
+- Gym Owners Landing Page Ecosystem (4 pages) (DONE)
+- Gym Funnel V3 Updates (Pre-qual section, dual-path hero, referral mechanics, Year 2+ messaging) (DONE)
+- Prototype self-serve upgrade via Client Portal with auto-credit (Genericized for all niches) (DONE)
+- Post-purchase APScheduler email drip for prototype buyers (DONE)
+
+**Earlier issues found/mentioned but not fixed**:
+None.
+
+**Known issue recurrence from previous fork**:
+  - Issue recurrence in previous fork: None
+  - Recurrence count: 0
+  - Status: RESOLVED
+
+**Code Architecture**:
+Standard React / FastAPI / MongoDB.
+-  handles package tiers and checkout calculations.
+-  (recently renamed from ) handles the self-serve upgrade logic and K credit eligibility.
+-  handles APScheduler cron jobs for email drips.
+
+**Key Technical Concepts**:
+PayPal SDK integrations, React Router, Tailwind/Shadcn UI, APScheduler for scheduled tasks, FastAPI backend.
+
+**key DB schema**:
+  - : {id, package_tier, amount, status}
+  - : {company_id, tier, status}
+  - : dynamic configs
+
+**changes in tech stack**:
+  - APScheduler is now actively used for sending scheduled post-purchase email drips ().
+
+**All files of reference**: 
+  -  (New)
+  -  (New)
+  -  (Needs routing updates for )
+  -  (Needs mega menu updates)
+  -  (Updated with coach tiers)
+  -  (Updated for generic upgrade logic)
+
+**Areas that need refactoring**: 
+N/A
+
+**key api endpoints**:
+- 
+- 
+- 
+
+**Critical Info for New Agent**: 
+- **Current State**: The backend logic for the Coach tiers is complete, tested, and green. The generic upgrade logic is functioning. You MUST focus entirely on building the Frontend React pages for the Coach vertical using the very detailed copy provided by the user in their last message.
+- Ensure you wire the new pages into  and add a link in the  Who We Serve mega menu.
+- **Testing**: After building the 4 pages, run a visual smoke test (screenshot) and then call  to ensure the entire flow (including PayPal dialogs) works flawlessly.
+
+**documents and test reports created in this job**: 
+  - 
+  - 
+
+**Last 10 User Messages and any pending HUMAN messages**: 
+ - *User*: Reported Google Drive OAuth  error via image.
+ - *Agent*: Fixed PKCE verifier storage and callback logic.
+ - *User*: Requested the 4-page Gym Owners Landing Page Ecosystem.
+ - *Agent*: Built and shipped the Gym funnel.
+ - *User*: Requested Mega Menu updates and niche PayPal checkout.
+ - *Agent*: Implemented Who We Serve menu and backend tier configurations.
+ - *User*: Provided massive V3 copy updates (Dual-path, pre-qual, referrals).
+ - *Agent*: Applied V3 updates.
+ - *User*: Approved enhancement (Self-serve portal upgrades).
+ - *User (LATEST)*: Requested the 4-page Coaches & Consultants Landing Page Ecosystem (Starter ,995, Premium ,995, Enterprise 4,995).
+
+**Project Health Check**:
+Healthy. Mid-feature implementation.
+
+**3rd Party Integrations**: 
+	• PayPal (Payments) — requires User API Key
+	• Google Drive — requires User OAuth Credentials (stored in DB)
+	• Emailit (Transactional Emails) — requires User API Key
+	• BreezeDocs (Proposals) — requires User API Key
+
+**Testing status**:
+  - Testing agent used after significant changes: YES (iteration 29 was 100% green)
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: , , 
+  - Known regressions: None
+
+**Credentials to test flow**:
+Check .
+
+**What agent forgot to execute**:
+The agent didn't forget anything; it simply ran out of context/tool calls right after creating the first two scaffold files for the Coach frontend ( and ). The actual 4 landing pages and their routing still need to be built.</analysis>

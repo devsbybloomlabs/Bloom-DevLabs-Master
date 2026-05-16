@@ -70,6 +70,9 @@ PACKAGE_TO_SUPPORT_TIER: Dict[str, str] = {
     "gym_express": "standard",
     "gym_custom": "premium",
     "gym_enterprise": "vip",
+    "coach_starter": "standard",
+    "coach_premium": "premium",
+    "coach_enterprise": "vip",
 }
 
 # Catalog — 6 SKUs (3 tiers × 2 cadences). Prices below are PER MONTH, but
