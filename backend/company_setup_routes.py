@@ -105,7 +105,8 @@ async def _get_or_create_company_for_client(client_email: str, client_name: str)
         "status": "active",
     })
     logger.info("company.created id=%s owner=%s", company_id, client_email)
-    return {**doc, "_id": None}
+    # Re-fetch with _id excluded to keep the response Mongo-clean
+    return await _db.companies.find_one({"id": company_id}, {"_id": 0})
 
 
 async def _get_member(company_id: str, client_email: str) -> Optional[Dict[str, Any]]:
@@ -281,8 +282,8 @@ async def update_member_role(
     target = await _db.company_members.find_one({"id": member_id, "company_id": me["company_id"]}, {"_id": 0})
     if not target:
         raise HTTPException(status_code=404, detail="member not found")
-    if target.get("is_owner") and payload.role != "admin":
-        raise HTTPException(status_code=400, detail="cannot demote the company owner")
+    if target.get("is_owner"):
+        raise HTTPException(status_code=400, detail="cannot change role of the company owner")
     await _db.company_members.update_one({"id": member_id}, {"$set": {"role": payload.role}})
     refreshed = await _db.company_members.find_one({"id": member_id}, {"_id": 0})
     return {"member": refreshed}

@@ -180,6 +180,33 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 - Backend tiers (`coach_starter` $2,995 / `coach_premium` $8,995 / `coach_enterprise` $14,995) and generic self-serve upgrade with $1K credit were shipped earlier in the same session and validated in iteration 29.
 - Tests: iteration 30 — frontend testing agent verified 12/12 acceptance items (100%) including all sections, all 3 tier dialogs, ROI calculators, FAQ accordions, mega-menu, mobile drawer. Zero console errors.
 
+**Phase I.3 — Real Estate Agents funnel + Team-invite SaaS flow + Site-wide cleanups (Feb 2026, iter 31)**
+- **NEW Real Estate Agents funnel** at `/real-estate*` mirroring the gym/coach structure, navy + amber palette:
+  - `/real-estate` Hero: dual-path Starter $2,995 vs Premium $8,995, pre-qual gate, problem section, 3-tier offer w/ PayPal dialog, simple ROI calc (commission-based), social proof, 5-item FAQ, final CTA.
+  - `/real-estate/how-it-works`: 4 layer blocks (MLS integration → Lead capture → Automated follow-up → Lead management), MLS / CRM / payment integrations grid, 7-step lead journey, compliance section.
+  - `/real-estate/process`: 4-phase 24-hour timeline (Fri 3pm call → Fri-Sat build → Sat-Sun review → Mon 9am launch), ~80-min commitment table, support tiers, checklist, upgrade path.
+  - `/real-estate/results`: 3 case-study archetypes (solo agent / team lead / new agent) with before/after, 4 big numbers, post-launch roadmap, detailed ROI calc (4 inputs: leads, lead→showing %, showing→deal %, commission), 5-item FAQ.
+  - Shared `RELayout.jsx` (sticky header, breadcrumb, footer) + niche-aware `ExitIntentModal` variant `realestate`.
+- Backend tier configs: `realestate_starter` $2,995, `realestate_premium` $8,995, `realestate_enterprise` $14,995 in `paypal_routes.py`. PayPal order creation tested end-to-end (24/24 backend tests green).
+- `UPGRADE_PATHS` in `gym_upgrade_routes.py` extended: `realestate_starter → realestate_premium` honors the $1K upgrade credit.
+- **Niche-aware Exit Intent Modal**: extracted to `/pages/shared/ExitIntentModal.jsx`. Takes a `variant` prop ("gym" | "coach" | "realestate"), each with its own copy + gradient. Fixed the bug where coach pages showed gym copy. Old `/pages/gym/components/ExitIntentModal.jsx` deleted.
+- **Pre-PayPal warm-lead capture (site-wide)**: new `/api/leads/warm` endpoint stores name/email/niche/tier in `warm_leads` Mongo collection. Idempotent (dedupes on niche+tier+email, increments visits). Fired onBlur from CoachCheckoutDialog, GymCheckoutDialog, and RECheckoutDialog — captures the lead BEFORE they complete PayPal so abandoners are recoverable.
+- **Post-purchase team-invite SaaS flow** (iter 31's biggest piece):
+  - Backend: `company_setup_routes.py` with three routers — `/company-setup/*` (init, profile, invites, complete, status), `/companies/me` (current user's company + role + members), `/company-invites/{token}` (validate + accept).
+  - Data model: `companies` collection extended with `owner_client_email`, `setup_status`, `phone`, `address`. New `company_members` collection (id, company_id, client_email, role: "admin"|"viewer", is_owner, status). New `company_invites` collection (token, email, role, expires_at, status).
+  - Roles: `owner` (always admin, cannot be demoted), `admin` (full purchaser-level), `viewer` (read-only). Any admin can promote viewers to admin.
+  - Invite emails sent via Emailit with a `/join/{token}` magic link, expire in 14 days.
+  - Frontend:
+    - `/portal/welcome` (`CompanyWelcomeWizard.jsx`) — 3-step wizard (Company profile → Team invites → Done). Required after purchase but skippable. Auto-creates the company on `init`.
+    - `/join/:token` (`CompanyInviteAccept.jsx`) — public branded landing "Join {Company} on Bloom DevLabs" → set name + password → membership created in view-only mode.
+    - `CompanySetupBanner.jsx` — portal-home banner shown when `setup_status != complete` (fallback B — user can resume the wizard anytime).
+    - `ClientLogin.jsx` updated to honor `?next=` query string so post-checkout flow redirects through login → wizard.
+    - `CheckoutSuccess.jsx` updated CTA to "Sign in & set up team" pointing to `/portal/welcome`.
+- **Mega menu: click-to-reveal niches**: refactored Who-We-Serve panel into `IndustriesMegaPanel`. Default state hides playbooks and shows a "Pick an industry" placeholder. Clicking `mega-industry-gym-owners` / `mega-industry-coaches` / `mega-industry-real-estate` reveals the corresponding `mega-playbook-*` column with 3 links + a "Visit overview" CTA. Mobile drawer gains "For Real Estate Agents".
+- **30-day money-back guarantee** REMOVED site-wide (gym + coach + realestate + pricing + checkout dialogs). Replaced with "approve each phase before payment moves forward" / "30-day support window" / "risk-managed" language.
+- Tests: iteration 31 — backend **24/24 (100%) PASS** (`/app/backend/tests/test_iteration_31.py`). Frontend ~95% — all RE pages render, mega-menu click-to-reveal works, /portal/welcome auth gate works, /join/{token} validates. Critical-review fixes applied: owner role lock tightened (cannot change owner's role at all), companies/me response no longer leaks `_id` field.
+
+
 
 **Phase J — Brief approval → contract & invoice automation (admin-review gate)**
 - On 3rd-phase approval, `_finalize_brief_approval` flips `brief.awaiting_contract_dispatch=true`. Admin sees an amber **Contract Dispatch Banner** in `ProjectBriefDialog` with Preview + Send buttons.
