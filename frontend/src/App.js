@@ -41,6 +41,8 @@ import ClientPortal from "@/pages/client/ClientPortal";
 import SetPassword from "@/pages/client/SetPassword";
 import ForgotPassword from "@/pages/client/ForgotPassword";
 import CheckoutSuccess from "@/pages/client/CheckoutSuccess";
+import CompanyWelcomeWizard from "@/pages/client/CompanyWelcomeWizard";
+import CompanyInviteAccept from "@/pages/client/CompanyInviteAccept";
 import OnboardingWizard from "@/pages/client/OnboardingWizard";
 import PublicCaseStudies from "@/pages/PublicCaseStudies";
 import PublicBlog from "@/pages/PublicBlog";
@@ -57,6 +59,10 @@ import CoachHeroPage from "@/pages/coach/CoachHeroPage";
 import CoachHowItWorksPage from "@/pages/coach/CoachHowItWorksPage";
 import CoachProcessPage from "@/pages/coach/CoachProcessPage";
 import CoachResultsPage from "@/pages/coach/CoachResultsPage";
+import REHeroPage from "@/pages/realestate/REHeroPage";
+import REHowItWorksPage from "@/pages/realestate/REHowItWorksPage";
+import REProcessPage from "@/pages/realestate/REProcessPage";
+import REResultsPage from "@/pages/realestate/REResultsPage";
 
 function App() {
   return (
@@ -79,6 +85,10 @@ function App() {
               <Route path="/coaches/how-it-works" element={<CoachHowItWorksPage />} />
               <Route path="/coaches/process" element={<CoachProcessPage />} />
               <Route path="/coaches/results" element={<CoachResultsPage />} />
+              <Route path="/real-estate" element={<REHeroPage />} />
+              <Route path="/real-estate/how-it-works" element={<REHowItWorksPage />} />
+              <Route path="/real-estate/process" element={<REProcessPage />} />
+              <Route path="/real-estate/results" element={<REResultsPage />} />
               <Route path="/pay/invoice/:invoiceId" element={<PayInvoice />} />
 
               {/* Client (public-facing) auth + portal */}
@@ -88,6 +98,8 @@ function App() {
               <Route path="/set-password" element={<SetPassword mode="set" />} />
               <Route path="/reset-password" element={<SetPassword mode="reset" />} />
               <Route path="/checkout/success" element={<CheckoutSuccess />} />
+              <Route path="/portal/welcome" element={<CompanyWelcomeWizard />} />
+              <Route path="/join/:token" element={<CompanyInviteAccept />} />
               <Route path="/checkout/cancel" element={<Navigate to="/" replace />} />
               {/* OAuth integration callbacks (Nifty et al.) */}
               <Route path="/auth/callback" element={<AuthCallback />} />

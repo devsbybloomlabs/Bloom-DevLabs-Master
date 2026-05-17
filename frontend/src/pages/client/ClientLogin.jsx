@@ -14,11 +14,15 @@ export default function ClientLogin() {
   const navigate = useNavigate();
   const location = useLocation();
   // Preserve query params (?tab=invoices, etc.) when bouncing back after login —
-  // emails deep-link straight into a specific portal tab.
+  // emails deep-link straight into a specific portal tab. Also honor ?next= query.
+  const searchParams = new URLSearchParams(location.search);
+  const nextParam = searchParams.get("next");
   const fromLoc = location.state?.from;
-  const from = fromLoc
-    ? `${fromLoc.pathname}${fromLoc.search || ""}${fromLoc.hash || ""}`
-    : "/portal";
+  const from = nextParam
+    ? nextParam
+    : fromLoc
+      ? `${fromLoc.pathname}${fromLoc.search || ""}${fromLoc.hash || ""}`
+      : "/portal";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

@@ -89,7 +89,7 @@ function DualPathSection() {
         "Advanced analytics + churn predictor",
         "60-day support",
       ],
-      footer: "Launches in 3 weeks. 30-day money-back guarantee from go-live.",
+      footer: "Launches in 3 weeks. You approve each phase before payment moves forward.",
     },
   ];
   const tones = {

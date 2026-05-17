@@ -24,6 +24,12 @@ from openrouter_client import OpenRouterClient  # noqa: E402
 from paypal_client import PayPalClient  # noqa: E402
 from paypal_routes import paypal_admin_router, paypal_router  # noqa: E402
 from gym_upgrade_routes import gym_upgrade_router  # noqa: E402
+from warm_leads_routes import warm_leads_router  # noqa: E402
+from company_setup_routes import (  # noqa: E402
+    company_setup_router,
+    companies_me_router,
+    company_invites_router,
+)
 from paypal_webhooks import paypal_webhook_router  # noqa: E402
 from nifty_client import NiftyClient  # noqa: E402
 from blog_routes import blog_admin_router, blog_public_router  # noqa: E402
@@ -357,6 +363,10 @@ api.include_router(notification_router)
 api.include_router(sync_router)
 api.include_router(paypal_router)
 api.include_router(gym_upgrade_router)
+api.include_router(warm_leads_router)
+api.include_router(company_setup_router)
+api.include_router(companies_me_router)
+api.include_router(company_invites_router)
 api.include_router(paypal_admin_router)
 api.include_router(paypal_webhook_router)
 api.include_router(client_auth_router)

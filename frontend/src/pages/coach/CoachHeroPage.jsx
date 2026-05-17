@@ -587,7 +587,7 @@ function FAQSection() {
     },
     {
       q: "What if I hate it?",
-      a: "30-day money-back guarantee. If you're not happy, we refund everything. But most coaches love it because they immediately start booking more clients.",
+      a: "If something isn't working for your coaching, we keep iterating during the 30-day support window — colors, copy, layout, booking-flow tweaks — until it's right. We don't ship and disappear.",
     },
     {
       q: "Will it really book more clients?",
@@ -666,7 +666,7 @@ function FinalCTASection() {
         </div>
         <div className="mt-8 flex items-center justify-center gap-2 text-sm text-slate-400">
           <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          30-day money-back guarantee · No long-term contracts · No pushy pitch
+          30-day support window · No long-term contracts · No pushy pitch
         </div>
       </div>
     </section>

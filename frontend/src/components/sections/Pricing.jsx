@@ -287,7 +287,7 @@ function CheckoutDialog({ plan, open, onOpenChange }) {
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
             <p className="text-[11px] text-muted-foreground text-center">
-              Secure checkout · 30-day money-back guarantee
+              Secure checkout · cancel anytime before kickoff
             </p>
           </div>
         ) : (
@@ -436,7 +436,7 @@ export const Pricing = () => {
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          All packages include a money-back guarantee on milestone 1. Need
+          Every engagement starts with a paid discovery sprint so you see exactly what you're getting. Need
           something custom?{" "}
           <a href="#book" className="underline underline-offset-4 hover:text-foreground">
             Talk to us.

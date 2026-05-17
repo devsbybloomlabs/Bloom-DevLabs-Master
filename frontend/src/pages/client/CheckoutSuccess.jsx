@@ -30,7 +30,7 @@ export default function CheckoutSuccess() {
         <p className="mt-3 text-base text-muted-foreground">
           {type === "subscription"
             ? "Your subscription is active. Check your email for setup instructions and a link to access the client portal."
-            : "Payment received. We&apos;ve emailed a link to set up your client portal access — keep an eye on your inbox."}
+            : "Payment received. Check your email for the link to set your password — then we'll walk you through a quick 2-minute setup so you can invite your team."}
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Button
@@ -38,8 +38,8 @@ export default function CheckoutSuccess() {
             className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-11 px-6"
             data-testid="checkout-success-portal-button"
           >
-            <Link to="/login">
-              Sign in to portal
+            <Link to="/login?next=/portal/welcome">
+              Sign in &amp; set up team
               <ArrowRight className="h-4 w-4 ml-2" />
             </Link>
           </Button>

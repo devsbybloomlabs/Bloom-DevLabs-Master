@@ -709,7 +709,7 @@ function FAQSection() {
     },
     {
       q: "What if I'm not happy with it?",
-      a: "30-day money-back guarantee from go-live on the full build. The prototype is single-payment by nature, but we'll roll that $2,995 into a full-build refund if you upgrade and then bail within 30 days. You're never trapped.",
+      a: "You approve each phase before we move forward, and the 50/50 split protects you — the second half is only due once the system is live and you've signed off. If we ever can't deliver what we scoped, we refund the unfulfilled portion. Prototype-to-full-build upgraders get their $2,995 rolled forward as $1,000 credit applied to the full build.",
     },
   ];
   return (
@@ -794,7 +794,7 @@ function FinalCTASection() {
         </div>
         <div className="mt-8 flex items-center justify-center gap-2 text-sm text-slate-400">
           <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          No sales pitch · 30-day money-back guarantee · 1-hour weekly commitment
+          No sales pitch · Approve each phase before paying · 1-hour weekly commitment
         </div>
       </div>
     </section>

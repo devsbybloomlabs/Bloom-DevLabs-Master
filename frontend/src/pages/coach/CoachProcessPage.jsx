@@ -271,14 +271,15 @@ function GuaranteeSection() {
       <div className="max-w-3xl mx-auto px-6 lg:px-10 text-center">
         <div className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-5">
           <Shield className="h-3.5 w-3.5" />
-          Risk-free
+          Risk-managed
         </div>
         <h2 className="font-display text-3xl md:text-5xl font-bold leading-tight">
-          30-day launch guarantee.
+          You stay in control at every checkpoint.
         </h2>
         <p className="mt-6 text-lg text-slate-300 leading-relaxed">
-          If you're not satisfied within 30 days of going live, we refund your investment.
-          No questions, no forms, no salvage-call. That's how confident we are.
+          You see the website live before launch. Tweaks happen real-time during review.
+          You approve the final build before we flip the switch — so what you see is
+          what you get. No surprises, no lock-in, no monthly fees.
         </p>
       </div>
     </section>
@@ -296,7 +297,6 @@ function ChecklistSection() {
     "Email automation (confirmations, reminders)",
     "30-day post-launch support",
     "Team training (1 call)",
-    "30-day money-back guarantee",
   ];
   return (
     <section className="py-20 bg-white" data-testid="coach-process-checklist">

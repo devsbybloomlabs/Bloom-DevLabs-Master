@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MilestoneTimeline from "@/components/MilestoneTimeline";
 import UpgradePrototypeBanner from "@/pages/client/components/UpgradePrototypeBanner";
+import CompanySetupBanner from "@/pages/client/components/CompanySetupBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -964,6 +965,8 @@ export default function ClientPortal() {
             Your projects, invoices, and subscriptions in one place.
           </p>
         </div>
+
+        <CompanySetupBanner />
 
         {onboarding && !onboarding.completed && (
           <Card

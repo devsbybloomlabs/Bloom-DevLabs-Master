@@ -8,7 +8,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { ArrowRight, Menu, X, Dumbbell, Calendar, Mail, Phone, ChevronRight } from "lucide-react";
 import { BRAND } from "@/lib/brand";
-import ExitIntentModal from "./components/ExitIntentModal";
+import ExitIntentModal from "../shared/ExitIntentModal";
 
 const NAV = [
   { to: "/gym-owners", label: "Overview", end: true },
@@ -208,7 +208,7 @@ export default function GymLayout({ breadcrumb, children }) {
       <GymBreadcrumb label={breadcrumb} />
       <main>{children}</main>
       <GymFooter />
-      <ExitIntentModal />
+      <ExitIntentModal variant="gym" />
     </div>
   );
 }

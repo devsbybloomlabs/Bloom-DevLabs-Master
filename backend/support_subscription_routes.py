@@ -73,6 +73,9 @@ PACKAGE_TO_SUPPORT_TIER: Dict[str, str] = {
     "coach_starter": "standard",
     "coach_premium": "premium",
     "coach_enterprise": "vip",
+    "realestate_starter": "standard",
+    "realestate_premium": "premium",
+    "realestate_enterprise": "vip",
 }
 
 # Catalog — 6 SKUs (3 tiers × 2 cadences). Prices below are PER MONTH, but

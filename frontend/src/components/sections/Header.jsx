@@ -105,96 +105,62 @@ const MEGA_GROUPS = [
   {
     id: "who-we-serve",
     label: "Who We Serve",
-    columns: [
+    industriesHeading: "Industries — click to reveal playbook",
+    industries: [
       {
-        heading: "Industries",
-        items: [
-          {
-            id: "gym-owners",
-            icon: Dumbbell,
-            label: "Gym Owners",
-            description: "Custom member-management software · 3-4 week build.",
-            href: "/gym-owners",
-            type: "route",
-          },
-          {
-            id: "coaches",
-            icon: Headphones,
-            label: "Coaches & Consultants",
-            description: "Pro website + booking + client dashboard · 24-hour build.",
-            href: "/coaches",
-            type: "route",
-          },
-          {
-            id: "coming-soon-clinics",
-            icon: Building2,
-            label: "Clinics & Wellness",
-            description: "Coming soon — patient retention + booking.",
-            href: "/gym-owners",
-            type: "route",
-            badge: "Soon",
-          },
-        ],
+        id: "gym-owners",
+        icon: Dumbbell,
+        label: "Gym Owners",
+        description: "Custom member-management software · 3–4 week build.",
+        href: "/gym-owners",
       },
       {
-        heading: "Coach playbook",
-        items: [
-          {
-            id: "coach-how",
-            icon: Workflow,
-            label: "How it works",
-            description: "Website + booking + dashboard, in 24 hours.",
-            href: "/coaches/how-it-works",
-            type: "route",
-          },
-          {
-            id: "coach-process",
-            icon: PenLine,
-            label: "24-hour process",
-            description: "Discovery → live in a single day. ~2 hrs of your time.",
-            href: "/coaches/process",
-            type: "route",
-          },
-          {
-            id: "coach-results",
-            icon: TrendingUp,
-            label: "Expected results",
-            description: "3–5 extra bookings / mo + ROI calculator.",
-            href: "/coaches/results",
-            type: "route",
-          },
-        ],
+        id: "coaches",
+        icon: Headphones,
+        label: "Coaches & Consultants",
+        description: "Pro website + booking + client dashboard · 24-hour build.",
+        href: "/coaches",
       },
       {
-        heading: "Gym-owner playbook",
-        items: [
-          {
-            id: "gym-how",
-            icon: Workflow,
-            label: "How it works",
-            description: "Three features, one custom platform.",
-            href: "/gym-owners/how-it-works",
-            type: "route",
-          },
-          {
-            id: "gym-process",
-            icon: PenLine,
-            label: "Our 4-week process",
-            description: "Discovery → Launch in 4 weeks. ~3 hrs of your time.",
-            href: "/gym-owners/process",
-            type: "route",
-          },
-          {
-            id: "gym-results",
-            icon: TrendingUp,
-            label: "Expected results",
-            description: "Interactive ROI calc + member-journey breakdown.",
-            href: "/gym-owners/results",
-            type: "route",
-          },
-        ],
+        id: "real-estate",
+        icon: Building2,
+        label: "Real Estate Agents",
+        description: "MLS-integrated lead-capture site · 24-hour build.",
+        href: "/real-estate",
       },
     ],
+    playbooks: {
+      "gym-owners": {
+        heading: "Gym-owner playbook",
+        visitLabel: "Visit gym-owner overview",
+        visitTo: "/gym-owners",
+        items: [
+          { id: "gym-how", icon: Workflow, label: "How it works", description: "Three features, one custom platform.", href: "/gym-owners/how-it-works" },
+          { id: "gym-process", icon: PenLine, label: "Our 4-week process", description: "Discovery → Launch in 4 weeks. ~3 hrs of your time.", href: "/gym-owners/process" },
+          { id: "gym-results", icon: TrendingUp, label: "Expected results", description: "Interactive ROI calc + member-journey breakdown.", href: "/gym-owners/results" },
+        ],
+      },
+      "coaches": {
+        heading: "Coach playbook",
+        visitLabel: "Visit coach overview",
+        visitTo: "/coaches",
+        items: [
+          { id: "coach-how", icon: Workflow, label: "How it works", description: "Website + booking + dashboard, in 24 hours.", href: "/coaches/how-it-works" },
+          { id: "coach-process", icon: PenLine, label: "24-hour process", description: "Discovery → live in a single day. ~2 hrs of your time.", href: "/coaches/process" },
+          { id: "coach-results", icon: TrendingUp, label: "Expected results", description: "3–5 extra bookings / mo + ROI calculator.", href: "/coaches/results" },
+        ],
+      },
+      "real-estate": {
+        heading: "Real-estate playbook",
+        visitLabel: "Visit real-estate overview",
+        visitTo: "/real-estate",
+        items: [
+          { id: "re-how", icon: Workflow, label: "How it works", description: "MLS integration + lead capture, in 24 hours.", href: "/real-estate/how-it-works" },
+          { id: "re-process", icon: PenLine, label: "24-hour process", description: "Fri call → Mon launch. Live by 9am.", href: "/real-estate/process" },
+          { id: "re-results", icon: TrendingUp, label: "Expected results", description: "20–60 leads/mo + commission math.", href: "/real-estate/results" },
+        ],
+      },
+    },
     featured: {
       eyebrow: "New · for coaches",
       title: "Pro website + booking, live in 24 hours.",
@@ -301,6 +267,7 @@ const MOBILE_ITEMS = [
   { id: "solution", label: "Solution", type: "anchor" },
   { id: "gym-owners", label: "For Gym Owners", type: "route", to: "/gym-owners" },
   { id: "coaches", label: "For Coaches & Consultants", type: "route", to: "/coaches" },
+  { id: "real-estate", label: "For Real Estate Agents", type: "route", to: "/real-estate" },
   { id: "pricing", label: "Pricing", type: "anchor" },
   { id: "case-studies", label: "Case Studies", type: "route", to: "/case-studies" },
   { id: "tour", label: "See it live", type: "route", to: "/tour" },
@@ -312,7 +279,133 @@ const MOBILE_ITEMS = [
 // --------------------------------------------------------------------------
 // Components
 // --------------------------------------------------------------------------
+function IndustriesMegaPanel({ group, onClose, activePlaybook, setActivePlaybook }) {
+  const playbook = activePlaybook ? group.playbooks?.[activePlaybook] : null;
+  return (
+    <div
+      className="absolute left-0 right-0 top-full bg-background border-b border-border shadow-[0_10px_30px_-15px_rgba(15,23,42,0.18)] animate-in fade-in-0 slide-in-from-top-1 z-40"
+      data-testid={`mega-panel-${group.id}`}
+    >
+      <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-12 gap-8">
+        {/* Industries column */}
+        <div className="col-span-12 lg:col-span-5">
+          <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-muted-foreground mb-3">
+            {group.industriesHeading}
+          </p>
+          <ul className="space-y-2">
+            {group.industries.map((ind) => {
+              const Icon = ind.icon;
+              const active = activePlaybook === ind.id;
+              return (
+                <li key={ind.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActivePlaybook(active ? null : ind.id)}
+                    aria-expanded={active}
+                    aria-controls={`mega-playbook-${ind.id}`}
+                    data-testid={`mega-industry-${ind.id}`}
+                    className={`group w-full text-left flex gap-3 items-start rounded-lg p-3 transition-colors border ${
+                      active
+                        ? "bg-primary/5 border-primary/30"
+                        : "bg-transparent border-transparent hover:bg-secondary/40 hover:border-border"
+                    }`}
+                  >
+                    <div className={`h-9 w-9 rounded-md flex items-center justify-center shrink-0 transition-colors ${
+                      active ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+                    }`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium leading-snug">{ind.label}</p>
+                        {ind.badge && (
+                          <span className="inline-flex items-center text-[9px] uppercase tracking-wider font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
+                            {ind.badge}
+                          </span>
+                        )}
+                      </div>
+                      {ind.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{ind.description}</p>
+                      )}
+                    </div>
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-2 transition-transform ${active ? "-rotate-90" : ""}`} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-[10px] text-muted-foreground mt-4 italic">
+            Click an industry to reveal its playbook.
+          </p>
+        </div>
+
+        {/* Playbook column (revealed) OR placeholder */}
+        <div className="col-span-12 lg:col-span-7 lg:border-l lg:border-border lg:pl-8">
+          {playbook ? (
+            <div id={`mega-playbook-${activePlaybook}`} data-testid={`mega-playbook-${activePlaybook}`}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-muted-foreground">{playbook.heading}</p>
+                <Link
+                  to={playbook.visitTo}
+                  onClick={onClose}
+                  data-testid={`mega-playbook-visit-${activePlaybook}`}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:gap-1.5 transition-all"
+                >
+                  {playbook.visitLabel}
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+              <ul className="space-y-3">
+                {playbook.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.id}>
+                      <Link
+                        to={item.href}
+                        onClick={onClose}
+                        className="group flex gap-3 items-start rounded-lg p-2 -m-2 hover:bg-secondary/40 transition-colors"
+                        data-testid={`mega-link-${item.id}`}
+                      >
+                        <div className="h-9 w-9 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium leading-snug">{item.label}</p>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{item.description}</p>
+                          )}
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : (
+            <div className="h-full grid place-items-center rounded-xl border border-dashed border-border/70 bg-secondary/20 p-8 text-center">
+              <div>
+                <p className="text-sm font-medium text-foreground">Pick an industry</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Click any niche on the left to reveal its detailed playbook — how it works,
+                  the build process, and expected results.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MegaPanel({ group, onClose }) {
+  const [activePlaybook, setActivePlaybook] = useState(null);
+  // Reset reveal when switching mega groups
+  useEffect(() => { setActivePlaybook(null); }, [group.id]);
+
+  if (group.industries) {
+    return <IndustriesMegaPanel group={group} onClose={onClose} activePlaybook={activePlaybook} setActivePlaybook={setActivePlaybook} />;
+  }
   return (
     <div
       className="absolute left-0 right-0 top-full bg-background border-b border-border shadow-[0_10px_30px_-15px_rgba(15,23,42,0.18)] animate-in fade-in-0 slide-in-from-top-1 z-40"

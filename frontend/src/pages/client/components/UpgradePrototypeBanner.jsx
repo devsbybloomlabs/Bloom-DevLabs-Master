@@ -104,7 +104,7 @@ export default function UpgradePrototypeBanner({ order, eligibility, onUpgraded 
             <ul className="space-y-1.5 mt-3 text-xs text-slate-600">
               <li className="flex gap-2"><Check className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0 mt-0.5" /> Discovery → 3-week launch</li>
               <li className="flex gap-2"><Check className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0 mt-0.5" /> Mobile app + payment integration</li>
-              <li className="flex gap-2"><Check className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0 mt-0.5" /> 60-day support + 30-day money-back guarantee</li>
+              <li className="flex gap-2"><Check className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0 mt-0.5" /> 60-day post-launch support</li>
             </ul>
             <p className="text-[10px] text-slate-500 flex items-start gap-1.5 mt-2">
               <ShieldCheck className="h-3 w-3 text-emerald-600 mt-0.5" />

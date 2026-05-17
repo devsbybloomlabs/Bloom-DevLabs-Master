@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PayPalCheckoutButton } from "@/components/payment/PayPalCheckoutButton";
 import { Check, ShieldCheck, Clock, AlertCircle } from "lucide-react";
+import axios from "axios";
+
+const API = process.env.REACT_APP_BACKEND_URL;
 
 const TIER_META = {
   coach_starter: {
@@ -56,8 +59,25 @@ export default function CoachCheckoutDialog({ open, onOpenChange, tierKey }) {
   const [email, setEmail] = useState("");
   const [niche, setNiche] = useState("");
   const [plan, setPlan] = useState("split_50_50");
+  const [warmCaptured, setWarmCaptured] = useState(false);
   const meta = tierKey ? TIER_META[tierKey] : null;
   const ready = name.trim() && /.+@.+\..+/.test(email);
+
+  const captureWarmLead = async () => {
+    if (warmCaptured || !ready) return;
+    setWarmCaptured(true);
+    try {
+      await axios.post(`${API}/api/leads/warm`, {
+        niche: "coaches",
+        tier: tierKey,
+        name,
+        email,
+        coaching_niche: niche || null,
+      });
+    } catch {
+      setWarmCaptured(false);
+    }
+  };
 
   if (!meta) return null;
 
@@ -76,7 +96,7 @@ export default function CoachCheckoutDialog({ open, onOpenChange, tierKey }) {
           <DialogHeader>
             <DialogTitle className="text-white text-xl font-display">Reserve your {meta.name}</DialogTitle>
             <DialogDescription className="text-teal-50/90 text-sm">
-              Discovery call within 24 hours of payment. 30-day money-back guarantee.
+              Discovery call within 24 hours of payment. Build kicks off the same day.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-3 flex items-baseline gap-3">
@@ -104,11 +124,11 @@ export default function CoachCheckoutDialog({ open, onOpenChange, tierKey }) {
           <div className="grid sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
             <div>
               <Label className="text-xs">Your name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Coach" data-testid="coach-checkout-name" className="mt-1" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} onBlur={captureWarmLead} placeholder="Jane Coach" data-testid="coach-checkout-name" className="mt-1" />
             </div>
             <div>
               <Label className="text-xs">Email</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@yourcoaching.com" data-testid="coach-checkout-email" className="mt-1" />
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={captureWarmLead} placeholder="you@yourcoaching.com" data-testid="coach-checkout-email" className="mt-1" />
             </div>
             <div className="sm:col-span-2">
               <Label className="text-xs">Coaching niche (optional)</Label>

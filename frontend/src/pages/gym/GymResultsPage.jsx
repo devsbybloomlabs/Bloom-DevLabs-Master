@@ -515,7 +515,7 @@ function FAQSection() {
   const faqs = [
     {
       q: "Will this actually work for MY gym?",
-      a: "Different gyms have different workflows — which is why we custom-build for YOU instead of using templates. We map out your specific process in discovery and tailor every screen, every email, every automation to fit. Backed by a 30-day money-back guarantee.",
+      a: "Different gyms have different workflows — which is why we custom-build for YOU instead of using templates. We map out your specific process in discovery and tailor every screen, every email, every automation to fit. You approve each phase before we move on, so you always know what you're getting before final payment.",
     },
     {
       q: "How much training will my team need?",
@@ -531,7 +531,7 @@ function FAQSection() {
     },
     {
       q: "What if I want to cancel?",
-      a: "30-day money-back guarantee on the build itself. After launch, you own the software outright — no monthly fee required. Ongoing support is optional and month-to-month, cancellable anytime.",
+      a: "You approve each phase before we move on, and the 50/50 split means the second half is only due once the system is live and signed off. After launch, you own the software outright — no monthly fee required. Ongoing support is optional and month-to-month, cancellable anytime.",
     },
   ];
   return (

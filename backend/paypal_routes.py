@@ -149,6 +149,55 @@ PACKAGE_TIERS: Dict[str, Dict[str, Any]] = {
             "Dedicated account manager",
         ],
     },
+    # ---- Real Estate Agents niche (Feb 2026) ----
+    "realestate_starter": {
+        "name": "Real Estate Starter Website",
+        "price": "2995.00",
+        "kind": "one_time",
+        "niche": "real-estate",
+        "support_tier": "standard",
+        "timeline": "24 hours",
+        "full_upfront_discount": 0,
+        "inclusions": [
+            "Professional MLS-integrated website (mobile-optimized)",
+            "Auto-sync listings from your MLS (any MLS with API)",
+            "Lead-capture forms on every page",
+            "Email lead dashboard",
+            "30-day support + $1,000 credit toward Premium upgrade (14 days)",
+        ],
+    },
+    "realestate_premium": {
+        "name": "Real Estate Premium Website",
+        "price": "8995.00",
+        "kind": "one_time",
+        "niche": "real-estate",
+        "support_tier": "premium",
+        "timeline": "4 weeks",
+        "inclusions": [
+            "Everything in Starter",
+            "Advanced CRM + lead-scoring",
+            "Drip email campaigns (buyer / seller / inquiry tracks)",
+            "SMS follow-up automation",
+            "Video hosting + listing video tours",
+            "Custom integrations (Zillow, Realtor.com, CRMs)",
+            "60-day support",
+        ],
+    },
+    "realestate_enterprise": {
+        "name": "Real Estate Enterprise / Team",
+        "price": "14995.00",
+        "kind": "one_time",
+        "niche": "real-estate",
+        "support_tier": "vip",
+        "timeline": "5-6 weeks",
+        "inclusions": [
+            "Everything in Premium",
+            "Multi-agent / team-routing system",
+            "White-label branding for brokerage",
+            "Multi-location / multi-market support",
+            "Dedicated account manager",
+        ],
+    },
 }
 
 # Niche-tier → generic-tier alias so support-tier provisioning + invoice

@@ -17,6 +17,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { PayPalCheckoutButton } from "@/components/payment/PayPalCheckoutButton";
 import { Check, ShieldCheck, Clock, AlertCircle } from "lucide-react";
+import axios from "axios";
+
+const API = process.env.REACT_APP_BACKEND_URL;
 
 const TIER_META = {
   gym_prototype: {
@@ -74,8 +77,25 @@ export default function GymCheckoutDialog({ open, onOpenChange, tierKey }) {
   const [email, setEmail] = useState("");
   const [gymName, setGymName] = useState("");
   const [plan, setPlan] = useState("split_50_50"); // 50/50 or full_upfront
+  const [warmCaptured, setWarmCaptured] = useState(false);
   const meta = tierKey ? TIER_META[tierKey] : null;
   const ready = name.trim() && /.+@.+\..+/.test(email);
+
+  const captureWarmLead = async () => {
+    if (warmCaptured || !ready) return;
+    setWarmCaptured(true);
+    try {
+      await axios.post(`${API}/api/leads/warm`, {
+        niche: "gym",
+        tier: tierKey,
+        name,
+        email,
+        gym_name: gymName || null,
+      });
+    } catch {
+      setWarmCaptured(false);
+    }
+  };
 
   if (!meta) return null;
 
@@ -100,7 +120,7 @@ export default function GymCheckoutDialog({ open, onOpenChange, tierKey }) {
               Reserve your {meta.name}
             </DialogTitle>
             <DialogDescription className="text-blue-50/90 text-sm">
-              We start within 3 business days of payment. 30-day money-back guarantee.
+              We start within 3 business days of payment. You approve each phase before we move forward.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-3 flex items-baseline gap-3">
@@ -135,6 +155,7 @@ export default function GymCheckoutDialog({ open, onOpenChange, tierKey }) {
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onBlur={captureWarmLead}
                 placeholder="Ryan Salvador"
                 data-testid="gym-checkout-name"
                 className="mt-1"
@@ -146,6 +167,7 @@ export default function GymCheckoutDialog({ open, onOpenChange, tierKey }) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={captureWarmLead}
                 placeholder="you@yourgym.com"
                 data-testid="gym-checkout-email"
                 className="mt-1"

@@ -6,7 +6,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { ArrowRight, Menu, X, Calendar, Mail, Phone, ChevronRight, Headphones } from "lucide-react";
 import { BRAND } from "@/lib/brand";
-import ExitIntentModal from "../gym/components/ExitIntentModal";
+import ExitIntentModal from "../shared/ExitIntentModal";
 
 const NAV = [
   { to: "/coaches", label: "Overview", end: true },
@@ -151,7 +151,7 @@ export default function CoachLayout({ breadcrumb, children }) {
       <CoachBreadcrumb label={breadcrumb} />
       <main>{children}</main>
       <CoachFooter />
-      <ExitIntentModal />
+      <ExitIntentModal variant="coach" />
     </div>
   );
 }

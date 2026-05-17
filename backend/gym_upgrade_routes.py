@@ -37,6 +37,7 @@ UPGRADE_CREDIT = 1000.00
 UPGRADE_PATHS: Dict[str, str] = {
     "gym_prototype": "gym_custom",
     "coach_starter": "coach_premium",
+    "realestate_starter": "realestate_premium",
 }
 
 
