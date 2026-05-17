@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 32 ROUND 2 retest — clientApi factory-pattern fix VERIFIED. Backend 35/35 PASS (test_iteration_32.py + test_iteration_31.py regression). Frontend: Manage Team panel now renders correctly with members-card + invite-card + owner badge for testclient@bybloomlabs.com (was always empty in round 1). Invite send works end-to-end — POST /api/company-setup/invites succeeds and shows 'Invited 1 teammate' toast. The CompanyWelcomeWizard init() call no longer throws the silent TypeError/'Couldn't load company info' toast — confirmed by a clean init that correctly redirected to /portal because testclient's setup_status flipped to complete after the invite (per backend's test_setup_status_complete_after_profile_plus_invite logic). CompanySetupBanner shows when partial and auto-hides when complete (verified the data-testid='portal-company-setup-banner' wrapper exists, button data-testid='portal-company-setup-resume-button' present). Zero console errors across all flows. No 'TypeError: clientApi.post is not a function' anywhere. Password toggle on admin-login (data-testid='login-password-input-toggle') flips input type to 'text' correctly. /admin/warm-leads renders 21 warm-lead rows with stats grid (21 / 8 / 7 / 6 / 0%), filter chips (All/Gym Owners/Coaches/Real Estate), search bar, and Refresh link — all functional.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_32.py",
+    "/app/backend/tests/test_iteration_31.py",
+    "/app/test_reports/pytest/iter32_round2.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "useCompanyContext.js — now correctly uses `clientApi(token).get(...)` factory pattern and logs errors via console.error instead of bare catch{}. Clean.",
+    "ManageTeamPanel.jsx — both writes (invite send + role change) correctly use `clientApi(token).post(...)`. Empty + loading early-returns now carry data-testid='manage-team-panel' for testability. Clean.",
+    "CompanyWelcomeWizard.jsx — uses `const api = token ? clientApi(token) : null;` then `api.post(...)` for all 5 calls. No more silent failures. Clean.",
+    "CompanySetupBanner.jsx — uses `clientApi(token).get('/company-setup/status')` with console.error on failure. Correctly hides when setup_status==='complete'. Clean.",
+    "Note: testclient@bybloomlabs.com's setup_status transitioned partial → complete during my test run (due to the invite I sent), which is correct backend behaviour but means a fresh second user would be needed to retest the wizard step-1 → step-2 → step-3 transitions in UI. Recommend creating a fresh test client (e.g. via /api/clients/register) for future wizard-flow regression tests."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (35/35)",
+    "frontend": "100% — all 4 fixed components verified working; manage-team flow + invite send + banner visibility + welcome wizard init all clean; no console errors"
+  },
+  "test_credentials": "Admin founder@thesalvador.group / admin123 (verified). Client testclient@bybloomlabs.com / clientpass123 (verified, setup_status now=complete after this iteration's invite).",
+  "seed_data_creation": "Sent 1 invite to teammate-iter32round2@example.com via UI (not cleaned — minor test leakage in the invite collection; harmless because the invite is in pending state and will be cleaned by 14-day TTL).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The clientApi factory-pattern fix is verified working across all 4 files (useCompanyContext, ManageTeamPanel, CompanyWelcomeWizard, CompanySetupBanner). testclient@bybloomlabs.com now has setup_status='complete' — to retest wizard step transitions you need a fresh client (use /api/clients/register or the demo@bybloomlabs.com account if it still has setup_status='pending'). Backend remains rock-solid at 35/35.",
+  "rca of the issue": "Round 1 root cause (clientApi as factory not instance) — FIXED. All 4 files now use `clientApi(token).METHOD(...)` correctly. Bare catch{} replaced with console.error so future regressions surface in dev console. Round 2 verified the fix end-to-end via real UI flows."
+}

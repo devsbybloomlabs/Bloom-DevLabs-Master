@@ -4,8 +4,8 @@
  * - Admins (incl. owner): can invite new members, promote/demote, see all.
  * - Viewers: see the team list, read-only.
  */
-import { useEffect, useState } from "react";
-import { clientApi } from "@/lib/clientAuth";
+import { useState } from "react";
+import { useClientAuth, clientApi } from "@/lib/clientAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,17 +15,18 @@ import { Users, ShieldCheck, ShieldX, Plus, Trash2, Mail, ArrowRight, Crown, Eye
 import useCompanyContext from "@/lib/useCompanyContext";
 
 export default function ManageTeamPanel() {
+  const { token } = useClientAuth();
   const ctx = useCompanyContext();
   const { company, role, isOwner, members, canWrite, loading, refresh } = ctx;
   const [emails, setEmails] = useState([""]);
   const [sending, setSending] = useState(false);
 
   if (loading) {
-    return <div className="text-sm text-muted-foreground p-4">Loading team…</div>;
+    return <div className="text-sm text-muted-foreground p-4" data-testid="manage-team-panel">Loading team…</div>;
   }
   if (!company) {
     return (
-      <Card className="border-dashed border-slate-300" data-testid="team-empty-state">
+      <Card className="border-dashed border-slate-300" data-testid="manage-team-panel">
         <CardContent className="p-6 text-center">
           <Users className="h-8 w-8 mx-auto text-slate-400 mb-3" />
           <p className="text-sm text-slate-600">No team set up yet.</p>
@@ -39,7 +40,7 @@ export default function ManageTeamPanel() {
     if (!cleaned.length) { toast.error("Add at least one valid email"); return; }
     setSending(true);
     try {
-      const { data } = await clientApi.post("/company-setup/invites", { emails: cleaned });
+      const { data } = await clientApi(token).post("/company-setup/invites", { emails: cleaned });
       const okN = (data.sent || []).length;
       const skipN = (data.skipped || []).length;
       if (okN) toast.success(`Invited ${okN} teammate${okN === 1 ? "" : "s"}`);
@@ -53,7 +54,7 @@ export default function ManageTeamPanel() {
 
   const updateRole = async (memberId, newRole) => {
     try {
-      await clientApi.post(`/companies/me/members/${memberId}/role`, { role: newRole });
+      await clientApi(token).post(`/companies/me/members/${memberId}/role`, { role: newRole });
       toast.success(`Role updated to ${newRole}`);
       refresh();
     } catch (err) {

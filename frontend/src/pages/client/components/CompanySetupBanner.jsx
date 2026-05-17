@@ -13,24 +13,27 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Users } from "lucide-react";
-import { clientApi } from "@/lib/clientAuth";
+import { useClientAuth, clientApi } from "@/lib/clientAuth";
 
 export default function CompanySetupBanner() {
+  const { token } = useClientAuth();
   const [status, setStatus] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     let alive = true;
+    if (!token) return undefined;
     (async () => {
       try {
-        const { data } = await clientApi.get("/company-setup/status");
+        const { data } = await clientApi(token).get("/company-setup/status");
         if (alive) setStatus(data);
-      } catch {
-        /* silent — non-blocking */
+      } catch (err) {
+        // Non-blocking — log so dev catches regressions
+        console.error("CompanySetupBanner: status fetch failed", err);
       }
     })();
     return () => { alive = false; };
-  }, []);
+  }, [token]);
 
   if (!status?.company || status.setup_status === "complete") return null;
 

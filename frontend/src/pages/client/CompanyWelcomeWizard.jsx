@@ -21,7 +21,8 @@ import { BRAND } from "@/lib/brand";
 
 export default function CompanyWelcomeWizard() {
   const navigate = useNavigate();
-  const { client, loading } = useClientAuth();
+  const { client, token, loading } = useClientAuth();
+  const api = token ? clientApi(token) : null;
   const [step, setStep] = useState(1);
   const [initializing, setInitializing] = useState(true);
   const [company, setCompany] = useState(null);
@@ -45,7 +46,7 @@ export default function CompanyWelcomeWizard() {
     if (!client) { navigate("/login?next=/portal/welcome"); return; }
     (async () => {
       try {
-        const { data } = await clientApi.post("/company-setup/init");
+        const { data } = await api.post("/company-setup/init");
         setCompany(data.company);
         setCompanyName(data.company?.name || client.name || "");
         setPhone(data.company?.phone || "");
@@ -60,7 +61,7 @@ export default function CompanyWelcomeWizard() {
         setInitializing(false);
       }
     })();
-  }, [loading, client, navigate]);
+  }, [loading, client, navigate, api]);
 
   const saveProfile = async () => {
     if (!companyName.trim()) {
@@ -69,7 +70,7 @@ export default function CompanyWelcomeWizard() {
     }
     setSavingProfile(true);
     try {
-      const { data } = await clientApi.post("/company-setup/profile", {
+      const { data } = await api.post("/company-setup/profile", {
         company_name: companyName.trim(),
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
@@ -87,15 +88,15 @@ export default function CompanyWelcomeWizard() {
     const cleaned = emails.map((e) => e.trim()).filter((e) => /.+@.+\..+/.test(e));
     if (!cleaned.length) {
       // Skip → just mark complete and go to portal
-      await clientApi.post("/company-setup/complete");
+      await api.post("/company-setup/complete");
       navigate("/portal?welcome=1");
       return;
     }
     setSavingInvites(true);
     try {
-      const { data } = await clientApi.post("/company-setup/invites", { emails: cleaned });
+      const { data } = await api.post("/company-setup/invites", { emails: cleaned });
       setInviteResult(data);
-      await clientApi.post("/company-setup/complete");
+      await api.post("/company-setup/complete");
       setStep(3);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Failed to send invites");

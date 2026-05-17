@@ -8,14 +8,19 @@
  *   <Button disabled={!canWrite} ... />
  */
 import { useEffect, useState, useCallback } from "react";
-import { clientApi } from "@/lib/clientAuth";
+import { useClientAuth, clientApi } from "@/lib/clientAuth";
 
 export default function useCompanyContext() {
+  const { token } = useClientAuth();
   const [state, setState] = useState({ company: null, role: null, members: [], isOwner: false, loading: true });
 
   const refresh = useCallback(async () => {
+    if (!token) {
+      setState({ company: null, role: null, isOwner: false, members: [], loading: false });
+      return;
+    }
     try {
-      const { data } = await clientApi.get("/companies/me");
+      const { data } = await clientApi(token).get("/companies/me");
       setState({
         company: data.company,
         role: data.role,
@@ -23,10 +28,12 @@ export default function useCompanyContext() {
         members: data.members || [],
         loading: false,
       });
-    } catch {
+    } catch (err) {
+      // Log so the failure surfaces during development; still degrade gracefully.
+      console.error("useCompanyContext: failed to fetch /companies/me", err);
       setState({ company: null, role: null, isOwner: false, members: [], loading: false });
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
