@@ -21,6 +21,7 @@ from auth import get_current_user
 from app_settings import get_setting, get_settings_bulk, set_setting
 from db_utils import prepare_for_mongo, serialize_doc
 from integration_credentials import (
+    get_credentials,
     list_masked_credentials,
     set_provider_credentials,
 )
@@ -482,6 +483,41 @@ async def test_breezedocs(
         "status": res.get("status"),
         "email": user_email,
     }
+
+
+@integrations_admin_router.post("/bing_webmaster/test")
+async def test_bing_webmaster(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
+    """Verify Bing Webmaster API key by calling the read-only `GetSites` endpoint.
+    No URLs are submitted — pure auth/permission check."""
+    import httpx
+
+    creds = await get_credentials(db, "bing_webmaster")
+    api_key = (creds.get("api_key") or "").strip()
+    if not api_key:
+        await _record_ping(db, "bing_webmaster", ok=False, detail="no api_key")
+        return {"ok": False, "mode": "mock", "reason": "API key not set — paste it above and click Save first"}
+    url = f"https://ssl.bing.com/webmaster/api.svc/json/GetSites?apikey={api_key}"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(url)
+    except Exception as exc:
+        await _record_ping(db, "bing_webmaster", ok=False, detail=f"net: {exc}")
+        return {"ok": False, "reason": f"network error: {exc}"}
+    ok = 200 <= r.status_code < 300
+    detail = None
+    if ok:
+        try:
+            data = r.json()
+            sites = data.get("d") if isinstance(data, dict) else None
+            detail = f"key valid · {len(sites) if isinstance(sites, list) else 0} site(s) attached"
+        except Exception:
+            detail = "key accepted"
+    else:
+        detail = f"HTTP {r.status_code}: {(r.text or '')[:120]}"
+    await _record_ping(db, "bing_webmaster", ok=ok, detail=detail)
+    return {"ok": ok, "mode": "live", "status": r.status_code, "detail": detail}
 
 
 # ============================================================
