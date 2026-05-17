@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MilestoneTimeline from "@/components/MilestoneTimeline";
 import UpgradePrototypeBanner from "@/pages/client/components/UpgradePrototypeBanner";
 import CompanySetupBanner from "@/pages/client/components/CompanySetupBanner";
+import ManageTeamPanel from "@/pages/client/components/ManageTeamPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1078,7 +1079,12 @@ export default function ClientPortal() {
             <ClientContactPanel token={token} />
           </TabsContent>
           <TabsContent value="profile" className="mt-6">
-            <ProfilePanel client={client} refreshClient={refreshClient} token={token} />
+            <div className="space-y-8">
+              <ProfilePanel client={client} refreshClient={refreshClient} token={token} />
+              <div className="border-t border-slate-200 pt-8">
+                <ManageTeamPanel />
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </main>

@@ -24,6 +24,7 @@ import PayPalOrdersPage from "@/pages/admin/PayPalOrdersPage";
 import InvoicesAdmin from "@/pages/admin/InvoicesAdmin";
 import SubscriptionsAdmin from "@/pages/admin/SubscriptionsAdmin";
 import LeadMagnetsAdmin from "@/pages/admin/LeadMagnetsAdmin";
+import WarmLeadsAdmin from "@/pages/admin/WarmLeadsAdmin";
 import MilestonesAdmin from "@/pages/admin/MilestonesAdmin";
 import ProjectModeAdmin from "@/pages/admin/ProjectModeAdmin";
 import ProjectFilesAdmin from "@/pages/admin/ProjectFilesAdmin";
@@ -157,6 +158,7 @@ function App() {
                 <Route path="support-clearance" element={<SupportClearanceAdmin />} />
                 <Route path="subscriptions" element={<SubscriptionsAdmin />} />
                 <Route path="lead-magnets" element={<LeadMagnetsAdmin />} />
+                <Route path="warm-leads" element={<WarmLeadsAdmin />} />
                 <Route path="milestones" element={<MilestonesAdmin />} />
                 <Route path="project-mode" element={<ProjectModeAdmin />} />
                 <Route path="project-mode/:projectId" element={<ProjectModeAdmin />} />

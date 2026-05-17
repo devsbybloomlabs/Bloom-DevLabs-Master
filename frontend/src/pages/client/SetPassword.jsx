@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PasswordInput from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -91,9 +92,8 @@ export default function SetPassword({ mode = "set" }) {
             <form onSubmit={onSubmit} className="space-y-4" data-testid="set-password-form">
               <div>
                 <Label htmlFor="password" className="text-sm">New password</Label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -104,9 +104,8 @@ export default function SetPassword({ mode = "set" }) {
               </div>
               <div>
                 <Label htmlFor="confirm" className="text-sm">Confirm password</Label>
-                <Input
+                <PasswordInput
                   id="confirm"
-                  type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required

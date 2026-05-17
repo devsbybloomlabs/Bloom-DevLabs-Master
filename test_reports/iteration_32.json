@@ -1,0 +1,62 @@
+{
+  "summary": "Iteration 32 — Backend 35/35 PASS (11 new iter32 tests + 24 iter31 regression). Frontend: password toggles work on client-login, client-register, admin-login (PasswordInput component is solid). /admin/warm-leads page renders perfectly with all required testids, 16 warm-lead rows, stats grid, filters, search, refresh button — all functional. ❌ CRITICAL FRONTEND BUG: /app/frontend/src/lib/useCompanyContext.js calls `clientApi.get('/companies/me')` but `clientApi` is a FUNCTION (clientApi(token) → axios instance). The call throws TypeError, is silently swallowed by the bare `catch {}`, so the hook always returns `{company: null, role: null}`. Result: ManageTeamPanel ALWAYS shows the 'No team set up yet.' empty state for every user (verified with testclient@bybloomlabs.com whose backend /api/companies/me clearly returns a valid company + admin role + owner=true). Same bug affects ManageTeamPanel.jsx lines 42 + 56 (invite-send + role-change use `clientApi.post(...)`).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "useCompanyContext hook + ManageTeamPanel",
+        "issue": "clientApi is imported as if it's an axios instance but it's actually a factory function that requires a token. Hook silently returns null company → empty state always shown. Manage Team feature is completely non-functional in UI even though backend works perfectly.",
+        "selector": "manage-team-panel (never rendered — falls through to 'No team set up yet' empty state which lacks data-testid)",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "ManageTeamPanel empty state",
+        "issue": "When company is null, the early-return JSX does NOT carry data-testid='manage-team-panel'. Even when this code path is legitimate (truly no company), tests can't assert the panel mounted.",
+        "selector": "manage-team-panel",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Portal → Profile tab → Manage Team",
+        "issue": "Backend /api/companies/me returns the full team + role for testclient@bybloomlabs.com, but the frontend hook cannot consume it (see useCompanyContext bug above). End-to-end manage-team is broken.",
+        "affected_selectors": ["manage-team-panel", "team-members-card", "team-invite-card", "team-invite-email-0", "team-invite-send", "team-promote-*", "team-demote-*"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_32.py",
+    "/app/test_reports/pytest/iter32.xml",
+    "/app/test_reports/pytest/iter31_regression.xml"
+  ],
+  "action_items": [
+    "FIX useCompanyContext.js: change `import { clientApi } from '@/lib/clientAuth'` + `clientApi.get('/companies/me')` to use the factory pattern. Either (a) `import { useClientAuth, clientApi } from ...; const { token } = useClientAuth(); const { data } = await clientApi(token).get('/companies/me');`, or (b) export a pre-bound `clientApiWithAuth` instance from clientAuth.js that pulls token from local storage.",
+    "FIX ManageTeamPanel.jsx lines 42 + 56: same factory bug for `clientApi.post('/company-setup/invites', ...)` and `clientApi.post('/companies/me/members/.../role', ...)`. Use `clientApi(token).post(...)`.",
+    "OPTIONAL: add `data-testid=\"manage-team-panel\"` to the empty-state early-return so tests can still assert the panel mounted even when no company exists.",
+    "Remove the bare `catch {}` in useCompanyContext.js OR at minimum `console.error(e)` so this class of bug is discoverable in dev.",
+    "Consider adding a frontend lint rule / unit test that catches TypeError on hook init — this slipped through because the catch swallowed it."
+  ],
+  "critical_code_review_comments": [
+    "useCompanyContext.js — wrong usage of clientApi (it's a token-bound factory, not an axios instance). Critical functional bug.",
+    "ManageTeamPanel.jsx — same wrong-usage bug repeated in 2 places (invite send + role change).",
+    "useCompanyContext.js — bare `catch {}` masked the TypeError. Always log the error in dev builds.",
+    "warm_leads_routes.py — admin router uses `Depends(get_current_user)` at router level which is good. Confirmed unauthenticated requests get 401/403. Niche filter works. Backend is clean.",
+    "reactivation_crons.py — both ticks are idempotent (watermark gate works on the 2nd call). Mongo $or with `$exists: false` is correct. Email failures are caught and don't poison the loop.",
+    "server.py — both new cron jobs registered at 09:00 and 10:00 UTC. Scheduler started cleanly (/api/health 200). No deferred-warmup regression.",
+    "company_setup_routes.py — owner role-lock now rejects ANY role change on is_owner=true (both demote-to-viewer AND set-to-admin return 400). Confirmed by test_iteration_32 tests."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_32.py (NEW — 11 tests, 100% pass)"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 iter32 + 24/24 iter31 regression = 35/35)",
+    "frontend": "~70% — password toggles + /admin/warm-leads work end-to-end. Manage Team panel is broken due to clientApi misuse."
+  },
+  "test_credentials": "Admin founder@thesalvador.group / admin123 (verified). Client testclient@bybloomlabs.com / clientpass123 (verified, has company id=3b18b632 + admin role + is_owner=true via API).",
+  "seed_data_creation": "Test fixtures auto-create TEST_iter32_* clients, warm-leads, and synthetic companies via fixtures. Synthetic cron docs are deleted in the finally block of each cron test.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend is rock-solid. Re-run test_iteration_32.py + test_iteration_31.py as the regression suite. The ONLY action item is the clientApi-factory misuse in useCompanyContext.js + ManageTeamPanel.jsx — once fixed, re-verify by logging in as testclient@bybloomlabs.com → /portal → Profile tab → should see Manage Team card with 'Test Co' company name, owner badge on testclient row, and (since role=admin) an invite card. Other password-toggle fields not directly verified (set-password, invite-password, nifty-manual-token-input, gdrive-credentials-client-secret, invite-password) but they all use the same PasswordInput component which proved correct on 3 verified fields.",
+  "rca of the issue": "useCompanyContext was authored against an outdated/imagined clientApi API (instance-style) but the actual export is a `clientApi(token)` factory. ESLint did not catch this because clientApi is a function and `clientApi.get` would only fail at runtime. The bare `catch {}` then swallowed the TypeError. Same author copy-pasted the wrong pattern into ManageTeamPanel.jsx for the write paths."
+}

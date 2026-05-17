@@ -24,7 +24,7 @@ from openrouter_client import OpenRouterClient  # noqa: E402
 from paypal_client import PayPalClient  # noqa: E402
 from paypal_routes import paypal_admin_router, paypal_router  # noqa: E402
 from gym_upgrade_routes import gym_upgrade_router  # noqa: E402
-from warm_leads_routes import warm_leads_router  # noqa: E402
+from warm_leads_routes import warm_leads_router, warm_leads_admin_router  # noqa: E402
 from company_setup_routes import (  # noqa: E402
     company_setup_router,
     companies_me_router,
@@ -254,6 +254,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("Prototype drip cron failed: %s", exc)
 
+    async def company_setup_reminder_cron() -> None:
+        try:
+            from reactivation_crons import company_setup_reminder_tick
+
+            res = await company_setup_reminder_tick(app.state.db)
+            if res.get("sent", 0) > 0 or res.get("failed", 0) > 0:
+                log.info("Company setup reminder tick: %s", res)
+        except Exception as exc:
+            log.exception("Company setup reminder cron failed: %s", exc)
+
+    async def warm_lead_reengagement_cron() -> None:
+        try:
+            from reactivation_crons import warm_lead_reengagement_tick
+
+            res = await warm_lead_reengagement_tick(app.state.db)
+            if res.get("sent", 0) > 0 or res.get("failed", 0) > 0:
+                log.info("Warm-lead re-engagement tick: %s", res)
+        except Exception as exc:
+            log.exception("Warm-lead re-engagement cron failed: %s", exc)
+
     # Hourly drip ticks
     scheduler.add_job(drip_cron, CronTrigger(minute=15))
     # Hourly prototype-buyer drip (offset by 5 min so it doesn't collide with
@@ -267,6 +287,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.add_job(breezedocs_sync_cron_wrapper, CronTrigger(minute="*/10"))
     # Daily 3am UTC — flip expired bundled support subscriptions to "expired"
     scheduler.add_job(support_subscription_expiry_cron, CronTrigger(hour=3, minute=0))
+    # Daily 9am UTC — company-setup wizard reminder for purchasers who haven't completed it
+    scheduler.add_job(company_setup_reminder_cron, CronTrigger(hour=9, minute=0))
+    # Daily 10am UTC — 48h warm-lead re-engagement
+    scheduler.add_job(warm_lead_reengagement_cron, CronTrigger(hour=10, minute=0))
 
     app.state.scheduler = scheduler
 
@@ -364,6 +388,7 @@ api.include_router(sync_router)
 api.include_router(paypal_router)
 api.include_router(gym_upgrade_router)
 api.include_router(warm_leads_router)
+api.include_router(warm_leads_admin_router)
 api.include_router(company_setup_router)
 api.include_router(companies_me_router)
 api.include_router(company_invites_router)

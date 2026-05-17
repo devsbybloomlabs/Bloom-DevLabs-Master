@@ -16,13 +16,20 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
+
+from auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 warm_leads_router = APIRouter(prefix="/leads", tags=["warm-leads"])
+warm_leads_admin_router = APIRouter(
+    prefix="/admin/leads",
+    tags=["warm-leads-admin"],
+    dependencies=[Depends(get_current_user)],
+)
 
 _mongo_client = AsyncIOMotorClient(os.environ["MONGO_URL"])
 _db = _mongo_client[os.environ["DB_NAME"]]
@@ -84,9 +91,9 @@ async def capture_warm_lead(payload: WarmLeadPayload) -> WarmLeadResponse:
     return WarmLeadResponse(id=doc["id"], deduped=False)
 
 
-@warm_leads_router.get("/warm")
+@warm_leads_admin_router.get("/warm")
 async def list_warm_leads(niche: Optional[str] = None, limit: int = 100) -> Dict[str, Any]:
-    """Admin-list view. (No auth wrapper here — protected by admin UI route.)"""
+    """Admin-only list view of warm leads (checkout abandoners)."""
     query: Dict[str, Any] = {}
     if niche:
         query["niche"] = niche
@@ -95,4 +102,4 @@ async def list_warm_leads(niche: Optional[str] = None, limit: int = 100) -> Dict
     return {"items": items, "count": len(items)}
 
 
-__all__ = ["warm_leads_router"]
+__all__ = ["warm_leads_router", "warm_leads_admin_router"]

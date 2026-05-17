@@ -23,6 +23,7 @@ import {
   Receipt,
   FileText,
   Sparkles,
+  Inbox,
   Target,
   Plug,
   ImagePlus,
@@ -64,6 +65,7 @@ const NAV = [
   // ── Authority — content + brand ────────────────────────────────────────
   { to: "/admin/content", label: "Content AI", icon: PenSquare, group: "Authority" },
   { to: "/admin/lead-magnets", label: "Lead Magnets", icon: Sparkles, group: "Authority" },
+  { to: "/admin/warm-leads", label: "Warm Leads", icon: Inbox, group: "Authority" },
   { to: "/admin/credibility", label: "Credibility Hub", icon: ShieldCheck, group: "Authority" },
   { to: "/admin/case-studies", label: "Case Studies", icon: Award, group: "Authority" },
   { to: "/admin/testimonials", label: "Testimonials", icon: Mic, group: "Authority" },

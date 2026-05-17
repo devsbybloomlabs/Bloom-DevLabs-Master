@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAdminApi } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PasswordInput from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -511,13 +512,13 @@ function NiftyCard() {
           <div className="space-y-3">
             <div>
               <Label>Access token</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 value={manualToken}
                 onChange={(e) => setManualToken(e.target.value)}
                 placeholder="Paste token here"
                 data-testid="nifty-manual-token-input"
-                className="mt-1.5 font-mono text-xs"
+                className="mt-1.5"
+                inputClassName="font-mono text-xs"
               />
             </div>
           </div>
@@ -1077,15 +1078,15 @@ function DriveCredentialsForm({ api, credentials, onSaved }) {
             </span>
           )}
         </Label>
-        <Input
-          type="password"
+        <PasswordInput
           value={clientSecret}
           onChange={(e) => setClientSecret(e.target.value)}
           placeholder="GOCSPX-…"
           autoComplete="off"
           spellCheck={false}
           data-testid="gdrive-credentials-client-secret"
-          className="mt-1 font-mono text-xs"
+          className="mt-1"
+          inputClassName="font-mono text-xs"
         />
       </div>
       <div>

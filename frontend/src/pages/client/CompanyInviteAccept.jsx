@@ -15,6 +15,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PasswordInput from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Users, ShieldCheck, AlertCircle, CheckCircle2, ArrowRight } from "lucide-react";
@@ -129,7 +130,7 @@ export default function CompanyInviteAccept() {
               </div>
               <div>
                 <Label>Choose a password</Label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" data-testid="invite-password" className="mt-1.5" />
+                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" data-testid="invite-password" className="mt-1.5" />
               </div>
               <Button type="submit" disabled={submitting} className="w-full bg-indigo-700 hover:bg-indigo-800 text-white h-11" data-testid="invite-submit">
                 {submitting ? "Joining…" : <>Join {invite.company_name}<ArrowRight className="h-4 w-4 ml-1.5" /></>}
