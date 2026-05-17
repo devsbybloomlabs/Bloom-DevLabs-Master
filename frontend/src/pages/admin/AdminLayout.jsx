@@ -26,6 +26,7 @@ import {
   Inbox,
   Target,
   Plug,
+  Search,
   ImagePlus,
   LifeBuoy,
   KanbanSquare,
@@ -75,6 +76,7 @@ const NAV = [
 
   // ── System ─────────────────────────────────────────────────────────────
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3, group: "System" },
+  { to: "/admin/seo", label: "SEO Submit", icon: Search, group: "System" },
   { to: "/admin/integrations", label: "Integrations", icon: Plug, group: "System" },
   { to: "/admin/settings", label: "Settings", icon: SettingsIcon, group: "System" },
 ];

@@ -33,6 +33,34 @@ export const Hero = () => {
               traditional agencies.
             </p>
 
+            <p className="mt-3 text-sm text-muted-foreground max-w-xl">
+              Now serving custom software for{" "}
+              <a
+                href="/solutions/gym-management-software"
+                className="text-[#1E3A8A] font-semibold hover:underline"
+                data-testid="hero-link-gym"
+              >
+                gym owners
+              </a>
+              ,{" "}
+              <a
+                href="/solutions/coach-funnel"
+                className="text-[#1E3A8A] font-semibold hover:underline"
+                data-testid="hero-link-coach"
+              >
+                coaches &amp; consultants
+              </a>
+              , and{" "}
+              <a
+                href="/solutions/real-estate-leads"
+                className="text-[#1E3A8A] font-semibold hover:underline"
+                data-testid="hero-link-re"
+              >
+                real estate brokers
+              </a>
+              .
+            </p>
+
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Button
                 asChild

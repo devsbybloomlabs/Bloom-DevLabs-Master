@@ -487,7 +487,7 @@ async def test_breezedocs(
 # ============================================================
 # DB-stored credentials (admin UI alternative to .env edits)
 # ============================================================
-ALLOWED_CRED_PROVIDERS = {"slack", "google_calendar", "breezedocs", "paypal"}
+ALLOWED_CRED_PROVIDERS = {"slack", "google_calendar", "breezedocs", "paypal", "bing_webmaster"}
 
 
 class CredentialsUpdate(BaseModel):

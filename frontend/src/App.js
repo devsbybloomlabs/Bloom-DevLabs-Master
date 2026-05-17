@@ -30,6 +30,7 @@ import ProjectModeAdmin from "@/pages/admin/ProjectModeAdmin";
 import ProjectFilesAdmin from "@/pages/admin/ProjectFilesAdmin";
 import SupportTriageAdmin from "@/pages/admin/SupportTriageAdmin";
 import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
+import SeoAdmin from "@/pages/admin/SeoAdmin";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
 import CompaniesAdmin from "@/pages/admin/CompaniesAdmin";
 import ProposalsAdmin from "@/pages/admin/ProposalsAdmin";
@@ -181,6 +182,7 @@ function App() {
                 <Route path="clients" element={<ClientsAdmin />} />
                 <Route path="companies" element={<CompaniesAdmin />} />
                 <Route path="integrations" element={<IntegrationsAdmin />} />
+                <Route path="seo" element={<SeoAdmin />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

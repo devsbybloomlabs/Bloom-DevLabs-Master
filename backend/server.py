@@ -106,6 +106,7 @@ from google_calendar_routes import (  # noqa: E402
 )
 from blog_extras_routes import blog_extras_router  # noqa: E402
 from integrations_admin_routes import integrations_admin_router  # noqa: E402
+from seo_routes import seo_router, run_seo_scan  # noqa: E402
 from invoice_routes import (  # noqa: E402
     invoice_admin_router,
     invoice_client_router,
@@ -275,6 +276,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("Warm-lead re-engagement cron failed: %s", exc)
 
+    async def seo_page_scan_cron() -> None:
+        try:
+            res = await run_seo_scan(app.state.db, app.state.openrouter)
+            if res.get("new_urls"):
+                log.info("SEO scan: %d new URL(s)", len(res["new_urls"]))
+        except Exception as exc:
+            log.exception("SEO page-scan cron failed: %s", exc)
+
     # Hourly drip ticks
     scheduler.add_job(drip_cron, CronTrigger(minute=15))
     # Hourly prototype-buyer drip (offset by 5 min so it doesn't collide with
@@ -292,6 +301,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.add_job(company_setup_reminder_cron, CronTrigger(hour=9, minute=0))
     # Daily 10am UTC — 48h warm-lead re-engagement
     scheduler.add_job(warm_lead_reengagement_cron, CronTrigger(hour=10, minute=0))
+    # Daily 11am UTC — SEO page-diff scan + (optional) OpenRouter enrichment
+    scheduler.add_job(seo_page_scan_cron, CronTrigger(hour=11, minute=0))
 
     app.state.scheduler = scheduler
 
@@ -401,6 +412,7 @@ api.include_router(client_admin_router)
 api.include_router(public_router)
 api.include_router(blog_extras_router)
 api.include_router(integrations_admin_router)
+api.include_router(seo_router)
 api.include_router(invoice_admin_router)
 api.include_router(invoice_client_router)
 api.include_router(invoice_public_router)

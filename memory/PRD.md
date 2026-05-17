@@ -24,6 +24,31 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Wave 4 — One-click Search-Engine Submission + AI page-diff watcher (Feb 17, 2026)
+**Goal**: Let the founder re-crawl any new public URL in a single click without leaving the admin. Auto-detect new pages added to the sitemap and ping with an OpenRouter-generated SEO review.
+
+**What changed**
+- `backend/seo_routes.py` — NEW. Endpoints under `/api/admin/seo`:
+  - `GET /state` — returns sitemap URL, IndexNow key (+ ownership .txt URL), Google Search Console deep-link, Bing Webmaster API status, current page count, new URLs since last scan, last submission timestamps, and the most recent AI suggestion.
+  - `POST /scan` — re-reads `frontend/public/sitemap.xml`, diffs against the persisted snapshot in `app_settings.seo_state`, fires a Notification for the founder, optionally enriches with OpenRouter (`chat()` → 4-sentence SEO review).
+  - `POST /submit/indexnow` — pushes URLs to `https://api.indexnow.org/IndexNow`. Bing returns HTTP 202 on accept (Yandex + Naver covered same call).
+  - `POST /submit/bing-webmaster` — pushes URLs via `SubmitUrlbatch` endpoint if user-provided API key is stored in `integration_credentials.bing_webmaster.api_key`.
+- IndexNow ownership file auto-generated at first scan: `/{uuid}.txt` in `frontend/public/` so Bing can verify domain control.
+- `backend/server.py` — `seo_router` mounted, daily cron at 11:00 UTC runs `run_seo_scan(db, openrouter)` which diffs, fires notification, and persists the OpenRouter SEO suggestion.
+- `backend/integrations_admin_routes.py` — added `bing_webmaster` to `ALLOWED_CRED_PROVIDERS` so the API key is editable from Admin → Integrations.
+- `frontend/src/components/admin/IntegrationCredentialsForm.jsx` — new "Bing Webmaster (URL submission)" credential block with secret + eye toggle.
+- `frontend/src/pages/admin/SeoAdmin.jsx` — NEW. Admin panel exposing: 4 status cards, three big submission buttons (IndexNow / Bing Webmaster / Google GSC deep-link), per-URL checkbox selection for new URLs, AI SEO review callout, per-provider submission history.
+- `frontend/src/App.js` + `AdminLayout.jsx` — wired `/admin/seo` route + sidebar nav under System with `Search` icon.
+- `frontend/src/components/sections/Hero.jsx` — added the homepage subhead "Now serving custom software for [gym owners] · [coaches &amp; consultants] · [real estate brokers]" with keyword-rich anchors pointing to the canonical `/solutions/*` paths (Phase 1 SEO improvement).
+
+**Verification (Feb 17, 2026)**
+- `GET /api/admin/seo/state` returns 22 public URLs, generated IndexNow key, configured/not-configured indicator for Bing API.
+- `POST /api/admin/seo/scan` first call: 22 new URLs surfaced, real OpenRouter SEO review generated and stored ("The slugs are clean and SEO-friendly overall, with good keyword targeting in the coach-funnel solution pages…"). Second call: 0 new URLs (idempotent ✓). A Notification was inserted into Mongo with title "New pages — re-submit to search engines".
+- `POST /api/admin/seo/submit/indexnow` returned **HTTP 202 Accepted** from Bing — real working IndexNow submission.
+- `POST /api/admin/seo/submit/bing-webmaster` correctly returns HTTP 400 with a helpful "configure key in Integrations" message when the key isn't set.
+- Hero subhead links verified: gym/coach/real-estate anchors resolve to `/solutions/gym-management-software`, `/solutions/coach-funnel`, `/solutions/real-estate-leads`.
+- Lint clean across `seo_routes.py`, `SeoAdmin.jsx`, `AdminLayout.jsx`, `Hero.jsx`.
+
 ### ✅ Wave 3.5 — SEO Phase 2: Sitemap + Internal Linking + Bloom vs Agencies (Feb 17, 2026)
 **Goal**: Push internal-link signal toward the new canonical /solutions/* URLs and add the explicit competitor positioning block from the SEO brief.
 

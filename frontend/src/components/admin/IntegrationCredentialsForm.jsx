@@ -29,6 +29,7 @@ import {
   PlugZap,
   FileSignature,
   CreditCard,
+  Search,
 } from "lucide-react";
 
 const PROVIDER_SPECS = [
@@ -102,6 +103,18 @@ const PROVIDER_SPECS = [
       },
     ],
     customConnect: true,
+  },
+  {
+    key: "bing_webmaster",
+    label: "Bing Webmaster (URL submission)",
+    icon: Search,
+    color: "#0F766E",
+    helpUrl: "https://www.bing.com/webmasters/settings/api",
+    description:
+      "API key from Bing Webmaster Tools → Settings → API access. Powers one-click URL submission on the SEO panel. IndexNow runs without this key.",
+    fields: [
+      { name: "api_key", label: "Bing Webmaster API key", secret: true, placeholder: "Paste API key from Bing Webmaster Tools" },
+    ],
   },
 ];
 
