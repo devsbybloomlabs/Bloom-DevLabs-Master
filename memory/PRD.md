@@ -24,6 +24,41 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Wave 3 — SEO Foundation: Meta + Schema + Niche-page Optimization (Feb 17, 2026)
+**Goal**: Lay the indexable-content foundation for ranking on the 20 target keywords (custom web app dev, 2-week delivery, gym/coach/real-estate vertical software). Phase 1 of the 4-phase SEO push.
+
+**What changed**
+- `frontend/src/components/SeoHead.jsx` — extended with `extraJsonLd` array prop so a page can inject Organization + WebSite + LocalBusiness + Product + FAQ schemas simultaneously without colliding with the breadcrumb block.
+- `frontend/src/lib/seo.js` — NEW central SEO assets module. Single source of truth for:
+  - `ORGANIZATION_SCHEMA` (founded 2026, LinkedIn/Instagram/TikTok/Facebook socials, US/PH/SG areas served)
+  - `LOCAL_BUSINESS_PH` + `LOCAL_BUSINESS_SG` (country-level ProfessionalService schema)
+  - `PRODUCT_SCHEMA` — Service with 3 tier Offers ($5,995 / $8,995 / $14,995) + AggregateRating 5.0 + 2 Reviews from real case studies
+  - `FAQ_SCHEMA()` + `HOMEPAGE_FAQS` — expanded from 5 to 8 questions including the SEO-mandated ones (cost, why projects fail, industries served, support window, etc.)
+  - `WEBSITE_SCHEMA` (enables Google sitelinks search box)
+  - `PAGE_META` — title/description/keywords/canonical presets for 16 pages
+  - `buildNicheSeo(niche, step)` — generates per-page Service schema + BreadcrumbList for any of the 12 niche-funnel pages
+- `frontend/src/pages/Landing.jsx` — renders 6 JSON-LD blocks (Org, WebSite, LocalBusiness×2, Product, FAQ) plus optimized title/description.
+- `frontend/src/components/sections/FAQ.jsx` — now pulls from `HOMEPAGE_FAQS` (single source). 8 visible questions matching FAQ JSON-LD.
+- `frontend/src/pages/{gym,coach,realestate}/{Layout}.jsx` — accept `seo` prop, render `<SeoHead>` automatically. Backwards-compatible (prop optional).
+- All 12 niche-funnel pages (gym, coach, realestate × hero/howitworks/process/results) — pass `seo={buildNicheSeo(...)}` to their layout. Each page now has keyword-optimized title, description, Service schema, BreadcrumbList.
+- `frontend/src/App.js` — added 12 new SEO-friendly alias routes under `/solutions/*`:
+  - `/solutions/gym-management-software` (+ /how-it-works, /process, /results)
+  - `/solutions/coach-funnel` (+ /how-it-works, /process, /results)
+  - `/solutions/real-estate-leads` (+ /how-it-works, /process, /results)
+  - Old `/gym-owners`, `/coaches`, `/real-estate` routes still work. Canonical `<link>` in SeoHead points to the new `/solutions/*` paths so search engines consolidate signal there.
+- H1 audit: every public + niche-funnel page has exactly ONE `<h1>` (verified).
+
+**Verification (Feb 17, 2026)**
+- Headless browser probe confirmed `/` exposes 6 distinct JSON-LD blocks: Organization, WebSite, ProfessionalService×2, Service, FAQPage.
+- `/solutions/gym-management-software` returns title "Gym Management Software Built in 3 Weeks | Bloom Labs", canonical pointing to the alias, Service + BreadcrumbList schema.
+- `/solutions/coach-funnel/results` returns title "Coach Portal ROI & Case Studies | Bloom Labs" with correct canonical.
+- Lint clean across `seo.js`, `SeoHead.jsx`, `Landing.jsx`, FAQ, and all gym/coach/realestate page directories.
+
+**Remaining SEO phases (proposed for future iterations)**
+- Phase 2: Internal-linking pass + "Bloom vs Traditional Agencies" comparison block
+- Phase 3: Blog post drafts (3 cornerstone articles, ~2k words each)
+- Phase 4: Core Web Vitals + mobile audit + rank-tracking integration
+
 ### ✅ Wave 2.5 — PayPal credentials managed from Admin UI (Feb 2026)
 **Goal**: Let the founder configure separate PayPal credentials per environment (Sandbox in Preview, Live in Production) directly from `/admin/integrations` — no `.env` edits, no redeploy.
 

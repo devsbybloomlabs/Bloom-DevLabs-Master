@@ -5,12 +5,13 @@ import { Link } from "react-router-dom";
 import { Database, Inbox, Mail, BarChart3, ArrowRight, Calendar, ShieldCheck, Lock, RefreshCw, CheckCircle2, Phone } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import RELayout from "./RELayout";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function REHowItWorksPage() {
   return (
-    <RELayout breadcrumb="How It Works">
+    <RELayout breadcrumb="How It Works" seo={buildNicheSeo("re", "HowItWorks")}>
       <Hero /><Layers /><Integrations /><Journey /><Security /><CTA />
     </RELayout>
   );

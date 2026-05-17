@@ -9,6 +9,7 @@ import { useState } from "react";
 import { ArrowRight, Menu, X, Dumbbell, Calendar, Mail, Phone, ChevronRight } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import ExitIntentModal from "../shared/ExitIntentModal";
+import SeoHead from "@/components/SeoHead";
 
 const NAV = [
   { to: "/gym-owners", label: "Overview", end: true },
@@ -195,7 +196,7 @@ export function GymFooter() {
 /**
  * Default export — wrap any gym-page content in a consistent shell.
  */
-export default function GymLayout({ breadcrumb, children }) {
+export default function GymLayout({ breadcrumb, seo, children }) {
   // Auto-scroll to top on route change.
   const { pathname } = useLocation();
   if (typeof window !== "undefined") {
@@ -204,6 +205,7 @@ export default function GymLayout({ breadcrumb, children }) {
   }
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased" key={pathname}>
+      {seo && <SeoHead {...seo} />}
       <GymHeader />
       <GymBreadcrumb label={breadcrumb} />
       <main>{children}</main>

@@ -17,12 +17,13 @@ import {
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import GymLayout from "./GymLayout";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function GymProcessPage() {
   return (
-    <GymLayout breadcrumb="Our Process">
+    <GymLayout breadcrumb="Our Process" seo={buildNicheSeo("gym", "Process")}>
       <Hero />
       <TimelineSection />
       <CommitmentSection />

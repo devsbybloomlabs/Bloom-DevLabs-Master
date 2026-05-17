@@ -11,12 +11,13 @@ import { BRAND } from "@/lib/brand";
 import RELayout from "./RELayout";
 import { SimpleREROICalculator } from "./components/REROICalculator";
 import RECheckoutDialog from "./components/RECheckoutDialog";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function REHeroPage() {
   return (
-    <RELayout breadcrumb="Overview">
+    <RELayout breadcrumb="Overview" seo={buildNicheSeo("re", "Hero")}>
       <Hero /><PreQual /><Problem /><Solution /><Offer /><ROI /><SocialProof /><FAQ /><FinalCTA />
     </RELayout>
   );

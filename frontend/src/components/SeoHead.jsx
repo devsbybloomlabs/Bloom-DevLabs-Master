@@ -114,6 +114,7 @@ export default function SeoHead({
   twitterHandle = "@bloomlabs",
   robots = "index, follow, max-image-preview:large",
   jsonLd,
+  extraJsonLd,
   breadcrumbs,
 }) {
   useEffect(() => {
@@ -154,6 +155,11 @@ export default function SeoHead({
     setLink("canonical", canonical);
 
     if (jsonLd) setJsonLd("primary", jsonLd);
+    if (Array.isArray(extraJsonLd)) {
+      extraJsonLd.forEach((block, i) => {
+        if (block) setJsonLd(`extra-${i}`, block);
+      });
+    }
     if (breadcrumbs && breadcrumbs.length > 0) {
       setJsonLd("breadcrumbs", {
         "@context": "https://schema.org",
@@ -179,6 +185,7 @@ export default function SeoHead({
     twitterHandle,
     robots,
     jsonLd,
+    extraJsonLd,
     breadcrumbs,
   ]);
 

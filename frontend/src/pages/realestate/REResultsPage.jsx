@@ -7,12 +7,13 @@ import { Calendar, ArrowRight, TrendingUp, Users, DollarSign, ChevronDown, Spark
 import { BRAND } from "@/lib/brand";
 import RELayout from "./RELayout";
 import { DetailedREROICalculator } from "./components/REROICalculator";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function REResultsPage() {
   return (
-    <RELayout breadcrumb="Results">
+    <RELayout breadcrumb="Results" seo={buildNicheSeo("re", "Results")}>
       <Hero /><Cases /><Numbers /><Roadmap /><ROI /><Next /><FAQ /><FinalCTA />
     </RELayout>
   );

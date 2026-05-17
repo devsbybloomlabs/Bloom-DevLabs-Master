@@ -19,12 +19,13 @@ import {
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import CoachLayout from "./CoachLayout";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function CoachProcessPage() {
   return (
-    <CoachLayout breadcrumb="Our Process">
+    <CoachLayout breadcrumb="Our Process" seo={buildNicheSeo("coach", "Process")}>
       <Hero />
       <TimelineSection />
       <CommitmentSection />

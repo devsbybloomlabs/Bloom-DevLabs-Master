@@ -22,12 +22,13 @@ import {
 import { BRAND } from "@/lib/brand";
 import CoachLayout from "./CoachLayout";
 import { DetailedCoachROICalculator } from "./components/CoachROICalculator";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function CoachResultsPage() {
   return (
-    <CoachLayout breadcrumb="Results">
+    <CoachLayout breadcrumb="Results" seo={buildNicheSeo("coach", "Results")}>
       <Hero />
       <ArchetypesSection />
       <NumbersSection />

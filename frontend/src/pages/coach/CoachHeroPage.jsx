@@ -28,12 +28,13 @@ import { BRAND } from "@/lib/brand";
 import CoachLayout from "./CoachLayout";
 import { SimpleCoachROICalculator } from "./components/CoachROICalculator";
 import CoachCheckoutDialog from "./components/CoachCheckoutDialog";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function CoachHeroPage() {
   return (
-    <CoachLayout breadcrumb="Overview">
+    <CoachLayout breadcrumb="Overview" seo={buildNicheSeo("coach", "Hero")}>
       <Hero />
       <PreQualSection />
       <ProblemSection />

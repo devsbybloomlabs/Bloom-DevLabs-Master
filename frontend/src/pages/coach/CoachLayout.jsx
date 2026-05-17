@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { ArrowRight, Menu, X, Calendar, Mail, Phone, ChevronRight, Headphones } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import ExitIntentModal from "../shared/ExitIntentModal";
+import SeoHead from "@/components/SeoHead";
 
 const NAV = [
   { to: "/coaches", label: "Overview", end: true },
@@ -140,13 +141,14 @@ export function CoachFooter() {
   );
 }
 
-export default function CoachLayout({ breadcrumb, children }) {
+export default function CoachLayout({ breadcrumb, seo, children }) {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [pathname]);
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased" key={pathname}>
+      {seo && <SeoHead {...seo} />}
       <CoachHeader />
       <CoachBreadcrumb label={breadcrumb} />
       <main>{children}</main>

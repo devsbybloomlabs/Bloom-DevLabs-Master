@@ -28,13 +28,14 @@ import { BRAND } from "@/lib/brand";
 import GymLayout from "./GymLayout";
 import { SimpleROICalculator } from "./components/ROICalculator";
 import GymCheckoutDialog from "./components/GymCheckoutDialog";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 // --------------------------------------------------------------------------
 export default function GymHeroPage() {
   return (
-    <GymLayout breadcrumb="Overview">
+    <GymLayout breadcrumb="Overview" seo={buildNicheSeo("gym", "Hero")}>
       <Hero />
       <PreQualSection />
       <ProblemSection />

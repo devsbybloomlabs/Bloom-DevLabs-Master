@@ -5,12 +5,13 @@ import { Link } from "react-router-dom";
 import { Calendar, ArrowRight, PhoneCall, Hammer, Sunset, Rocket, Clock, CheckCircle2, Shield, Headphones, TrendingUp, MessageCircle } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import RELayout from "./RELayout";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function REProcessPage() {
   return (
-    <RELayout breadcrumb="Our Process">
+    <RELayout breadcrumb="Our Process" seo={buildNicheSeo("re", "Process")}>
       <Hero /><Timeline /><Commitment /><Support /><Risk /><Checklist /><Upgrade /><CTA />
     </RELayout>
   );

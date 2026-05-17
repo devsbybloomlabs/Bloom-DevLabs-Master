@@ -90,6 +90,20 @@ function App() {
               <Route path="/real-estate/how-it-works" element={<REHowItWorksPage />} />
               <Route path="/real-estate/process" element={<REProcessPage />} />
               <Route path="/real-estate/results" element={<REResultsPage />} />
+              {/* SEO-friendly /solutions/* aliases. Same components, canonical
+                  URLs in SeoHead point to these paths so they win in search. */}
+              <Route path="/solutions/gym-management-software" element={<GymHeroPage />} />
+              <Route path="/solutions/gym-management-software/how-it-works" element={<GymHowItWorksPage />} />
+              <Route path="/solutions/gym-management-software/process" element={<GymProcessPage />} />
+              <Route path="/solutions/gym-management-software/results" element={<GymResultsPage />} />
+              <Route path="/solutions/coach-funnel" element={<CoachHeroPage />} />
+              <Route path="/solutions/coach-funnel/how-it-works" element={<CoachHowItWorksPage />} />
+              <Route path="/solutions/coach-funnel/process" element={<CoachProcessPage />} />
+              <Route path="/solutions/coach-funnel/results" element={<CoachResultsPage />} />
+              <Route path="/solutions/real-estate-leads" element={<REHeroPage />} />
+              <Route path="/solutions/real-estate-leads/how-it-works" element={<REHowItWorksPage />} />
+              <Route path="/solutions/real-estate-leads/process" element={<REProcessPage />} />
+              <Route path="/solutions/real-estate-leads/results" element={<REResultsPage />} />
               <Route path="/pay/invoice/:invoiceId" element={<PayInvoice />} />
 
               {/* Client (public-facing) auth + portal */}

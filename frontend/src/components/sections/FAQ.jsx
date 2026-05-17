@@ -6,34 +6,9 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "lucide-react";
+import { HOMEPAGE_FAQS } from "@/lib/seo";
 
-const FAQS = [
-  {
-    id: "ai-native",
-    q: "How is AI-native development different?",
-    a: "Traditional agencies write everything from scratch — boilerplate, scaffolding, tests, docs. AI-native means we use modern AI tooling at every layer of the build, so we ship the same enterprise-grade quality in a fraction of the time. You get a real, well-architected web app — not a 'no-code' prototype with limits.",
-  },
-  {
-    id: "not-technical",
-    q: "What if I'm not technical?",
-    a: "Most of our clients aren't. We translate your business workflow into a real system, walk you through weekly demos in plain language, and give you a simple admin panel your team can actually use without training. Our discovery call is non-technical — we ask about your business, not your stack.",
-  },
-  {
-    id: "changes-after-launch",
-    q: "What if I need changes after launch?",
-    a: "Every package includes a post-launch support window (7–30 days depending on tier) for bug fixes and small tweaks. After that, we offer monthly retainer plans for ongoing iteration, or you can hire us for new feature builds at a transparent hourly/sprint rate. You own all the code — no lock-in.",
-  },
-  {
-    id: "ongoing-support",
-    q: "Do you do ongoing support?",
-    a: "Yes. We offer monthly retainer plans for clients who want continuous improvements: new features, integrations, security updates, performance optimization. Retainers start at $1,500/month for ~10 hours of senior dev time. You can pause or cancel anytime.",
-  },
-  {
-    id: "timeline",
-    q: "What's the typical timeline?",
-    a: "Express Launch ships in 10–14 days. Custom Build in 20–28 days. Enterprise in 28–35 days. We finalize the exact timeline in your discovery call and lock it in writing in the proposal. Weekly demos + a written status update every Friday — no black box.",
-  },
-];
+const FAQS = HOMEPAGE_FAQS;
 
 export const FAQ = () => {
   return (

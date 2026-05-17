@@ -19,12 +19,13 @@ import {
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import GymLayout from "./GymLayout";
+import { buildNicheSeo } from "@/lib/seo";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function GymHowItWorksPage() {
   return (
-    <GymLayout breadcrumb="How It Works">
+    <GymLayout breadcrumb="How It Works" seo={buildNicheSeo("gym", "HowItWorks")}>
       <Hero />
       <DualPathSection />
       <FeaturesSection />

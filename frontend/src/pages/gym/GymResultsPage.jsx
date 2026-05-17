@@ -21,13 +21,14 @@ import {
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import GymLayout from "./GymLayout";
+import { buildNicheSeo } from "@/lib/seo";
 import { DetailedROICalculator } from "./components/ROICalculator";
 
 const TIDYCAL = BRAND.tidycal;
 
 export default function GymResultsPage() {
   return (
-    <GymLayout breadcrumb="Results">
+    <GymLayout breadcrumb="Results" seo={buildNicheSeo("gym", "Results")}>
       <Hero />
       <ArchetypesSection />
       <NumbersSection />
