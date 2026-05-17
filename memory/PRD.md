@@ -24,6 +24,21 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 
 ## Implementation Phases
 
+### ✅ Wave 3.5 — SEO Phase 2: Sitemap + Internal Linking + Bloom vs Agencies (Feb 17, 2026)
+**Goal**: Push internal-link signal toward the new canonical /solutions/* URLs and add the explicit competitor positioning block from the SEO brief.
+
+**What changed**
+- `frontend/public/sitemap.xml` — replaced. Now lists all 12 new `/solutions/*` URLs at priority 0.85–0.95, plus /case-studies, /blog, /tour. Old `/gym-owners` etc. omitted so search engines follow canonicals to the SEO-friendly aliases.
+- `frontend/src/components/sections/BloomVsAgencies.jsx` — NEW. 7-row side-by-side comparison table (Timeline / Cost / Communication / Process / Tech Stack / Scope Changes / Code Ownership), keyword-rich H2 "Why Bloom Labs is 40% cheaper — and 6× faster", 3 stat cards (~40% / 6× / 0 surprise fees), CTA. Mobile renders stacked cards.
+- `frontend/src/pages/Landing.jsx` — `<BloomVsAgencies />` inserted between Pricing and CaseStudies so visitors see comparison right after the tier prices.
+- `frontend/src/components/sections/WhoWeServe.jsx` — expanded from 2 cards (gym + clinics) to 4 cards (gym + coach + real estate live, clinics coming soon). Each LIVE card links to the canonical `/solutions/*` path with keyword-rich anchor ("See our gym management software" etc.).
+- `frontend/src/components/sections/CaseStudies.jsx` — appended a cross-link strip at the bottom: "Explore by industry: gym management software / coach client portal / real estate lead management" pointing to canonical solution hubs.
+
+**Verification (Feb 17, 2026)**
+- Headless probe: WhoWeServe renders all 4 cards, CaseStudies cross-links point to `/solutions/*`, sitemap.xml returns 200 with all 3 niche slugs present.
+- Visual: comparison table renders cleanly on 1920×1100 viewport (green checks vs red X, stat cards align).
+- Lint clean across all touched sections.
+
 ### ✅ Wave 3 — SEO Foundation: Meta + Schema + Niche-page Optimization (Feb 17, 2026)
 **Goal**: Lay the indexable-content foundation for ranking on the 20 target keywords (custom web app dev, 2-week delivery, gym/coach/real-estate vertical software). Phase 1 of the 4-phase SEO push.
 

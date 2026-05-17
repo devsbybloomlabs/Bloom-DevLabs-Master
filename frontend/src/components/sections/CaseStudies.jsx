@@ -144,6 +144,32 @@ export const CaseStudies = () => {
             </div>
           ))}
         </div>
+
+        {/* Cross-links to canonical solution hubs for internal-linking signal */}
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-3 text-sm">
+          <span className="text-muted-foreground">Explore by industry:</span>
+          <a
+            href="/solutions/gym-management-software"
+            className="text-[#1E3A8A] font-semibold hover:underline"
+            data-testid="case-studies-link-gym"
+          >
+            gym management software →
+          </a>
+          <a
+            href="/solutions/coach-funnel"
+            className="text-[#1E3A8A] font-semibold hover:underline"
+            data-testid="case-studies-link-coach"
+          >
+            coach client portal →
+          </a>
+          <a
+            href="/solutions/real-estate-leads"
+            className="text-[#1E3A8A] font-semibold hover:underline"
+            data-testid="case-studies-link-re"
+          >
+            real estate lead management →
+          </a>
+        </div>
       </div>
     </section>
   );

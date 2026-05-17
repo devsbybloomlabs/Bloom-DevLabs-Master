@@ -4,6 +4,7 @@ import { PainPoints } from "@/components/sections/PainPoints";
 import { Solution } from "@/components/sections/Solution";
 import { WhoWeServe } from "@/components/sections/WhoWeServe";
 import { Pricing } from "@/components/sections/Pricing";
+import { BloomVsAgencies } from "@/components/sections/BloomVsAgencies";
 import { CaseStudies } from "@/components/sections/CaseStudies";
 import { HowWeWork } from "@/components/sections/HowWeWork";
 import { WhyBloomLabs } from "@/components/sections/WhyBloomLabs";
@@ -46,6 +47,7 @@ export default function Landing() {
       <Solution />
       <WhoWeServe />
       <Pricing />
+      <BloomVsAgencies />
       <CaseStudies />
       <HowWeWork />
       <WhyBloomLabs />
