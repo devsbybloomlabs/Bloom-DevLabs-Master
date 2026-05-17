@@ -46,6 +46,26 @@ async def get_credential(
     return val.strip() if isinstance(val, str) else val
 
 
+async def get_credential_db_first(
+    db: AsyncIOMotorDatabase, provider: str, field: str, env_var: Optional[str] = None
+) -> str:
+    """Same as get_credential, but DB wins over env (admin-UI-first).
+
+    Used for credentials the admin manages exclusively from the UI
+    (e.g. PayPal, where preview/prod need different values driven from
+    each environment's database).
+    """
+    creds = await get_credentials(db, provider)
+    val = creds.get(field) or ""
+    if isinstance(val, str):
+        val = val.strip()
+    if val:
+        return val
+    if env_var:
+        return os.environ.get(env_var, "").strip()
+    return ""
+
+
 async def set_provider_credentials(
     db: AsyncIOMotorDatabase, provider: str, fields: Dict[str, Any]
 ) -> Dict[str, Any]:

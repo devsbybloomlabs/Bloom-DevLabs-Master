@@ -298,6 +298,7 @@ paypal_router = APIRouter(prefix="/paypal", tags=["paypal"])
 @paypal_router.get("/config")
 async def paypal_config(pp: PayPalClient = Depends(get_pp)) -> Dict[str, Any]:
     """Public config so frontend can init JS SDK with the right client_id + env."""
+    await pp._resolve_creds()
     return {
         "configured": pp.is_configured,
         "client_id": pp.client_id if pp.is_configured else "",

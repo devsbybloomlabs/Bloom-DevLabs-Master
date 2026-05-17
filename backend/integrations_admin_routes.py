@@ -436,22 +436,6 @@ async def test_emailit(
         return {"ok": True, "warning": f"Auth ok; send response: {msg[:200]}"}
 
 
-@integrations_admin_router.post("/paypal/test")
-async def test_paypal(
-    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
-) -> Dict[str, Any]:
-    client = request.app.state.paypal
-    if not client.is_configured:
-        await _record_ping(db, "paypal", ok=False, detail="not configured")
-        raise HTTPException(503, "PayPal not configured")
-    token = await client._get_access_token()
-    if not token:
-        await _record_ping(db, "paypal", ok=False, detail="OAuth failed")
-        raise HTTPException(502, "PayPal OAuth failed — check CLIENT_ID/SECRET")
-    await _record_ping(db, "paypal", ok=True)
-    return {"ok": True, "env": client.env}
-
-
 # ============================================================
 # Slack test endpoint
 # ============================================================
@@ -503,7 +487,7 @@ async def test_breezedocs(
 # ============================================================
 # DB-stored credentials (admin UI alternative to .env edits)
 # ============================================================
-ALLOWED_CRED_PROVIDERS = {"slack", "google_calendar", "breezedocs"}
+ALLOWED_CRED_PROVIDERS = {"slack", "google_calendar", "breezedocs", "paypal"}
 
 
 class CredentialsUpdate(BaseModel):
@@ -545,6 +529,28 @@ async def update_provider_credentials(
         await bd._resolve_creds()
     masked = await list_masked_credentials(db)
     return {"ok": True, "provider": provider, "fields": masked.get(provider, {})}
+
+
+@integrations_admin_router.post("/paypal/test")
+async def paypal_test(
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> Dict[str, Any]:
+    """Verify PayPal credentials by requesting an OAuth access token.
+    Persists the result under app_settings.integration_pings.paypal."""
+    pp = request.app.state.paypal
+    await pp._resolve_creds()
+    if not pp.is_configured:
+        detail = "PayPal credentials not configured"
+        await _record_ping(db, "paypal", ok=False, detail=detail)
+        raise HTTPException(503, detail)
+    token = await pp._get_access_token()
+    if not token:
+        detail = "Could not obtain access token — check client_id / secret / env"
+        await _record_ping(db, "paypal", ok=False, detail=detail)
+        raise HTTPException(502, detail)
+    await _record_ping(db, "paypal", ok=True, detail=f"OAuth token obtained ({pp.env})")
+    return {"ok": True, "env": pp.env, "currency": pp.default_currency, "webhook_configured": bool(pp.webhook_id)}
 
 
 @integrations_admin_router.get("/health")

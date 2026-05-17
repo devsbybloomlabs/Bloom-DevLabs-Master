@@ -18,6 +18,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
+from motor.motor_asyncio import AsyncIOMotorDatabase
+
+from integration_credentials import get_credential_db_first, get_credentials
 
 log = logging.getLogger("paypal")
 
@@ -27,7 +30,11 @@ LIVE_BASE = "https://api-m.paypal.com"
 
 
 class PayPalClient:
-    """Async wrapper around PayPal REST v2."""
+    """Async wrapper around PayPal REST v2.
+
+    Credentials may live in either `.env` or the DB (`integration_credentials.paypal`).
+    DB wins so the admin UI is authoritative across preview/prod.
+    """
 
     def __init__(
         self,
@@ -36,6 +43,8 @@ class PayPalClient:
         env: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
+        # Constructor-supplied values seed the instance; runtime resolution
+        # (via _resolve_creds) overrides them once a DB binding exists.
         self.client_id = client_id or os.environ.get("PAYPAL_CLIENT_ID", "")
         self.client_secret = client_secret or os.environ.get("PAYPAL_CLIENT_SECRET", "")
         self.env = (env or os.environ.get("PAYPAL_ENV", "sandbox")).lower()
@@ -47,9 +56,46 @@ class PayPalClient:
         # token cache
         self._token: Optional[str] = None
         self._token_expiry: Optional[datetime] = None
+        self._db: Optional[AsyncIOMotorDatabase] = None
+        self._creds_fingerprint: Optional[str] = self._fingerprint()
 
         if not self.client_id or not self.client_secret:
-            log.warning("PayPal credentials not fully configured.")
+            log.warning("PayPal credentials not fully configured (will retry from DB).")
+
+    # ----- DB binding & credential resolution -----
+    def bind_db(self, db: AsyncIOMotorDatabase) -> None:
+        self._db = db
+
+    def _fingerprint(self) -> str:
+        # Compact, comparable signature used to detect credential rotation.
+        return f"{self.env}|{self.client_id}|{self.client_secret}|{self.webhook_id}"
+
+    async def _resolve_creds(self) -> None:
+        """Pull the newest credentials. DB wins over env so the admin UI is
+        authoritative — different DBs (preview vs prod) → different keys."""
+        if self._db is None:
+            return
+        # Pull all 4 fields in one read so we stay consistent.
+        creds = await get_credentials(self._db, "paypal")
+        client_id = (creds.get("client_id") or "").strip() or os.environ.get("PAYPAL_CLIENT_ID", "").strip()
+        client_secret = (creds.get("client_secret") or "").strip() or os.environ.get("PAYPAL_CLIENT_SECRET", "").strip()
+        env_value = (creds.get("env") or "").strip().lower() or os.environ.get("PAYPAL_ENV", "sandbox").lower()
+        webhook_id = (creds.get("webhook_id") or "").strip() or os.environ.get("PAYPAL_WEBHOOK_ID", "").strip()
+        currency = (creds.get("currency") or "").strip() or os.environ.get("PAYPAL_CURRENCY", "USD")
+
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.env = env_value if env_value in ("sandbox", "live") else "sandbox"
+        self.base_url = SANDBOX_BASE if self.env != "live" else LIVE_BASE
+        self.webhook_id = webhook_id
+        self.default_currency = currency or "USD"
+
+        # If creds changed, invalidate the cached OAuth token immediately
+        new_fp = self._fingerprint()
+        if new_fp != self._creds_fingerprint:
+            self._token = None
+            self._token_expiry = None
+            self._creds_fingerprint = new_fp
 
     @property
     def is_configured(self) -> bool:
@@ -59,6 +105,7 @@ class PayPalClient:
     # Auth
     # ------------------------------------------------------------------
     async def _get_access_token(self) -> Optional[str]:
+        await self._resolve_creds()
         if not self.is_configured:
             return None
         now = datetime.now(timezone.utc)
@@ -97,6 +144,7 @@ class PayPalClient:
         json: Optional[Dict[str, Any]] = None,
         extra_headers: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
+        await self._resolve_creds()
         if not self.is_configured:
             return {"success": False, "status": 0, "data": None, "error": "PayPal not configured"}
         token = await self._get_access_token()

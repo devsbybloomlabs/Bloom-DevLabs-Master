@@ -28,9 +28,35 @@ import {
   CalendarDays,
   PlugZap,
   FileSignature,
+  CreditCard,
 } from "lucide-react";
 
 const PROVIDER_SPECS = [
+  {
+    key: "paypal",
+    label: "PayPal",
+    icon: CreditCard,
+    color: "#1E3A8A",
+    helpUrl: "https://developer.paypal.com/dashboard/applications",
+    description:
+      "REST API credentials. Use SANDBOX in preview, LIVE in production — set them independently in each environment so dev and prod stay isolated.",
+    fields: [
+      { name: "client_id", label: "Client ID", placeholder: "AcqmRBWBxVefV5FQ0A…" },
+      { name: "client_secret", label: "Client secret", secret: true, placeholder: "Paste live or sandbox secret" },
+      {
+        name: "env",
+        label: "Environment",
+        kind: "select",
+        options: [
+          { value: "sandbox", label: "sandbox · for preview / dev" },
+          { value: "live", label: "live · for production payments" },
+        ],
+        placeholder: "sandbox",
+      },
+      { name: "webhook_id", label: "Webhook ID (optional)", placeholder: "WH-…" },
+    ],
+    testPath: "/admin/integrations/paypal/test",
+  },
   {
     key: "breezedocs",
     label: "BreezeDocs",
@@ -172,9 +198,12 @@ export default function IntegrationCredentialsForm() {
           Credentials
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Paste keys here to flip BreezeDocs, Slack, and Google Calendar
-          credentials live. Env vars on the server always take precedence; this
-          is the fast path so you don&apos;t need to redeploy.
+          Paste keys here to flip PayPal, BreezeDocs, Slack, and Google Calendar
+          credentials live in <strong>this environment</strong>. Preview and
+          production each have their own database, so saving sandbox keys here
+          won&apos;t affect live. Env vars on the server take precedence over
+          DB for BreezeDocs/Slack/Calendar; PayPal is DB-first so the form is
+          authoritative.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -248,20 +277,39 @@ export default function IntegrationCredentialsForm() {
                           )}
                         </Label>
                         <div className="relative mt-1.5">
-                          <Input
-                            type={f.secret && !isVisible ? "password" : "text"}
-                            value={draftVal}
-                            placeholder={f.placeholder || (storedVal ? "(leave blank to keep)" : "")}
-                            onChange={(e) =>
-                              setDrafts({
-                                ...drafts,
-                                [spec.key]: { ...draft, [f.name]: e.target.value },
-                              })
-                            }
-                            className={f.secret ? "pr-10 font-mono text-xs" : ""}
-                            data-testid={`credentials-${spec.key}-${f.name}-input`}
-                          />
-                          {f.secret && (
+                          {f.kind === "select" ? (
+                            <select
+                              value={draftVal || storedVal || ""}
+                              onChange={(e) =>
+                                setDrafts({
+                                  ...drafts,
+                                  [spec.key]: { ...draft, [f.name]: e.target.value },
+                                })
+                              }
+                              data-testid={`credentials-${spec.key}-${f.name}-input`}
+                              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            >
+                              <option value="">— Select —</option>
+                              {(f.options || []).map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <Input
+                              type={f.secret && !isVisible ? "password" : "text"}
+                              value={draftVal}
+                              placeholder={f.placeholder || (storedVal ? "(leave blank to keep)" : "")}
+                              onChange={(e) =>
+                                setDrafts({
+                                  ...drafts,
+                                  [spec.key]: { ...draft, [f.name]: e.target.value },
+                                })
+                              }
+                              className={f.secret ? "pr-10 font-mono text-xs" : ""}
+                              data-testid={`credentials-${spec.key}-${f.name}-input`}
+                            />
+                          )}
+                          {f.secret && f.kind !== "select" && (
                             <button
                               type="button"
                               onClick={() =>

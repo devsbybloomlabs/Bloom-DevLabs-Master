@@ -172,6 +172,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.openrouter = OpenRouterClient()
     app.state.emailit = EmailitClient()
     app.state.paypal = PayPalClient()
+    app.state.paypal.bind_db(db)
     app.state.nifty = NiftyClient()
     app.state.nifty.bind_db(db)
     app.state.breezedocs = BreezeDocsClient()

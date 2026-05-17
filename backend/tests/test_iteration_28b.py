@@ -29,7 +29,7 @@ import requests
 from dotenv import load_dotenv
 
 BASE_URL = os.environ.get(
-    "REACT_APP_BACKEND_URL", "https://coach-dashboard-86.preview.emergentagent.com"
+    "REACT_APP_BACKEND_URL", "https://cred-manager-20.preview.emergentagent.com"
 ).rstrip("/")
 API = f"{BASE_URL}/api"
 
