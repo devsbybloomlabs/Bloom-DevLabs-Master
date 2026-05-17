@@ -206,6 +206,19 @@ Build & maintain the Bloom Labs (`bybloomlabs.com`) full-stack application:
 - **30-day money-back guarantee** REMOVED site-wide (gym + coach + realestate + pricing + checkout dialogs). Replaced with "approve each phase before payment moves forward" / "30-day support window" / "risk-managed" language.
 - Tests: iteration 31 — backend **24/24 (100%) PASS** (`/app/backend/tests/test_iteration_31.py`). Frontend ~95% — all RE pages render, mega-menu click-to-reveal works, /portal/welcome auth gate works, /join/{token} validates. Critical-review fixes applied: owner role lock tightened (cannot change owner's role at all), companies/me response no longer leaks `_id` field.
 
+**Phase I.4 — Password UX + reactivation crons + Manage-Team panel + Warm-Leads admin (Feb 2026, iter 32-33)**
+- **Reusable `PasswordInput` component** (`/app/frontend/src/components/ui/password-input.jsx`) with built-in eye/eye-off toggle. Retrofitted across every password field site-wide: client login + register, admin login, set-password (×2 fields), company-invite accept, Nifty manual token, Google Drive client secret. Each toggle button gets `data-testid="{field-testid}-toggle"`.
+- **APScheduler reactivation crons** (`reactivation_crons.py`):
+  - `company_setup_reminder_tick` (daily 09:00 UTC) — finds companies whose owner created the company >24h ago and `setup_status != complete`, sends an Emailit nudge, sets `setup_reminder_sent_at` watermark for idempotency.
+  - `warm_lead_reengagement_tick` (daily 10:00 UTC) — finds warm-leads captured 24–72h ago with `status=captured`, skips ones that converted (matching paypal_transaction by email+tier), sends "did you change your mind?" email with niche-aware CTA, bumps status to `nurtured` + `reengagement_sent_at` watermark.
+- **`useCompanyContext()` hook** (`/app/frontend/src/lib/useCompanyContext.js`) — pulls `/companies/me`, exposes `{company, role, members, isOwner, canWrite, refresh}`. `canWrite = role === "admin"`. Used by ManageTeamPanel today; ready for write-action gating site-wide.
+- **Manage Team panel** (`ManageTeamPanel.jsx`) embedded in portal's Profile tab. Admins see: members list with role badges (owner/admin/viewer), promote/demote buttons (`team-promote-{id}` / `team-demote-{id}`), invite form (`team-invite-email-N`, `team-invite-send`). Viewers see read-only list with a "ask admin to promote you" hint.
+- **Warm Leads admin dashboard** at `/admin/warm-leads` (`WarmLeadsAdmin.jsx`) — admin-only view of every captured warm lead. Stats grid (total, per-niche counts, conversion %), search box (`warm-leads-search`), niche filter chips (`warm-leads-filter-{niche}`), refresh button, expandable row per lead with status badge + tier + niche-specific context (gym name / coaching niche / market).
+- **Security tightening**: `GET /api/leads/warm` (previously unauthenticated) was REMOVED. New admin endpoint `GET /api/admin/leads/warm` is protected by `Depends(get_current_user)`. POST `/api/leads/warm` remains public for capture.
+- **clientApi factory bug fix** (iter 33): `clientApi` in `/lib/clientAuth.js` is a FACTORY `(token) => axios`. Iter 31's code called `clientApi.post(...)` directly which raised TypeError silently. Fixed across 4 components: useCompanyContext, ManageTeamPanel, CompanyWelcomeWizard, CompanySetupBanner. All now use `clientApi(token).post(...)`. Also added `data-testid` to empty/loading early returns + replaced silent `catch {}` with `console.error` for discoverability.
+- Tests: iter 32 round 1 — backend 35/35 (100%) but frontend ~70% due to the factory bug. Iter 33 retest — **backend 35/35 + frontend 100%, zero open issues, zero retests**.
+
+
 
 
 **Phase J — Brief approval → contract & invoice automation (admin-review gate)**
