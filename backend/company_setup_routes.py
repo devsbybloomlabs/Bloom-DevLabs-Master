@@ -36,8 +36,35 @@ from emailit_client import EmailitClient
 
 logger = logging.getLogger(__name__)
 
-_mongo = AsyncIOMotorClient(os.environ["MONGO_URL"])
-_db = _mongo[os.environ["DB_NAME"]]
+
+class _LazyDB:
+    """Defers Motor client creation until first request handler runs.
+
+    Creating an AsyncIOMotorClient at module-import time is unsafe in
+    production: it binds to whichever event loop is current at import (often
+    none, or the wrong one) and can hang on SRV resolution under Atlas. Lazy
+    init guarantees the client is born on uvicorn's worker loop.
+    """
+
+    _client = None
+    _db = None
+
+    def _ensure(self):
+        if self._db is None:
+            self._client = AsyncIOMotorClient(
+                os.environ["MONGO_URL"],
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=5000,
+                socketTimeoutMS=10000,
+            )
+            self._db = self._client[os.environ["DB_NAME"]]
+        return self._db
+
+    def __getattr__(self, name):
+        return getattr(self._ensure(), name)
+
+
+_db = _LazyDB()
 _emailit = EmailitClient()
 
 INVITE_TTL_DAYS = 14

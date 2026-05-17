@@ -31,8 +31,36 @@ warm_leads_admin_router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 
-_mongo_client = AsyncIOMotorClient(os.environ["MONGO_URL"])
-_db = _mongo_client[os.environ["DB_NAME"]]
+
+class _LazyDB:
+    """Defers Motor client creation until first request handler runs.
+
+    Creating an AsyncIOMotorClient at module-import time is unsafe: it binds
+    to whichever event loop happens to be current at import (often none, or
+    the wrong one) and can hang on SRV resolution in production K8s when the
+    URI is `mongodb+srv://...` (Atlas). Lazy-init guarantees the client is
+    born on uvicorn's worker loop with sane timeouts.
+    """
+
+    _client = None
+    _db = None
+
+    def _ensure(self):
+        if self._db is None:
+            self._client = AsyncIOMotorClient(
+                os.environ["MONGO_URL"],
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=5000,
+                socketTimeoutMS=10000,
+            )
+            self._db = self._client[os.environ["DB_NAME"]]
+        return self._db
+
+    def __getattr__(self, name):
+        return getattr(self._ensure(), name)
+
+
+_db = _LazyDB()
 
 
 class WarmLeadPayload(BaseModel):
