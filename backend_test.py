@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 # Public endpoint from frontend/.env
-BASE_URL = "https://cred-manager-20.preview.emergentagent.com/api"
+BASE_URL = "https://seo-dashboard-test.preview.emergentagent.com/api"
 
 # Test credentials from backend/.env
 TEST_EMAIL = "founder@thesalvador.group"

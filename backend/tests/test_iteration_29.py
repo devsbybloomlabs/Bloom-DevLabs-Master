@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv("/app/backend/.env")
 sys.path.insert(0, "/app/backend")
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://cred-manager-20.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://seo-dashboard-test.preview.emergentagent.com").rstrip("/")
 ADMIN_EMAIL = "founder@thesalvador.group"
 ADMIN_PASSWORD = "admin123"
 
