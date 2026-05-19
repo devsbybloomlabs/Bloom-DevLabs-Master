@@ -1,5 +1,4 @@
 """Verify gym-niche PayPal tiers + support-tier mapping."""
-import os
 import sys
 
 from dotenv import load_dotenv
@@ -7,7 +6,6 @@ from dotenv import load_dotenv
 load_dotenv("/app/backend/.env")
 sys.path.insert(0, "/app/backend")
 
-import pytest
 
 
 def test_gym_tiers_present_with_correct_prices():

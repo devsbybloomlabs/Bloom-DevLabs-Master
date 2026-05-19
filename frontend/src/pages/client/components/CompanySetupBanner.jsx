@@ -29,7 +29,10 @@ export default function CompanySetupBanner() {
         if (alive) setStatus(data);
       } catch (err) {
         // Non-blocking — log so dev catches regressions
-        console.error("CompanySetupBanner: status fetch failed", err);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("CompanySetupBanner: status fetch failed", err);
+        }
       }
     })();
     return () => { alive = false; };

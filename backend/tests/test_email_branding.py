@@ -9,7 +9,6 @@ had no matching React route → blank page. This test pins the new behavior:
      transparent and was invisible on white).
 """
 import asyncio
-from unittest.mock import AsyncMock
 
 import pytest
 

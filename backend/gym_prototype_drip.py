@@ -14,7 +14,6 @@ Idempotent: a second capture event on the same order does not double-enqueue.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4

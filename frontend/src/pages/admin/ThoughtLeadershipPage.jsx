@@ -45,7 +45,8 @@ export default function ThoughtLeadershipPage() {
     } catch { toast.error("Failed to load"); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const openCreate = () => { setEditing(null); setForm(BLANK); setOpen(true); };
   const openEdit = (it) => {

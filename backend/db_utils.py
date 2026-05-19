@@ -1,6 +1,6 @@
 """MongoDB serialization helpers (datetime / ObjectId safe)."""
 from datetime import date, datetime
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 
 def _serialize_value(v: Any) -> Any:

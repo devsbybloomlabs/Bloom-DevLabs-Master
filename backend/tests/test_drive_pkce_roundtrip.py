@@ -54,7 +54,6 @@ async def test_drive_connect_persists_verifier(db):
     from google_drive_routes import _build_flow, _store_pkce_verifier, _consume_pkce_verifier
 
     # Skip if no OAuth config (env-based test envs may not have one)
-    from app_settings import get_setting
     from fastapi import HTTPException
 
     try:

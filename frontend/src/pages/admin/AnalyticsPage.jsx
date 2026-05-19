@@ -42,7 +42,8 @@ export default function AnalyticsPage() {
     } catch { toast.error("Failed to load analytics"); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const saveToday = async () => {
     setSaving(true);

@@ -18,7 +18,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
 from auth import get_current_user
-from app_settings import get_setting, get_settings_bulk, set_setting
+from app_settings import get_setting, set_setting
 from db_utils import prepare_for_mongo, serialize_doc
 from integration_credentials import (
     get_credentials,

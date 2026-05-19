@@ -223,7 +223,7 @@ def test_admin_crud_requires_auth():
         ("PATCH", {"name": "x"}),
         ("DELETE", None),
     ):
-        path = f"/api/admin/clients" if method == "POST" else f"/api/admin/clients/{test_email}"
+        path = "/api/admin/clients" if method == "POST" else f"/api/admin/clients/{test_email}"
         r = requests.request(method, f"{base}{path}", json=body, timeout=10)
         assert r.status_code in (401, 403), f"{method} {path}: {r.status_code}"
 

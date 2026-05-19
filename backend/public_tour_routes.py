@@ -10,7 +10,7 @@ Auto-seeds the demo dataset on first request so the tour is never empty.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from fastapi import APIRouter, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase

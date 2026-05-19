@@ -14,12 +14,11 @@ Endpoints (all under `/api/clients`):
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel
 
 from client_routes import get_current_client
 from paypal_client import PayPalClient

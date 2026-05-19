@@ -32,11 +32,10 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from activity_log import log_activity
 from auth import get_current_user
-from db_utils import prepare_for_mongo
 
 log = logging.getLogger("support_clearance")
 

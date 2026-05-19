@@ -35,7 +35,8 @@ export default function SettingsPage() {
     } catch { toast.error("Failed to load settings"); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const save = async () => {
     setSaving(true);

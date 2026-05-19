@@ -39,7 +39,8 @@ export default function WarmLeadsAdmin() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();

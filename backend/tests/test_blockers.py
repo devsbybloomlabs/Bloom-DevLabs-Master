@@ -1,7 +1,6 @@
 """Integration #5 — Nifty blocker comment → Slack."""
 import os
 import uuid
-import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 

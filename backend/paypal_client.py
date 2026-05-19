@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from integration_credentials import get_credential_db_first, get_credentials
+from integration_credentials import get_credentials
 
 log = logging.getLogger("paypal")
 

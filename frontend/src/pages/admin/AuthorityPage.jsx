@@ -41,7 +41,8 @@ export default function AuthorityPage() {
     } catch { toast.error("Failed to load authority metrics"); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const save = async () => {
     setSaving(true);

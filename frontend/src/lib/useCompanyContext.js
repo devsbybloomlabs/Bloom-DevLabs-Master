@@ -30,7 +30,10 @@ export default function useCompanyContext() {
       });
     } catch (err) {
       // Log so the failure surfaces during development; still degrade gracefully.
-      console.error("useCompanyContext: failed to fetch /companies/me", err);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.error("useCompanyContext: failed to fetch /companies/me", err);
+      }
       setState({ company: null, role: null, isOwner: false, members: [], loading: false });
     }
   }, [token]);

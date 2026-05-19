@@ -20,10 +20,10 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 
 from auth import get_current_user
-from db_utils import prepare_for_mongo, serialize_doc
+from db_utils import serialize_doc
 from google_calendar_client import GoogleCalendarClient
 
 log = logging.getLogger("calendar.routes")

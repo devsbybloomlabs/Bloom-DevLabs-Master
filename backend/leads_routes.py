@@ -13,11 +13,9 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, EmailStr
 
 from auth import get_current_user
 from db_utils import prepare_for_mongo, serialize_doc

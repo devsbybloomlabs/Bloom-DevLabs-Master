@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request

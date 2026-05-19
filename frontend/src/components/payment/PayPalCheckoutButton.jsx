@@ -112,7 +112,10 @@ export function PayPalCheckoutButton({
             onSuccess?.({ type: "subscription", subscriptionID: data.subscriptionID });
           }}
           onError={(err) => {
-            console.error(err);
+            if (process.env.NODE_ENV !== "production") {
+              // eslint-disable-next-line no-console
+              console.error(err);
+            }
             toast.error("PayPal subscription failed");
             onError?.(err);
           }}
@@ -156,7 +159,10 @@ export function PayPalCheckoutButton({
             }
           }}
           onError={(err) => {
-            console.error(err);
+            if (process.env.NODE_ENV !== "production") {
+              // eslint-disable-next-line no-console
+              console.error(err);
+            }
             toast.error("PayPal checkout failed");
             onError?.(err);
           }}

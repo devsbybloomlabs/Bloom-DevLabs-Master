@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict
 from xml.sax.saxutils import escape as _esc
 
-from fastapi import APIRouter, Depends, Request, Response, HTTPException
+from fastapi import APIRouter, Request, Response, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 log_prefix = "blog_extras"

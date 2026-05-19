@@ -1000,7 +1000,7 @@ async def send_testimonial_request(
     try:
         result = await emailit.send_email(
             to=target_email,
-            subject=f"Quick favor — testimonial for Bloom Labs?",
+            subject="Quick favor — testimonial for Bloom Labs?",
             html=html,
             text=body_text,
         )

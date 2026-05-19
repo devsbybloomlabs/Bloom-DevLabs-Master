@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, EmailStr, Field
@@ -25,7 +25,7 @@ from auth import (
     hash_password,
     verify_password,
 )
-from db_utils import prepare_for_mongo, serialize_doc
+from db_utils import prepare_for_mongo
 
 log = logging.getLogger("client_routes")
 
