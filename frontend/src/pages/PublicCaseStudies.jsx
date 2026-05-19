@@ -145,17 +145,20 @@ export default function PublicCaseStudies() {
 
         <div className="mt-14 text-center">
           <p className="text-sm text-muted-foreground">
-            Have a project that needs a similar treatment?
+            Want results like this?
           </p>
           <Button
             asChild
-            className="mt-3 bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-11 px-6"
+            className="mt-3 bg-amber-500 hover:bg-amber-600 text-white h-11 px-6 shadow-[0_8px_24px_-8px_rgba(245,158,11,0.5)]"
             data-testid="public-case-studies-cta"
           >
-            <Link to="/#book">
-              Book a discovery call <ArrowRight className="h-4 w-4 ml-2" />
+            <Link to="/get-audit?src=case-studies-page">
+              Get your audit <ArrowRight className="h-4 w-4 ml-2" />
             </Link>
           </Button>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Free · 24h turnaround · 3–5 personalised app recommendations.
+          </p>
         </div>
       </section>
 

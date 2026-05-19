@@ -34,6 +34,8 @@ import SeoAdmin from "@/pages/admin/SeoAdmin";
 import AbTestsDashboard from "@/pages/admin/AbTestsDashboard";
 import AbTestWizard from "@/pages/admin/AbTestWizard";
 import AbTestDetail from "@/pages/admin/AbTestDetail";
+import AuditsAdmin from "@/pages/admin/AuditsAdmin";
+import AuditDetailAdmin from "@/pages/admin/AuditDetailAdmin";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
 import CompaniesAdmin from "@/pages/admin/CompaniesAdmin";
 import ProposalsAdmin from "@/pages/admin/ProposalsAdmin";
@@ -52,6 +54,8 @@ import OnboardingWizard from "@/pages/client/OnboardingWizard";
 import PublicCaseStudies from "@/pages/PublicCaseStudies";
 import PublicBlog from "@/pages/PublicBlog";
 import PublicBlogPost from "@/pages/PublicBlogPost";
+import GetAuditPage from "@/pages/GetAuditPage";
+import ExitIntentPopup from "@/components/ExitIntentPopup";
 import PublicSandboxTour from "@/pages/PublicSandboxTour";
 import PayInvoice from "@/pages/PayInvoice";
 import AnalyticsTracker from "@/components/Analytics";
@@ -76,11 +80,13 @@ function App() {
         <ClientAuthProvider>
           <AuthProvider>
             <AnalyticsTracker />
+            <ExitIntentPopup />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/case-studies" element={<PublicCaseStudies />} />
               <Route path="/blog" element={<PublicBlog />} />
               <Route path="/blog/:slug" element={<PublicBlogPost />} />
+              <Route path="/get-audit" element={<GetAuditPage />} />
               <Route path="/tour" element={<PublicSandboxTour />} />
               <Route path="/gym-owners" element={<GymHeroPage />} />
               <Route path="/gym-owners/how-it-works" element={<GymHowItWorksPage />} />
@@ -189,6 +195,8 @@ function App() {
                 <Route path="ab-tests" element={<AbTestsDashboard />} />
                 <Route path="ab-tests/new" element={<AbTestWizard />} />
                 <Route path="ab-tests/:testId" element={<AbTestDetail />} />
+                <Route path="audits" element={<AuditsAdmin />} />
+                <Route path="audits/:auditId" element={<AuditDetailAdmin />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

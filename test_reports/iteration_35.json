@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 35 backend testing — Audit Submission Engine (multi-step Customer Acquisition pipeline). All 26 pytest cases PASSED in 37s including live Claude Sonnet 4.5 analysis. Full submit→analyze→list→detail→patch→reanalyze→delete lifecycle verified with one shared audit_id to minimize LLM cost. 422 enum/email validation covered (industry, company_size, pain_point, budget_range, timeline, email, short workflow_description). Public /status endpoint correctly hides sensitive fields (email/phone/workflow). Reports summary returns all required keys (total, week, month, called, won, call_rate_pct, win_rate_pct, deal_value_won_usd, avg_time_to_call_hours, by_status, by_industry, by_source_cta, daily). Auth required on /api/admin/audits (returns 401 unauthenticated).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_audit_iteration_35.py",
+    "/app/test_reports/pytest/iteration_35.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "audit_routes.py:160 POST /api/audits returns 200 (FastAPI default) instead of 201 for a successful resource creation — consider response_model + status_code=201 for REST conformance.",
+    "audit_routes.py:179 — `AuditSubmission(**req.model_dump())` re-validates EmailStr; OK but note `extra='ignore'` on the model means typos in admin PATCH bodies won't surface (AuditUpdateRequest has no `extra` config — currently fine since only declared fields accepted).",
+    "audit_routes.py:259 (count_documents week/month) — Uses ISO string comparison on `created_at`. Works as long as ALL documents are stored as ISO strings via prepare_for_mongo. Any future direct insert with a real datetime would break the count silently. Consider a unit test or a migration safeguard.",
+    "audit_routes.py:330 win_rate_pct denominator is `called`, not `total`. Functionally OK but the field name `win_rate_pct` may mislead — consider `win_rate_of_called_pct` or document it explicitly in the response.",
+    "audit_routes.py:381 admin_reanalyze does NOT reset status to 'submitted' or clear `analyzed_at` before queuing — if the background task fails silently, the UI will still show the previous analyzed state with the old `analyzed_at` timestamp. Recommend writing `status='reanalyzing'` (or similar) before scheduling.",
+    "audit_routes.py:541 recommendation title regex `## RECOMMENDATION X: ...` is brittle — Claude occasionally formats as `## Recommendation 1:` or `### RECOMMENDATION 1`. Consider case-insensitive + tolerant heading-level match.",
+    "audit_routes.py:476 priority calculation in Slack post uses simple sum of budget+urgency — could be extracted into a helper + unit-tested; currently no test coverage on prioritisation logic.",
+    "audit_routes.py:475 — single-line ternary `priority = 'HIGH' if ... else 'MEDIUM' if ... else 'LOW'` is hard to read; split into a small helper for readability.",
+    "No rate-limiting on public POST /api/audits — a spam attacker could fill audit_submissions and trigger LLM cost. Consider IP-based throttle (e.g., slowapi) before launch."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_audit_iteration_35.py (new)"
+  ],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "n/a (backend-only request)"},
+  "test_credentials": "Admin founder@thesalvador.group / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created ONE audit_submissions doc (TEST_Acme Strength & Performance, Gym Owners, ASAP, $12K-$20K, source_cta=homepage_hero_get_my_new_workflow). Used across all read/update/reanalyze tests then DELETEd in TestZZZCleanup. Confirmation email + Slack post fire-and-forget in background (Emailit may log 'Domain not verified' on test domain, Slack may report 'not_configured' depending on workspace creds — both expected and non-blocking). Claude analysis completed in <30s (well within the 90s polling window).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_audit_iteration_35.py is the canonical regression suite for the Audit Submission Engine. Run with: pytest backend/tests/test_audit_iteration_35.py -v. Note: TestAnalysisPipeline hits live OpenRouter (Claude Sonnet 4.5) — ~$0.01 per run. Skip with `-k 'not Analysis'` if cost-sensitive. The audit is created with a randomized email so no cleanup conflicts. ZZZ-prefixed cleanup class ensures DELETE runs last in pytest collection order.",
+  "rca of the issue": "No issues found. All endpoints (GET /options, POST /, GET /{id}/status, GET /admin/audits, GET /admin/audits/{id}, GET /admin/audits/reports/summary, PATCH, POST /reanalyze, DELETE) return correct status codes, persist data, enforce enum validation, hide sensitive fields on public status, require auth on admin routes, and the background Claude pipeline successfully populates analyzed_recommendations + recommendation_titles + analyzed_at within the polling window."
+}

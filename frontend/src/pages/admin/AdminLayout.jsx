@@ -46,6 +46,7 @@ const NAV = [
   { to: "/admin/support-triage", label: "Support Triage", icon: LifeBuoy, group: "Daily" },
 
   // ── Pipeline — win new work ────────────────────────────────────────────
+  { to: "/admin/audits", label: "Audit Leads", icon: Sparkles, group: "Pipeline" },
   { to: "/admin/pipeline", label: "Pipeline", icon: TrendingUp, group: "Pipeline" },
   { to: "/admin/outreach", label: "Outreach AI", icon: Users, group: "Pipeline" },
   { to: "/admin/companies", label: "Companies", icon: Users, group: "Pipeline" },

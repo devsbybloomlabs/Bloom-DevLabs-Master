@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, ArrowRight, BadgeCheck, Timer, Lock } from "lucide-react";
+import { Calendar, BadgeCheck, Timer, Lock, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import { BRAND } from "@/lib/brand";
 import AbSlot from "@/components/AbSlot";
 
@@ -63,11 +64,21 @@ export const Hero = () => {
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              <Link to="/get-audit?src=hero-primary" className="block">
+                <Button
+                  className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white h-12 px-6 text-base shadow-[0_10px_28px_-10px_rgba(245,158,11,0.65)] hover:shadow-[0_14px_36px_-10px_rgba(245,158,11,0.75)] transition-shadow"
+                  data-testid="hero-audit-cta-button"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Get my New Workflow
+                </Button>
+              </Link>
               <AbSlot elementKey="homepage_hero_cta" fallback="Book a Discovery Call">
                 {(content, trackClick) => (
                   <Button
                     asChild
-                    className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-12 px-6 text-base shadow-[var(--shadow-sm)]"
+                    variant="outline"
+                    className="h-12 px-6 text-base border-border hover:bg-secondary"
                     data-testid="hero-primary-cta-button"
                   >
                     <a href="#book" onClick={trackClick}>
@@ -77,18 +88,10 @@ export const Hero = () => {
                   </Button>
                 )}
               </AbSlot>
-              <Button
-                asChild
-                variant="outline"
-                className="h-12 px-6 text-base border-border hover:bg-secondary"
-                data-testid="hero-secondary-cta-button"
-              >
-                <a href="#pricing">
-                  See Pricing
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              See what custom app we&rsquo;d build for you in 2 weeks · free · 24h turnaround.
+            </p>
 
             <div className="mt-8 flex flex-wrap gap-2 sm:gap-3">
               {[

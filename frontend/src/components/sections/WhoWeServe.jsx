@@ -152,9 +152,9 @@ export function WhoWeServe() {
 
         <p className="text-center text-xs text-muted-foreground mt-8">
           Have an industry that&apos;s not listed?{" "}
-          <a href="#book" className="text-primary font-semibold hover:underline">
-            Book a discovery call
-          </a>{" "}
+          <Link to="/get-audit?src=below-who-we-serve" className="text-primary font-semibold hover:underline">
+            Get my audit
+          </Link>{" "}
           — we ship custom verticals every quarter.
         </p>
       </div>

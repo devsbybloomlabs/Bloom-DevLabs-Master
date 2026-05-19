@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Check, Sparkles, ArrowRight, BadgePercent, CalendarClock } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { PayPalCheckoutButton } from "@/components/payment/PayPalCheckoutButton";
 
 const FULL_UPFRONT_DISCOUNT = 500;
@@ -442,9 +442,35 @@ export const Pricing = () => {
             Talk to us.
           </a>
         </p>
+
+        <PricingAuditCta />
       </div>
 
       <CheckoutDialog plan={activePlan} open={open} onOpenChange={setOpen} />
     </section>
   );
 };
+
+function PricingAuditCta() {
+  return (
+    <div
+      className="mt-12 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50/50 p-6 sm:p-8 text-center max-w-3xl mx-auto"
+      data-testid="pricing-audit-cta"
+    >
+      <p className="text-xs uppercase tracking-wider text-amber-900 font-medium mb-2">Still deciding?</p>
+      <p className="font-display text-xl sm:text-2xl font-semibold tracking-tight">
+        Get your personalised proposal
+      </p>
+      <p className="text-sm text-foreground/70 mt-2 max-w-xl mx-auto">
+        We&rsquo;ll analyse your workflow and show you exactly which apps to build, what
+        they&rsquo;ll cost, and when they&rsquo;ll be live — within 24 business hours.
+      </p>
+      <Link to="/get-audit?src=pricing-section" className="inline-block mt-4">
+        <Button className="bg-amber-500 hover:bg-amber-600 text-white h-11 px-6 text-base shadow-[0_8px_24px_-8px_rgba(245,158,11,0.5)]" data-testid="pricing-audit-cta-button">
+          Get my custom proposal
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
+      </Link>
+    </div>
+  );
+}
