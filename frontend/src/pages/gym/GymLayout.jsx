@@ -10,6 +10,7 @@ import { ArrowRight, Menu, X, Dumbbell, Calendar, Mail, Phone, ChevronRight } fr
 import { BRAND } from "@/lib/brand";
 import ExitIntentModal from "../shared/ExitIntentModal";
 import SeoHead from "@/components/SeoHead";
+import RelatedLinks from "@/components/RelatedLinks";
 
 const NAV = [
   { to: "/gym-owners", label: "Overview", end: true },
@@ -209,6 +210,7 @@ export default function GymLayout({ breadcrumb, seo, children }) {
       <GymHeader />
       <GymBreadcrumb label={breadcrumb} />
       <main>{children}</main>
+      <RelatedLinks />
       <GymFooter />
       <ExitIntentModal variant="gym" />
     </div>

@@ -8,6 +8,7 @@ import { ArrowRight, Menu, X, Calendar, Mail, Phone, ChevronRight, Headphones } 
 import { BRAND } from "@/lib/brand";
 import ExitIntentModal from "../shared/ExitIntentModal";
 import SeoHead from "@/components/SeoHead";
+import RelatedLinks from "@/components/RelatedLinks";
 
 const NAV = [
   { to: "/coaches", label: "Overview", end: true },
@@ -152,6 +153,7 @@ export default function CoachLayout({ breadcrumb, seo, children }) {
       <CoachHeader />
       <CoachBreadcrumb label={breadcrumb} />
       <main>{children}</main>
+      <RelatedLinks />
       <CoachFooter />
       <ExitIntentModal variant="coach" />
     </div>

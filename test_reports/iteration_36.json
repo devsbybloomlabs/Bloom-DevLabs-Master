@@ -1,0 +1,34 @@
+{
+  "summary": "Comprehensive end-to-end testing of the new Bloom Labs Affiliate Program (backend + frontend) and SEO Phase 3 RelatedLinks injection. 20/20 backend pytest cases passed and 7/7 frontend Playwright flows passed. Verified happy path (enroll, verify, click tracking, dashboard, admin listing, tier upgrade hooks) AND abuse scenarios (no-auth, missing-terms, forged/empty JWTs, founder JWT on /me/*, client JWT on /admin/affiliates, self-referral, bogus affiliate_ref payloads including path-traversal, SQL-ish, XSS, and 200-char strings).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_affiliate_program.py",
+    "/app/test_reports/pytest/affiliate_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "affiliate_routes.py uses naive minute-bucketed rate-limit collection (affiliate_click_rl) with no TTL index — recommend adding a TTL index on `minute` or `ts` so the collection doesn't grow unbounded.",
+    "track-click endpoint trusts `X-Affiliate-Self: 1` header from the client to flag self-clicks — this is purely cosmetic since any actor can pass or omit it; consider removing the header check or cross-checking against the affiliate cookie+JWT instead.",
+    "affiliate_routes.py is ~730 lines and mixes models, helpers, public/me/admin routers, and pipeline hooks — consider splitting into affiliate_models.py / affiliate_emails.py / affiliate_public.py / affiliate_admin.py before it grows further.",
+    "verify endpoint generates a code with secrets.token_urlsafe(16).lower()[:12] which after stripping `_`/`-` may occasionally yield <12 chars; safer to loop until len(code)==CODE_LENGTH.",
+    "On the admin /admin/affiliates page the browser logs four 404s for missing static assets (likely icon/sprite) — non-functional but worth cleaning up."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_affiliate_program.py (new)"
+  ],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "100% (7/7 flows)"},
+  "test_credentials": "Used founder@thesalvador.group/admin123, testclient@bybloomlabs.com/clientpass123 (enrolled, code=1iedova6mz44), demo@bybloomlabs.com/BloomDemo2026! (not enrolled). All worked.",
+  "seed_data_creation": "Click-tracking inserts created ~14 new affiliate_events rows + affiliate_click_rl docs against testclient's affiliate (total_clicks visible on dashboard rose to 37→39 during run). No persistent referrals created (self-referral block + bogus refs were dropped).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Affiliate program is GA-ready. Test file at /app/backend/tests/test_affiliate_program.py covers enrollment, verify, click tracking + per-IP rate-limit (uses random X-Forwarded-For so it won't interfere with future runs), /me/* endpoints (status/dashboard/referrals), auth boundaries (founder-on-/me=403, client-on-/admin=403), self-referral block, bogus affiliate_ref payloads, and forged-JWT rejection. Frontend confirmed: H1=1 on every public page, RelatedLinks markers present on /blog, /case-studies, /get-audit, /gym-owners, /coaches, /real-estate, /affiliate. ?ref=CODE cookie + localStorage write verified. Admin /admin/affiliates listing renders with correct stats.",
+  "rca of the issue": "n/a — no bugs found."
+}

@@ -8,6 +8,7 @@ import { ArrowRight, Menu, X, Calendar, Mail, Phone, ChevronRight, Home } from "
 import { BRAND } from "@/lib/brand";
 import ExitIntentModal from "../shared/ExitIntentModal";
 import SeoHead from "@/components/SeoHead";
+import RelatedLinks from "@/components/RelatedLinks";
 
 const NAV = [
   { to: "/real-estate", label: "Overview", end: true },
@@ -152,6 +153,7 @@ export default function RELayout({ breadcrumb, seo, children }) {
       <REHeader />
       <REBreadcrumb label={breadcrumb} />
       <main>{children}</main>
+      <RelatedLinks />
       <REFooter />
       <ExitIntentModal variant="realestate" />
     </div>

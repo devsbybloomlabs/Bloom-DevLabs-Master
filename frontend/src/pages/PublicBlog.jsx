@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import { Header } from "@/components/sections/Header";
 import { Footer } from "@/components/sections/Footer";
+import RelatedLinks from "@/components/RelatedLinks";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowRight, BookOpen } from "lucide-react";
 import SeoHead from "@/components/SeoHead";
@@ -125,6 +126,7 @@ export default function PublicBlog() {
         )}
       </section>
 
+      <RelatedLinks />
       <Footer />
     </main>
   );

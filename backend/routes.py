@@ -609,6 +609,7 @@ class StageMoveRequest(BaseModel):
 async def move_prospect(
     prospect_id: str,
     req: StageMoveRequest,
+    request: Request,
     db=Depends(get_db),
     user=Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -643,6 +644,15 @@ async def move_prospect(
             }
         )
     )
+    # Affiliate hook — if this prospect was attributed via an affiliate link,
+    # flip the corresponding referral to closed_won + recompute tier.
+    if req.status == "won":
+        try:
+            from affiliate_routes import on_prospect_won
+            fresh_prospect = await db.prospects.find_one({"id": prospect_id}, {"_id": 0})
+            await on_prospect_won(db, request.app, fresh_prospect or prospect)
+        except Exception as exc:
+            log.warning("Affiliate on_prospect_won failed: %s", exc)
     fresh = await db.prospects.find_one({"id": prospect_id}, {"_id": 0})
     return serialize_doc(fresh)
 

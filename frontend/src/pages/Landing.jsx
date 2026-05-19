@@ -11,6 +11,7 @@ import { WhyBloomLabs } from "@/components/sections/WhyBloomLabs";
 import { BookCall } from "@/components/sections/BookCall";
 import { FAQ } from "@/components/sections/FAQ";
 import { Footer } from "@/components/sections/Footer";
+import RelatedLinks from "@/components/RelatedLinks";
 import SeoHead from "@/components/SeoHead";
 import {
   ORGANIZATION_SCHEMA,
@@ -53,6 +54,7 @@ export default function Landing() {
       <WhyBloomLabs />
       <BookCall />
       <FAQ />
+      <RelatedLinks />
       <Footer />
     </main>
   );

@@ -36,6 +36,7 @@ import AbTestWizard from "@/pages/admin/AbTestWizard";
 import AbTestDetail from "@/pages/admin/AbTestDetail";
 import AuditsAdmin from "@/pages/admin/AuditsAdmin";
 import AuditDetailAdmin from "@/pages/admin/AuditDetailAdmin";
+import AffiliatesAdmin from "@/pages/admin/AffiliatesAdmin";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
 import CompaniesAdmin from "@/pages/admin/CompaniesAdmin";
 import ProposalsAdmin from "@/pages/admin/ProposalsAdmin";
@@ -55,10 +56,14 @@ import PublicCaseStudies from "@/pages/PublicCaseStudies";
 import PublicBlog from "@/pages/PublicBlog";
 import PublicBlogPost from "@/pages/PublicBlogPost";
 import GetAuditPage from "@/pages/GetAuditPage";
+import AffiliatePage from "@/pages/AffiliatePage";
+import AffiliateDashboard from "@/pages/AffiliateDashboard";
+import AffiliateVerifyPage from "@/pages/AffiliateVerifyPage";
 import ExitIntentPopup from "@/components/ExitIntentPopup";
 import PublicSandboxTour from "@/pages/PublicSandboxTour";
 import PayInvoice from "@/pages/PayInvoice";
 import AnalyticsTracker from "@/components/Analytics";
+import AffiliateTracker from "@/lib/affiliate";
 import AuthCallback from "@/pages/AuthCallback";
 import GymHeroPage from "@/pages/gym/GymHeroPage";
 import GymHowItWorksPage from "@/pages/gym/GymHowItWorksPage";
@@ -80,6 +85,7 @@ function App() {
         <ClientAuthProvider>
           <AuthProvider>
             <AnalyticsTracker />
+            <AffiliateTracker />
             <ExitIntentPopup />
             <Routes>
               <Route path="/" element={<Landing />} />
@@ -87,6 +93,9 @@ function App() {
               <Route path="/blog" element={<PublicBlog />} />
               <Route path="/blog/:slug" element={<PublicBlogPost />} />
               <Route path="/get-audit" element={<GetAuditPage />} />
+              <Route path="/affiliate" element={<AffiliatePage />} />
+              <Route path="/affiliate/dashboard" element={<AffiliateDashboard />} />
+              <Route path="/affiliate/verify" element={<AffiliateVerifyPage />} />
               <Route path="/tour" element={<PublicSandboxTour />} />
               <Route path="/gym-owners" element={<GymHeroPage />} />
               <Route path="/gym-owners/how-it-works" element={<GymHowItWorksPage />} />
@@ -197,6 +206,7 @@ function App() {
                 <Route path="ab-tests/:testId" element={<AbTestDetail />} />
                 <Route path="audits" element={<AuditsAdmin />} />
                 <Route path="audits/:auditId" element={<AuditDetailAdmin />} />
+                <Route path="affiliates" element={<AffiliatesAdmin />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

@@ -125,6 +125,7 @@ class AuditCreateRequest(BaseModel):
     timeline: str
     source_cta: Optional[str] = None
     source_url: Optional[str] = None
+    affiliate_ref: Optional[str] = Field(default=None, max_length=32)
 
 
 class AuditUpdateRequest(BaseModel):
@@ -179,6 +180,13 @@ async def submit_audit(
     await db.audit_submissions.insert_one(
         prepare_for_mongo(submission.model_dump())
     )
+
+    # Affiliate attribution — best-effort, never blocks submission
+    try:
+        from affiliate_routes import attach_referral_from_audit
+        await attach_referral_from_audit(db, submission.model_dump(), req.affiliate_ref)
+    except Exception as exc:
+        log.warning("Affiliate attribution failed: %s", exc)
 
     # Fire-and-forget: email + slack + claude
     background_tasks.add_task(

@@ -98,6 +98,11 @@ from support_subscription_routes import (  # noqa: E402
 from brief_contract_routes import brief_contract_router  # noqa: E402
 from ab_test_routes import public_ab_router, ab_admin_router  # noqa: E402
 from audit_routes import audit_public_router, audit_admin_router  # noqa: E402
+from affiliate_routes import (  # noqa: E402
+    affiliate_public_router,
+    affiliate_me_router,
+    affiliate_admin_router,
+)
 from ab_v2_routes import (  # noqa: E402
     public_v2_router,
     admin_v2_router,
@@ -474,6 +479,9 @@ api.include_router(public_v2_router)
 api.include_router(admin_v2_router)
 api.include_router(audit_public_router)
 api.include_router(audit_admin_router)
+api.include_router(affiliate_public_router)
+api.include_router(affiliate_me_router)
+api.include_router(affiliate_admin_router)
 api.include_router(nifty_workspaces_router)
 api.include_router(calendar_oauth_router)
 api.include_router(calendar_admin_router)

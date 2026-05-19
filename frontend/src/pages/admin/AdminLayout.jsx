@@ -51,6 +51,7 @@ const NAV = [
   { to: "/admin/outreach", label: "Outreach AI", icon: Users, group: "Pipeline" },
   { to: "/admin/companies", label: "Companies", icon: Users, group: "Pipeline" },
   { to: "/admin/proposals", label: "Proposals", icon: FileText, group: "Pipeline" },
+  { to: "/admin/affiliates", label: "Affiliates", icon: TrendingUp, group: "Pipeline" },
 
   // ── Delivery — ship the work ───────────────────────────────────────────
   { to: "/admin/onboarding", label: "Onboarding", icon: ClipboardList, group: "Delivery" },

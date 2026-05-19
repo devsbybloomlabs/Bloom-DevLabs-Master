@@ -8,6 +8,7 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { Header } from "@/components/sections/Header";
 import { Footer } from "@/components/sections/Footer";
+import RelatedLinks from "@/components/RelatedLinks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import SeoHead from "@/components/SeoHead";
 import { fireGlobalConversion } from "@/lib/abVariant";
+import { getAffiliateRef } from "@/lib/affiliate";
 import {
   ChevronLeft,
   ChevronRight,
@@ -108,7 +110,8 @@ export default function GetAuditPage() {
     }
     setSubmitting(true);
     try {
-      const r = await axios.post(`${API}/audits`, form);
+      const payload = { ...form, affiliate_ref: getAffiliateRef() };
+      const r = await axios.post(`${API}/audits`, payload);
       setSubmitted(r.data);
       setStep(3);
       // Fire conversion for any active A/B test this visitor was bucketed into
@@ -373,6 +376,7 @@ export default function GetAuditPage() {
           </p>
         )}
       </section>
+      <RelatedLinks />
       <Footer />
     </main>
   );

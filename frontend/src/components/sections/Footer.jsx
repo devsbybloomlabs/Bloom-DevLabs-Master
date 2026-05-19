@@ -26,6 +26,7 @@ const LINKS = [
   { label: "Case Studies", href: "#case-studies" },
   { label: "How We Work", href: "#how-we-work" },
   { label: "FAQ", href: "#faq" },
+  { label: "Affiliate Program", href: "/affiliate" },
   { label: "Book a Call", href: "#book" },
 ];
 
