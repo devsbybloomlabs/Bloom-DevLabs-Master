@@ -1126,3 +1126,23 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - `onboardings`
 - `lead_magnets`, `leads`
 - `milestones`, `milestone_sync_history`
+
+
+---
+
+### ✅ Wave 5 — Bing fix · Blog WYSIWYG + AI SEO Suggest · A/B Testing MVP (Feb 19, 2026)
+
+**Bing IndexNow fix**: replaced `bing_webmaster/test` impl. Previously hit `GetSites` (needs Bing Webmaster API key, not IndexNow key). Now POSTs to `api.indexnow.org/indexnow` with a single test URL — works for both key types and surfaces actual error reasons with hints.
+
+**Blog**: installed `@uiw/react-md-editor` — body field is now a live-preview WYSIWYG markdown editor. New `POST /api/admin/blog/ai/seo-suggest` (Claude Sonnet 4.5) returns optimised `seo_title`/`seo_description`/`slug`/`primary_keyword`/`secondary_keywords`/`tags`/`og_image_prompt`/`internal_link_suggestions`/`faq_schema`. New "AI SEO Suggest" button in editor with 1-click apply dialog.
+
+**A/B Testing v2 MVP**
+- Backend (`/app/backend/ab_v2_routes.py`): two-collection design (`ab_tests`, `ab_test_events`), page registry (Homepage, Pricing, Gym Owners, Clinics, How It Works, Platform, Case Studies, Solutions, Blog), element types (headline, cta, subheadline, testimonial, form_copy). Endpoints under `/api/admin/ab/v2/*` and public `/api/public/ab/v2/*` (variant assign + track). Statistical engine: two-proportion z-test using internal `erf`-based normal CDF (no scipy). Hourly cron auto-completes expired tests + drops a system notification.
+- Frontend: `AbTestsDashboard.jsx` (header stats + active/completed tables), `AbTestWizard.jsx` (5 steps: page → element → duration & split → AI variations → review/launch), `AbTestDetail.jsx` (per-variant table, Recharts conversion-rate line chart, progress bar, winner banner, apply-winner workflow), `useAbVariant` hook + `<AbSlot>` component for live-page injection.
+
+**Testing**: 23/23 backend pytest cases passed (iteration 34) — full lifecycle, Chi-square verified, element-key uniqueness 409, deterministic visitor bucketing, daily-trend aggregation, v1 backward compat intact. Frontend dashboard renders.
+
+## MongoDB Collections (added)
+- `ab_tests` — A/B test configurations with embedded variants
+- `ab_test_events` — page_view / cta_click / conversion / session_end events
+- `ab_applied_winners` — audit log for declared winners
