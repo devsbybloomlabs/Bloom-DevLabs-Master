@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, ArrowRight, BadgeCheck, Timer, Lock } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import AbSlot from "@/components/AbSlot";
 
 export const Hero = () => {
   return (
@@ -62,16 +63,20 @@ export const Hero = () => {
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <Button
-                asChild
-                className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-12 px-6 text-base shadow-[var(--shadow-sm)]"
-                data-testid="hero-primary-cta-button"
-              >
-                <a href="#book">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Book a Discovery Call
-                </a>
-              </Button>
+              <AbSlot elementKey="homepage_hero_cta" fallback="Book a Discovery Call">
+                {(content, trackClick) => (
+                  <Button
+                    asChild
+                    className="bg-[#1E3A8A] hover:bg-[#1A3278] text-white h-12 px-6 text-base shadow-[var(--shadow-sm)]"
+                    data-testid="hero-primary-cta-button"
+                  >
+                    <a href="#book" onClick={trackClick}>
+                      <Calendar className="h-4 w-4 mr-2" />
+                      {content}
+                    </a>
+                  </Button>
+                )}
+              </AbSlot>
               <Button
                 asChild
                 variant="outline"

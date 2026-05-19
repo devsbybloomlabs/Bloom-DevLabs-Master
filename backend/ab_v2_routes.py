@@ -381,9 +381,9 @@ async def dashboard_summary(
 ) -> Dict[str, Any]:
     """Header stats for the dashboard."""
     now = _now()
-    month_ago = now - timedelta(days=30)
+    month_ago_iso = (now - timedelta(days=30)).isoformat()
     active_count = await db.ab_tests.count_documents({"status": "active"})
-    month_count = await db.ab_tests.count_documents({"created_at": {"$gte": month_ago}})
+    month_count = await db.ab_tests.count_documents({"created_at": {"$gte": month_ago_iso}})
     completed = await db.ab_tests.find(
         {"status": "completed", "p_value": {"$lte": 0.05}},
         {"_id": 0, "name": 1, "winner_variant_key": 1, "variants": 1, "p_value": 1, "id": 1},
