@@ -62,7 +62,7 @@ function Hero() {
         className="absolute inset-0 opacity-25 mix-blend-luminosity bg-cover bg-center"
         style={{
           backgroundImage:
-            "url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1900&q=80')",
+            "url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1280&q=80')",
         }}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
@@ -759,7 +759,7 @@ function FinalCTASection() {
       data-testid="gym-final-cta"
     >
       <div className="absolute inset-0 opacity-10 bg-cover bg-center"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=1900&q=80')" }} />
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=1280&q=80')" }} />
       <div className="relative max-w-4xl mx-auto px-6 lg:px-10 text-center">
         <div className="inline-flex items-center gap-1.5 bg-orange-500/20 border border-orange-400/40 text-orange-300 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-5">
           <Flame className="h-3.5 w-3.5" />

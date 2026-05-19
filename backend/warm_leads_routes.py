@@ -130,4 +130,85 @@ async def list_warm_leads(niche: Optional[str] = None, limit: int = 100) -> Dict
     return {"items": items, "count": len(items)}
 
 
+@warm_leads_admin_router.get("/warm/revenue-stats")
+async def warm_lead_revenue_stats() -> Dict[str, Any]:
+    """Roll up captured-but-not-converted warm leads × their tier prices.
+
+    Returns:
+      total_pipeline_usd: SUM(tier_price) across all non-converted leads
+      total_leads: count of non-converted leads
+      by_niche: {niche: {count, pipeline_usd}}
+      by_tier: {tier: {count, pipeline_usd, name}}
+      top_value_leads: up to 10 newest non-converted leads with tier_price
+    """
+    # Local import to avoid a circular module-load dependency
+    from paypal_routes import PACKAGE_TIERS
+
+    # Aggregate non-converted leads grouped by (niche, tier)
+    pipeline = [
+        {"$match": {"status": {"$nin": ["converted", "discarded"]}}},
+        {
+            "$group": {
+                "_id": {"niche": "$niche", "tier": "$tier"},
+                "count": {"$sum": 1},
+            }
+        },
+    ]
+    rows = [r async for r in _db.warm_leads.aggregate(pipeline)]
+
+    by_niche: Dict[str, Dict[str, Any]] = {}
+    by_tier: Dict[str, Dict[str, Any]] = {}
+    total_pipeline = 0.0
+    total_leads = 0
+
+    for row in rows:
+        niche = row["_id"].get("niche") or "unknown"
+        tier_key = row["_id"].get("tier") or "unknown"
+        count = int(row["count"])
+        cfg = PACKAGE_TIERS.get(tier_key, {})
+        try:
+            price = float(cfg.get("price", 0))
+        except (TypeError, ValueError):
+            price = 0.0
+        revenue = price * count
+        total_pipeline += revenue
+        total_leads += count
+        n = by_niche.setdefault(niche, {"count": 0, "pipeline_usd": 0.0})
+        n["count"] += count
+        n["pipeline_usd"] += revenue
+        t = by_tier.setdefault(
+            tier_key,
+            {"count": 0, "pipeline_usd": 0.0, "name": cfg.get("name", tier_key), "price": price},
+        )
+        t["count"] += count
+        t["pipeline_usd"] += revenue
+
+    # Top value leads (newest first, only non-converted)
+    top_cursor = (
+        _db.warm_leads.find(
+            {"status": {"$nin": ["converted", "discarded"]}},
+            {"_id": 0, "id": 1, "niche": 1, "tier": 1, "email": 1, "name": 1, "created_at": 1, "visits": 1},
+        )
+        .sort("created_at", -1)
+        .limit(10)
+    )
+    top_leads: list = []
+    async for d in top_cursor:
+        cfg = PACKAGE_TIERS.get(d.get("tier") or "", {})
+        try:
+            d["tier_price_usd"] = float(cfg.get("price", 0))
+        except (TypeError, ValueError):
+            d["tier_price_usd"] = 0.0
+        d["tier_name"] = cfg.get("name", d.get("tier"))
+        top_leads.append(d)
+
+    return {
+        "total_pipeline_usd": round(total_pipeline, 2),
+        "total_leads": total_leads,
+        "by_niche": {k: {**v, "pipeline_usd": round(v["pipeline_usd"], 2)} for k, v in by_niche.items()},
+        "by_tier": {k: {**v, "pipeline_usd": round(v["pipeline_usd"], 2)} for k, v in by_tier.items()},
+        "top_value_leads": top_leads,
+    }
+
+
 __all__ = ["warm_leads_router", "warm_leads_admin_router"]

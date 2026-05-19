@@ -46,7 +46,7 @@ function Hero() {
   return (
     <section className="relative bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-950 text-white py-20 md:py-24 overflow-hidden">
       <div className="absolute inset-0 opacity-15 bg-cover bg-center"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1900&q=80')" }} />
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1280&q=80')" }} />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent" />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-10">
         <h1 className="font-display text-4xl md:text-6xl font-bold leading-[1.05] max-w-3xl">
@@ -469,7 +469,7 @@ function FinalCTA() {
   return (
     <section className="relative overflow-hidden py-20 bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-950 text-white">
       <div className="absolute inset-0 opacity-10 bg-cover bg-center"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1521737852567-6949f3f9f2b5?auto=format&fit=crop&w=1900&q=80')" }} />
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1521737852567-6949f3f9f2b5?auto=format&fit=crop&w=1280&q=80')" }} />
       <div className="relative max-w-4xl mx-auto px-6 lg:px-10 text-center">
         <h2 className="font-display text-3xl md:text-5xl font-bold leading-tight">
           Stop being invisible online.<br />

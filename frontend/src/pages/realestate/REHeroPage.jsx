@@ -27,7 +27,7 @@ function Hero() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white" data-testid="re-hero-section">
       <div className="absolute inset-0 opacity-25 mix-blend-luminosity bg-cover bg-center"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1900&q=80')" }} />
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1280&q=80')" }} />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-10 py-20 md:py-28">
         <div className="max-w-3xl">
@@ -334,7 +334,7 @@ function FinalCTA() {
   return (
     <section className="relative overflow-hidden py-20 bg-gradient-to-br from-indigo-950 via-slate-950 to-slate-950 text-white" data-testid="re-final-cta">
       <div className="absolute inset-0 opacity-10 bg-cover bg-center"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=1900&q=80')" }} />
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=1280&q=80')" }} />
       <div className="relative max-w-4xl mx-auto px-6 lg:px-10 text-center">
         <div className="inline-flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-5">
           <Flame className="h-3.5 w-3.5" />Limited capacity

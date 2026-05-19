@@ -303,7 +303,7 @@ export default function AffiliatePage() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E3A8A] to-[#0F172A] text-white py-20 lg:py-28" data-testid="affiliate-hero">
         <div className="absolute inset-0 opacity-20 mix-blend-luminosity bg-cover bg-center"
-             style={{ backgroundImage: "url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1900&q=80')" }} />
+             style={{ backgroundImage: "url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1280&q=80')" }} />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-transparent to-transparent" />
         <div className="relative mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">

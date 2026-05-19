@@ -42,7 +42,7 @@ function Hero() {
   return (
     <section className="relative bg-gradient-to-br from-teal-950 via-slate-900 to-slate-950 text-white py-20 md:py-24 overflow-hidden">
       <div className="absolute inset-0 opacity-15 bg-cover bg-center"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1900&q=80')" }} />
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1280&q=80')" }} />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent" />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-10">
         <h1 className="font-display text-4xl md:text-6xl font-bold leading-[1.05] max-w-3xl">

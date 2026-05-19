@@ -26,6 +26,7 @@ import MRRWidget from "@/components/admin/MRRWidget";
 import IntegrationsHealthStrip from "@/components/admin/IntegrationsHealthStrip";
 import DemoModeCard from "@/components/admin/DemoModeCard";
 import TodaysCoachingCard from "@/components/admin/TodaysCoachingCard";
+import WarmLeadRevenueWidget from "@/components/admin/WarmLeadRevenueWidget";
 
 const BLOCK_BG = {
   OUTREACH: "bg-[#3B82F6]/10 text-[#1E3A8A] border-[#3B82F6]/30",
@@ -215,6 +216,9 @@ export default function DashboardHome() {
 
       {/* Integrations health strip */}
       <IntegrationsHealthStrip />
+
+      {/* Warm-lead revenue pipeline (captured-but-not-converted SUM) */}
+      <WarmLeadRevenueWidget />
 
       {/* Demo mode card — 1-click sandbox for Loom recordings */}
       <DemoModeCard />
