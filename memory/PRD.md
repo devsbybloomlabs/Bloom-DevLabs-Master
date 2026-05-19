@@ -194,7 +194,7 @@ Preview and Production each have their own MongoDB. Saving credentials in the pr
 - Per-project schema fields added: `sync_to_drive`, `drive_folder_id`, `drive_folder_link`, `last_sync_at`.
 - `project_files_routes.upload_file` now best-effort mirrors via `mirror_file_bytes_to_drive` after the primary object-storage upload succeeds. Failures are logged and never block the upload.
 - Frontend `IntegrationsAdmin.jsx::GoogleDriveCard` — Connect/Disconnect, per-project Sync checkbox + `Sync now` button + folder link. Shows `Setup required` notice with the 3 env var names while `GOOGLE_CLIENT_ID` is empty.
-- **Pending user action**: create OAuth Web client in Google Cloud Console, paste `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, redirect `https://seo-dashboard-test.preview.emergentagent.com/api/admin/google-drive/oauth/callback` (preview) + `https://bybloomlabs.com/api/admin/google-drive/oauth/callback` (prod) into `backend/.env` and restart backend. Then click `Connect Google Drive` in Admin → Integrations.
+- **Pending user action**: create OAuth Web client in Google Cloud Console, paste `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, redirect `https://lead-pipeline-66.preview.emergentagent.com/api/admin/google-drive/oauth/callback` (preview) + `https://bybloomlabs.com/api/admin/google-drive/oauth/callback` (prod) into `backend/.env` and restart backend. Then click `Connect Google Drive` in Admin → Integrations.
 
 **Tests**: `/app/backend/tests/test_iteration_27.py` (11 tests — Publit.io upload rejections + Drive 503/400 guards + integrations health regression). `/app/backend/tests/test_brief_per_phase.py` rewritten to assert single Discovery card + emoji chips.
 
@@ -978,7 +978,7 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 
 **Real OAuth creds wired** (provided by user):
 - `client_id` = `728881545908-a752kc3enjgnadmb1c0m6ff90ruick4n.apps.googleusercontent.com`
-- Redirect URI = `https://seo-dashboard-test.preview.emergentagent.com/api/oauth/calendar/callback` (preview) + `https://bybloomlabs.com/api/oauth/calendar/callback` (prod)
+- Redirect URI = `https://lead-pipeline-66.preview.emergentagent.com/api/oauth/calendar/callback` (preview) + `https://bybloomlabs.com/api/oauth/calendar/callback` (prod)
 - Scope = `https://www.googleapis.com/auth/calendar`
 
 **New backend (`google_calendar_client.py` + `google_calendar_routes.py`):**

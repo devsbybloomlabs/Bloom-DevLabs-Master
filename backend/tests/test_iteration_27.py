@@ -13,7 +13,7 @@ import zlib
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://seo-dashboard-test.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://lead-pipeline-66.preview.emergentagent.com").rstrip("/")
 
 ADMIN_EMAIL = "founder@thesalvador.group"
 ADMIN_PASSWORD = "admin123"
