@@ -1233,6 +1233,29 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - `/admin/affiliates` — founder pipeline view
 - Footer link to `/affiliate`
 
+
+### ✅ Wave 15 — Core Web Vitals + Warm-Lead Revenue Widget (May 19, 2026)
+
+**Goal**: Shrink the public-page JS bundle for better LCP/INP scores, and surface the captured-but-not-converted warm-lead pipeline value on the admin homepage.
+
+**Core Web Vitals Optimization**
+- `/app/frontend/src/App.js` fully refactored: 50+ admin + niche + client/portal pages converted to `React.lazy()` + `<Suspense fallback={<RouteFallback />}>`. Public Landing, Blog, Case Studies, GetAudit, Affiliate, ExitIntentPopup, AnalyticsTracker, AffiliateTracker remain eager for fastest first-paint.
+- All Unsplash hero/results background widths reduced 1900px → 1280px (~33% bandwidth savings on niche pages)
+- Added `<link rel="preconnect" href="https://images.unsplash.com" crossorigin>` in `/app/frontend/public/index.html`
+- Expected impact: 30-50% reduction in initial JS chunk for non-admin visitors; faster TTFB → image load through eager preconnect
+
+**Warm-Lead Revenue Widget**
+- New `GET /api/admin/leads/warm/revenue-stats` endpoint in `/app/backend/warm_leads_routes.py`:
+  - Aggregates non-converted warm_leads × PACKAGE_TIERS price
+  - Returns `total_pipeline_usd`, `total_leads`, `by_niche`, `by_tier`, `top_value_leads[10]`
+  - Excludes `status ∈ {converted, discarded}` from the rollup
+  - Unknown tiers (e.g., test fixtures) resolve to price 0 — no inflation
+- New `<WarmLeadRevenueWidget />` at `/app/frontend/src/components/admin/WarmLeadRevenueWidget.jsx` — amber-gradient card showing dollar amount + by-niche breakdown + CTA to `/admin/warm-leads`
+- Injected on `DashboardHome` between `<IntegrationsHealthStrip />` and `<DemoModeCard />`
+- Current live data: **$74,895 across 22 leads** (Gym $35,960 · Coaches $20,965 · Real Estate $17,970)
+
+**Testing**: Iteration 37 — 7/7 backend + 100% frontend, zero bugs. Test credentials valid.
+
 **Pending / Phase 2**
 - Discount-code generation + checkout integration (currently tier % is display-only)
 - Real CRM auto-sync for stage progression (currently admin-driven)
