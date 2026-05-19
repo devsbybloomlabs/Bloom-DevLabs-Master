@@ -1175,3 +1175,66 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 
 ## MongoDB Collections (added)
 - `audit_submissions` — multi-step audit lead capture with embedded Claude recommendations + sales workflow
+
+
+### ✅ Wave 14 — SEO Phase 3 + Affiliate Program v1 (May 19, 2026)
+
+**Goal**: (a) Deepen the topic-cluster internal linking across every public page for better SEO crawl; (b) Launch a transparent, abuse-resistant affiliate program where existing Bloom clients refer companies and unlock stacking discounts.
+
+**SEO Phase 3 — Internal Link Audit**
+- New `RELATED_LINKS` map at `/app/frontend/src/lib/internalLinks.js` — longest-prefix matched contextual links per page
+- New `<RelatedLinks />` component at `/app/frontend/src/components/RelatedLinks.jsx` — keyword-rich, accessible anchor list with kicker labels
+- Injected into shared niche layouts (Gym/Coach/RealEstate), Landing, GetAuditPage, PublicBlog, PublicBlogPost, PublicCaseStudies, AffiliatePage
+- Verified single-H1 rule across all niche pages via grep audit (12 pages, 1 H1 each)
+
+**Affiliate Program v1**
+- Auth model: ONLY existing Bloom clients (with `/login` JWT, `role=client`) can enrol — re-uses the existing `clients` collection
+- Double opt-in: enrolment puts the row in `pending_verification`; user clicks email link → `/affiliate/verify?token=...` → POST `/api/affiliate/verify` flips to `active` and generates a 12-char alphanumeric `unique_code`
+- Click attribution: `<AffiliateTracker />` mounted in `App.js` reads `?ref=CODE` URL param → cookie `bloom_aff_ref` (90 days, root-domain scoped) → POST `/api/affiliate/track-click` (per-IP rate-limited 10/min; TTL index `ttl_5min` on rate-limit bucket)
+- Audit attribution: `POST /api/audits` accepts `affiliate_ref` field → `attach_referral_from_audit` creates a row in `affiliate_referrals` at stage=`evaluating` (skips self-referrals where affiliate email == audit email)
+- Pipeline hook: `move_prospect` to `won` cascades into `on_prospect_won` which flips the linked referral to `closed_won` + recomputes tier
+- Tier ladder: `_compute_tier(closed_won_count)` → 1 win = 10%, 2 = 15%, 3 = 20%. Upgrades fire an Emailit notification.
+- Admin: `/admin/affiliates` lists all affiliates with stats. Drawer shows referral pipeline + stage dropdown — switching a referral to `closed_won` upgrades the tier inline.
+
+**New MongoDB Collections**
+- `affiliates` — id, client_id, email, full_name, company_name, relationship, volume_expectation, unique_code, status (pending_verification|active|archived), tier_pct, total_clicks, total_referrals, closed_won_count, verification_token (transient), verified_at
+- `affiliate_referrals` — id, affiliate_id, affiliate_email, audit_id, referred_company_name, referred_contact_*, stage (clicked|contacted|evaluating|proposed|closed_won|closed_lost), deal_value_usd, closed_at
+- `affiliate_events` — id, affiliate_id, referral_id?, type (click|stage:X|tier_upgraded), ts, ip, ua
+- `affiliate_click_rl` — naive rolling per-IP click budget; TTL 5 min
+
+**Public/User API**
+- `POST /api/affiliate/enroll` (client JWT) — idempotent enrol or resend
+- `POST /api/affiliate/verify` (public) — single-use 48h token
+- `POST /api/affiliate/track-click` (public, rate-limited) — info-leak-safe (always 200)
+- `GET /api/affiliate/me/status` (client JWT) — returns `{enrolled: bool, ...}`
+- `GET /api/affiliate/me/dashboard` (active affiliate) — aggregated stats
+- `GET /api/affiliate/me/referrals` (active affiliate) — own referrals only
+
+**Admin API**
+- `GET /api/admin/affiliates` — all affiliates
+- `GET /api/admin/affiliates/{id}/referrals` — drill-down
+- `PATCH /api/admin/affiliates/referrals/{id}/stage` — admin moves stage + auto-fires tier upgrade
+
+**Abuse hardening tested (iteration 36 — 20/20 backend + 7/7 frontend passed)**
+- No-auth on enrol/me/admin (401 or 403 depending on route)
+- Founder JWT cannot hit `/me/*` (`role==client` check)
+- Client JWT cannot hit `/admin/affiliates`
+- Self-referral silently dropped (matched by email)
+- Bogus `affiliate_ref` payloads (path-traversal, SQL-ish, XSS, 200-char strings) safely no-op
+- Verification tokens single-use (`$unset` after success) + 48h expiry
+- Tier recompute is purely state-based, so duplicate `closed_won` PATCH calls don't double-count
+- Rate limit: 10 clicks/minute/IP enforced via X-Forwarded-For
+- Per-IP rate-limit bucket has 5-min TTL index
+
+**Frontend routes added**
+- `/affiliate` — marketing landing + signup
+- `/affiliate/dashboard` — referrer's own dashboard
+- `/affiliate/verify` — double-opt-in handler
+- `/admin/affiliates` — founder pipeline view
+- Footer link to `/affiliate`
+
+**Pending / Phase 2**
+- Discount-code generation + checkout integration (currently tier % is display-only)
+- Real CRM auto-sync for stage progression (currently admin-driven)
+- Affiliate leaderboard + community channel
+- Branded subdomain links (`yourcompany.bybloomlabs.com`)

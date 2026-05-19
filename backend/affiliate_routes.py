@@ -55,9 +55,15 @@ def _now() -> datetime:
 
 
 def _new_code() -> str:
-    """12-char URL-safe code, lowercase + digits. Excludes ambiguous chars."""
-    raw = secrets.token_urlsafe(16).lower().replace("_", "").replace("-", "")
-    return raw[:CODE_LENGTH]
+    """12-char URL-safe code, lowercase + digits. Excludes ambiguous chars.
+
+    Loops until a sufficiently long candidate is produced — stripping
+    `_` / `-` from token_urlsafe occasionally yields short strings.
+    """
+    while True:
+        raw = secrets.token_urlsafe(20).lower().replace("_", "").replace("-", "")
+        if len(raw) >= CODE_LENGTH:
+            return raw[:CODE_LENGTH]
 
 
 def get_db(request: Request) -> AsyncIOMotorDatabase:
@@ -377,7 +383,7 @@ async def track_click(
         # Silently swallow
         return {"ok": True, "recorded": False, "reason": "rate_limited"}
     await db.affiliate_click_rl.insert_one(
-        prepare_for_mongo({"ip": ip, "minute": minute_window, "ts": _now().isoformat()})
+        {"ip": ip, "minute": minute_window, "ts": _now()}
     )
 
     aff = await db.affiliates.find_one(

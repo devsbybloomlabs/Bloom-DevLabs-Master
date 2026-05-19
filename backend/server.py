@@ -337,6 +337,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await ensure_seed_user(db)
             await ensure_settings(db)
             await ensure_authority_metric(db)
+            # TTL index on the affiliate rate-limit bucket so it never grows
+            # unbounded — rows expire 5 minutes after insertion.
+            try:
+                await db.affiliate_click_rl.create_index(
+                    "ts", expireAfterSeconds=300, name="ttl_5min"
+                )
+            except Exception as exc:
+                log.warning("affiliate_click_rl TTL index init failed: %s", exc)
             # Phase B: seed companies + contacts from legacy clients (idempotent)
             mig_res = await migrate_clients_to_companies(db)
             if mig_res.get("created", 0) > 0:
