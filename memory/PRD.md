@@ -1146,3 +1146,32 @@ Public `/blog` + `/case-studies`, admin Blog CRUD + AI drafts, 3-phase onboardin
 - `ab_tests` — A/B test configurations with embedded variants
 - `ab_test_events` — page_view / cta_click / conversion / session_end events
 - `ab_applied_winners` — audit log for declared winners
+
+
+---
+
+### ✅ Wave 6 — Customer Acquisition Engine (Feb 19, 2026)
+
+**Goal**: Convert anonymous homepage visitors into qualified leads within 24 hours via multi-step audit form → AI workflow analysis → sales-team dashboard.
+
+**Flow**: Hero CTA "Get my New Workflow" → `/get-audit` 2-step form → submit → background Claude Sonnet 4.5 analysis (5 app recs + quick win + price tier) → confirmation email via Emailit (from `audit@bybloomlabs.com`) + Slack `#leads` ping → admin reviews/closes in `/admin/audits`.
+
+**Backend** (`/app/backend/audit_routes.py`)
+- New `audit_submissions` Mongo collection
+- Public: `GET /api/audits/options`, `POST /api/audits`, `GET /api/audits/{id}/status`
+- Admin: `GET /api/admin/audits` (with filters), `GET /api/admin/audits/reports/summary`, `GET/PATCH/DELETE /api/admin/audits/{id}`, `POST /api/admin/audits/{id}/reanalyze`
+- Background `_post_submit_pipeline` runs email + Slack + Claude analysis concurrently via `asyncio.gather`
+- Parser extracts `recommendation_titles[]`, `quick_win`, `estimated_price_tier` from Claude markdown
+- Reports include: total/week/month/called/won, call_rate_pct, win_rate_pct, deal_value_won_usd, avg_time_to_call_hours, by_status/industry/source_cta, daily 14-day trend
+- Uses existing OpenRouter (user's own API key — no Emergent credit consumption), Emailit, slack_notifier
+
+**Frontend**
+- New: `GetAuditPage.jsx` (2-step form + confirmation), `AuditsAdmin.jsx` (dashboard with 4 stat tiles + daily-trend line chart + industry bar chart + CTA-source attribution), `AuditDetailAdmin.jsx` (full Claude analysis + sales workflow + one-click email/call), `AuditCta.jsx` (drop-in CTA block), `ExitIntentPopup.jsx` (armed after 8s, mouseleave-top-edge, session-dismissible)
+- Updated: Hero (adds amber "Get my New Workflow" primary CTA, keeps A/B-tested "Book Discovery" as secondary), WhoWeServe, Pricing (Still-deciding CTA block), PublicCaseStudies, AdminLayout (sidebar Audit Leads link), App.js
+
+**Funnel attribution**: every CTA passes `?src=`: `hero-primary`, `below-who-we-serve`, `pricing-section`, `case-studies-page`, `exit-intent-popup`. Stored as `source_cta` + surfaced in dashboard.
+
+**Testing**: 26/26 backend pytest cases passed (iteration 35). Live Claude analysis verified end-to-end with 5 specific recommendations for a Gym Owners retention scenario.
+
+## MongoDB Collections (added)
+- `audit_submissions` — multi-step audit lead capture with embedded Claude recommendations + sales workflow
