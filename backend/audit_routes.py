@@ -395,16 +395,91 @@ async def admin_delete(
 # Background pipeline — email + slack + AI analysis
 # =============================================================================
 async def _post_submit_pipeline(app, submission: Dict[str, Any]) -> None:
-    """Runs after a new audit lands: confirmation email + Slack ping + Claude analysis."""
+    """Runs after a new audit lands: confirmation email + Slack ping + Claude analysis + pipeline insert."""
     try:
         await asyncio.gather(
             _send_confirmation_email(app, submission),
             _post_to_slack(app, submission),
             _run_ai_analysis(app, submission),
+            _add_to_pipeline(app, submission),
             return_exceptions=True,
         )
     except Exception as exc:
         log.exception("post-submit pipeline failed: %s", exc)
+
+
+async def _add_to_pipeline(app, submission: Dict[str, Any]) -> None:
+    """Auto-create a hot/qualified Prospect row in the admin Pipeline so audits
+    appear next to outbound leads in the Kanban. Idempotent on customer_email."""
+    db = app.state.db
+    email = submission.get("customer_email")
+    audit_id = submission.get("id")
+    # Idempotent: if a prospect already linked to this audit_id exists, skip.
+    if audit_id and await db.prospects.find_one({"audit_id": audit_id}):
+        return
+
+    # Budget midpoint for deal_value estimate
+    budget_midpoint = {
+        "$3K-$7K": 5000,
+        "$7K-$12K": 9500,
+        "$12K-$20K": 16000,
+        "$20K+": 25000,
+    }.get(submission.get("budget_range", ""), None)
+
+    # Heat score from budget × urgency (HIGH = "hot" lead)
+    budget_score = {"$3K-$7K": 1, "$7K-$12K": 2, "$12K-$20K": 3, "$20K+": 4}.get(
+        submission.get("budget_range", ""), 1
+    )
+    urgency_score = {
+        "ASAP (this month)": 3,
+        "Next month": 2,
+        "Next quarter": 1,
+        "Still exploring": 0,
+    }.get(submission.get("timeline", ""), 0)
+    heat = "hot" if budget_score + urgency_score >= 5 else "warm" if budget_score + urgency_score >= 3 else "cool"
+
+    notes = (
+        f"🔥 Audit lead ({heat.upper()}) — auto-created from /get-audit form.\n\n"
+        f"Pain point: {submission.get('pain_point')}\n"
+        f"Budget: {submission.get('budget_range')} · Timeline: {submission.get('timeline')}\n"
+        f"Role: {submission.get('customer_title')} · Size: {submission.get('company_size')}\n"
+        f"Phone: {submission.get('customer_phone')}\n\n"
+        f"Workflow snippet:\n{(submission.get('workflow_description') or '')[:400]}…\n\n"
+        f"Bottleneck:\n{submission.get('bottleneck_description')}\n\n"
+        f"Full audit: /admin/audits/{audit_id}"
+    )
+
+    next_at = _now() + timedelta(hours=24)
+
+    prospect_doc = {
+        "id": _id(),
+        "name": submission.get("customer_name"),
+        "company": submission.get("company_name"),
+        "email": email,
+        "industry": submission.get("industry"),
+        "source": f"audit-form:{submission.get('source_cta') or 'direct'}",
+        # "qualified" puts it in the right Kanban column (past contacted/new)
+        "status": "qualified",
+        "notes": notes,
+        "deal_value": budget_midpoint,
+        "next_action": f"Call within 24h ({heat} lead)",
+        "next_action_at": next_at,
+        "heat": heat,  # extra field stored on doc (Prospect model ignores extras)
+        "audit_id": audit_id,
+        "created_at": _now(),
+        "updated_at": _now(),
+    }
+    try:
+        await db.prospects.insert_one(prepare_for_mongo(prospect_doc))
+        log.info(
+            "Pipeline: created %s prospect for audit %s (%s @ %s)",
+            heat,
+            audit_id,
+            submission.get("customer_name"),
+            submission.get("company_name"),
+        )
+    except Exception as exc:
+        log.warning("Failed to insert audit into pipeline: %s", exc)
 
 
 async def _send_confirmation_email(app, submission: Dict[str, Any]) -> None:

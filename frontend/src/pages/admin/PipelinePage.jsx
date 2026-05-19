@@ -132,15 +132,40 @@ function StatTile({ label, value, sub }) {
 
 function ProspectCard({ prospect, onOpen, onDragStart }) {
   const value = fmtMoney(prospect.deal_value);
+  const heat = prospect.heat;
+  const isAudit = (prospect.source || "").startsWith("audit-form");
   return (
     <button
       type="button"
       draggable
       onDragStart={(e) => onDragStart(e, prospect)}
       onClick={() => onOpen(prospect)}
-      className="w-full text-left rounded-lg border border-border bg-background p-3 hover:shadow-md hover:border-primary/40 transition-all cursor-grab active:cursor-grabbing"
+      className={`w-full text-left rounded-lg border bg-background p-3 hover:shadow-md hover:border-primary/40 transition-all cursor-grab active:cursor-grabbing ${
+        heat === "hot"
+          ? "border-red-300 ring-1 ring-red-200/60 bg-red-50/30"
+          : "border-border"
+      }`}
       data-testid={`pipeline-card-${prospect.id}`}
     >
+      {(isAudit || heat) && (
+        <div className="flex items-center gap-1.5 mb-2 -mt-0.5">
+          {heat === "hot" && (
+            <span className="text-[9px] font-semibold uppercase tracking-wide bg-red-600 text-white rounded-full px-1.5 py-0.5 inline-flex items-center gap-0.5" data-testid={`pipeline-heat-${prospect.id}`}>
+              🔥 Hot
+            </span>
+          )}
+          {heat === "warm" && (
+            <span className="text-[9px] font-semibold uppercase tracking-wide bg-amber-500 text-white rounded-full px-1.5 py-0.5">
+              Warm
+            </span>
+          )}
+          {isAudit && (
+            <span className="text-[9px] font-semibold uppercase tracking-wide bg-purple-100 text-purple-800 rounded-full px-1.5 py-0.5">
+              Audit form
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex items-start gap-2.5 mb-2">
         <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-semibold shrink-0">
           {initialsFor(prospect.name)}
