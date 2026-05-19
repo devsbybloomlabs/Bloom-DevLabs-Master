@@ -216,6 +216,131 @@ async def admin_ai_draft(
         raise HTTPException(502, f"AI generation failed: {exc}")
 
 
+# Cornerstone post blueprints — long-form (1,800-2,500 word target).
+CORNERSTONE_POSTS = [
+    {
+        "topic": "Why does web development take 6 months? (And how Bloom Labs ships in 2-4 weeks)",
+        "angle": (
+            "Explain why traditional agencies stretch projects to 4-6 months: scope creep, "
+            "over-architecture, account-manager overhead, hand-rolled boilerplate. Then show how "
+            "Bloom Labs's AI-native scaffolding + fixed-scope methodology compresses that into 2-4 "
+            "weeks without sacrificing enterprise quality. Cite the SaaS founder $5K MRR and gym "
+            "3x bookings case studies. End with a CTA to /get-audit. Target keywords: web "
+            "development timeline, why is development slow, custom web app development."
+        ),
+        "tags": ["web development", "process", "AI-native"],
+    },
+    {
+        "topic": "The true cost of custom software (and how Bloom Labs is 40% cheaper)",
+        "angle": (
+            "Break down where the $30K-$80K agency invoice actually goes: account managers, "
+            "discovery theatre, hand-written boilerplate, scope-creep change orders. Then show the "
+            "Bloom Labs cost stack: $5,995 Express Launch / $8,995 Custom Build / $14,995 "
+            "Enterprise. Explain why fixed-price + AI-native scaffolding = 40% less. Include a "
+            "comparison table. Link to /pricing and /case-studies. Target keywords: custom "
+            "software cost, web development pricing, hire developer, affordable custom software."
+        ),
+        "tags": ["pricing", "agencies", "ROI"],
+    },
+    {
+        "topic": "AI-native development explained (why it's the new way to build custom software)",
+        "angle": (
+            "Define AI-native development clearly: using modern AI tooling at every layer of the "
+            "build (scaffolding, tests, integrations, docs) without resorting to limiting "
+            "no-code platforms. Contrast with traditional hand-coding AND with no-code (Bubble, "
+            "Webflow). Show what changes for the customer: 2-4 week delivery, 40% cheaper, real "
+            "code you own, enterprise-grade quality. End with CTA to /get-audit. Target "
+            "keywords: AI development, AI-native development, modern web development, software "
+            "development 2026."
+        ),
+        "tags": ["AI-native", "development", "innovation"],
+    },
+]
+
+
+@blog_admin_router.post("/seed-cornerstones")
+async def admin_seed_cornerstones(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> Dict[str, Any]:
+    """One-shot: generate + save the 3 cornerstone SEO blog posts as drafts.
+    Idempotent — skips any cornerstone whose slug already exists."""
+    openrouter = request.app.state.openrouter
+    results: List[Dict[str, Any]] = []
+    for spec in CORNERSTONE_POSTS:
+        prompt = _draft_prompt(
+            BlogDraftPromptRequest(
+                topic=spec["topic"],
+                angle=spec["angle"],
+                target_length="long",
+                audience=(
+                    "SaaS founders, agency owners, gym & clinic operators evaluating custom "
+                    "software vendors"
+                ),
+            )
+        )
+        try:
+            text = await openrouter.chat(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are Bloom Labs's senior content strategist writing for "
+                            "bybloomlabs.com — an AI-native custom web app development agency. "
+                            "Write authoritative, founder-friendly long-form markdown posts "
+                            "(target 1800-2400 words). Structure with H2/H3 headings, short "
+                            "punchy paragraphs, occasional callouts in blockquotes, bullet "
+                            "lists for scannability, and ONE clear CTA at the end linking to "
+                            "/get-audit. Use the primary keyword in the H1 and naturally in "
+                            "first 100 words. NEVER use emoji. Tone: confident, "
+                            "technical-yet-clear, no fluff, no marketing-speak."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=3200,
+                temperature=0.65,
+            )
+            if not text:
+                results.append({"topic": spec["topic"], "ok": False, "reason": "empty"})
+                continue
+            # Extract title
+            title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
+            title = title_match.group(1).strip() if title_match else spec["topic"]
+            slug = _slugify(title)[:100]
+            # Excerpt
+            excerpt_match = re.search(r"^(?!#)([^\n]{40,220})", text, re.MULTILINE)
+            excerpt = excerpt_match.group(1).strip() if excerpt_match else ""
+            # Skip if slug already exists
+            if await db.blog_posts.find_one({"slug": slug}):
+                results.append({"topic": spec["topic"], "ok": False, "reason": "slug_exists", "slug": slug})
+                continue
+            post = BlogPost(
+                slug=slug,
+                title=title,
+                excerpt=excerpt,
+                body=text,
+                tags=spec["tags"],
+                seo_title=title[:65],
+                seo_description=excerpt[:158],
+                published=False,  # saved as drafts for user review
+            )
+            await db.blog_posts.insert_one(prepare_for_mongo(post.model_dump()))
+            results.append(
+                {
+                    "topic": spec["topic"],
+                    "ok": True,
+                    "id": post.id,
+                    "slug": slug,
+                    "title": title,
+                    "word_count": len(text.split()),
+                }
+            )
+        except Exception as exc:
+            log.exception("Cornerstone seed failed for topic %s", spec["topic"])
+            results.append({"topic": spec["topic"], "ok": False, "reason": str(exc)})
+    return {"results": results}
+
+
 @blog_admin_router.post("/ai/seo-suggest")
 async def admin_ai_seo_suggest(
     req: BlogSeoSuggestRequest, request: Request

@@ -443,6 +443,7 @@ export const Pricing = () => {
           </a>
         </p>
 
+        <HowWereCheaper />
         <PricingAuditCta />
       </div>
 
@@ -450,6 +451,55 @@ export const Pricing = () => {
     </section>
   );
 };
+
+function HowWereCheaper() {
+  const reasons = [
+    {
+      h: "No account managers",
+      p: "You talk directly to the senior engineer building your app. Zero middle-layer overhead means zero middle-layer fees.",
+    },
+    {
+      h: "AI-native scaffolding",
+      p: "We generate boilerplate, tests, and integrations with modern AI tooling — 60-80% faster than hand-writing them, while keeping enterprise-grade quality.",
+    },
+    {
+      h: "Fixed scope, fixed price",
+      p: "Your proposal locks the scope in writing. No surprise change orders. No 'we'll bill that as time-and-materials.'",
+    },
+    {
+      h: "Transparent process",
+      p: "Weekly demos, a shared workspace, and shipped progress you can verify. No invoices for vague 'discovery' or 'planning' phases.",
+    },
+  ];
+  return (
+    <div className="mt-16 max-w-5xl mx-auto" data-testid="how-were-cheaper">
+      <div className="text-center mb-8">
+        <p className="text-xs uppercase tracking-wider text-amber-700 font-semibold mb-2">
+          Here&rsquo;s the breakdown
+        </p>
+        <h3 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight">
+          How we&rsquo;re 40% cheaper than traditional agencies
+        </h3>
+        <p className="text-sm text-muted-foreground mt-2 max-w-2xl mx-auto">
+          Same enterprise-grade quality. Same custom code you own. Just none of the fat that
+          inflates a typical $30K+ agency invoice.
+        </p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        {reasons.map((r) => (
+          <div
+            key={r.h}
+            className="rounded-xl border border-border bg-card p-5"
+            data-testid={`cheaper-reason-${r.h.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}
+          >
+            <p className="font-display text-base font-semibold tracking-tight">{r.h}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed mt-1.5">{r.p}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function PricingAuditCta() {
   return (
