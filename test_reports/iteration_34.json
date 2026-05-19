@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 34 backend testing — A/B Testing v2 system + Blog AI SEO Suggest + Bing IndexNow. 23/23 pytest cases passed including live LLM calls (Claude Sonnet 4.5 via OpenRouter for both /generate and /seo-suggest) and full lifecycle (draft→launch→pause→resume→complete→apply-winner→archive→delete). Statistical significance verified (varA conversion 30% vs control 10% → p_value <= 0.05, lift_pct > 100%). Element-key uniqueness 409, deterministic visitor hashing, daily-trend aggregation, and v1 backward compat (tour_cta_position) all intact.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ab_v2_iteration_34.py",
+    "/app/test_reports/pytest/iter34_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ab_v2_routes.py:209 — Bucketing iterates variants in stored order using weight cumulative sums; if a single variant has weight=100 (or sum>100) others starve. Consider normalising weights to sum to 100 on create.",
+    "ab_v2_routes.py:535 — `complete_test` only considers `rows[1:]` as candidates (skips control) which is correct only if the first variant is always control; rely on `control_key` index for clarity.",
+    "ab_v2_routes.py:449 — Element-key uniqueness check fires only against status=='active'; a draft can be created with the same key but launching two simultaneous active tests is still safely blocked since launch transitions to active. However, if two drafts exist and both call /launch in a race, both could become active. Recommend re-checking uniqueness inside /launch.",
+    "blog_routes.py:23 — `BlogSeoSuggestRequest` uses `str | None` PEP 604 syntax which requires Python 3.10+. Verify deployment runtime.",
+    "integrations_admin_routes.py:512 — `site_url` defaults to 'https://bybloomlabs.com' if not stored; ensure admin saves correct host so IndexNow `host` field matches the verified IndexNow key location.",
+    "ab_v2_routes.py:767 (auto_complete_expired_tests) — Wrapped per-test in try/except but does NOT mark failed ones to avoid retry storms; consider exponential backoff or a failure counter."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_ab_v2_iteration_34.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "n/a (backend-only request)"},
+  "test_credentials": "Admin founder@thesalvador.group / admin123 (loaded from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created ephemeral A/B tests with element_key prefix 'test_iter34_*' and TEST_ name prefix. All cleaned up via DELETE in fixture teardown. 80 page_view + 16 conversion ab_test_events were created and removed via cascade DELETE.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_ab_v2_iteration_34.py is now the canonical regression suite for A/B v2 + Blog SEO suggest + Bing IndexNow. Note: TestAiGenerate + TestBlogSeoSuggest hit live OpenRouter (~30s combined, costs tokens). Skip those if testing without LLM budget by passing `-k 'not Generate and not Seo'`. Bing test currently returns mode:'mock' because no IndexNow API key is configured in app_settings.integration_credentials.bing_webmaster — when the admin saves a real key, the same endpoint will switch to mode:'live' against api.indexnow.org.",
+  "rca of the issue": "No issues found. All 23 tests pass. v1 backward compat (tour_cta_position experiment via /api/admin/ab + /api/public/ab) verified separately via curl and unaffected."
+}

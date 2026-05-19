@@ -489,35 +489,70 @@ async def test_breezedocs(
 async def test_bing_webmaster(
     request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Verify Bing Webmaster API key by calling the read-only `GetSites` endpoint.
-    No URLs are submitted — pure auth/permission check."""
+    """Verify the saved IndexNow / Bing Webmaster API key by submitting a single
+    URL to Bing's IndexNow endpoint.
+
+    The user can paste **either** an IndexNow key **or** a Bing Webmaster API key
+    — IndexNow accepts both (Bing aliases them). A 200/202 response confirms the
+    key + ownership file are wired correctly. Anything else (400/403/422) is the
+    real "non-OK" we surface back to the dashboard with the actual Bing message.
+    """
     import httpx
 
     creds = await get_credentials(db, "bing_webmaster")
     api_key = (creds.get("api_key") or "").strip()
     if not api_key:
         await _record_ping(db, "bing_webmaster", ok=False, detail="no api_key")
-        return {"ok": False, "mode": "mock", "reason": "API key not set — paste it above and click Save first"}
-    url = f"https://ssl.bing.com/webmaster/api.svc/json/GetSites?apikey={api_key}"
+        return {
+            "ok": False,
+            "mode": "mock",
+            "reason": "API key not set — paste it above and click Save first",
+        }
+
+    site_url = (creds.get("site_url") or "https://bybloomlabs.com").rstrip("/")
+    # IndexNow requires the key file to be hosted at <host>/<key>.txt
+    key_location = f"{site_url}/{api_key}.txt"
+    payload = {
+        "host": site_url.replace("https://", "").replace("http://", ""),
+        "key": api_key,
+        "keyLocation": key_location,
+        "urlList": [site_url + "/"],
+    }
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            r = await client.get(url)
+            r = await client.post(
+                "https://api.indexnow.org/indexnow",
+                json=payload,
+                headers={"Content-Type": "application/json; charset=utf-8"},
+            )
     except Exception as exc:
         await _record_ping(db, "bing_webmaster", ok=False, detail=f"net: {exc}")
         return {"ok": False, "reason": f"network error: {exc}"}
-    ok = 200 <= r.status_code < 300
-    detail = None
+
+    ok = r.status_code in (200, 202)
     if ok:
-        try:
-            data = r.json()
-            sites = data.get("d") if isinstance(data, dict) else None
-            detail = f"key valid · {len(sites) if isinstance(sites, list) else 0} site(s) attached"
-        except Exception:
-            detail = "key accepted"
+        detail = f"IndexNow accepted (HTTP {r.status_code}) · 1 URL submitted"
     else:
-        detail = f"HTTP {r.status_code}: {(r.text or '')[:120]}"
+        # IndexNow returns JSON error bodies; surface them verbatim so the user
+        # can fix (most common: 403 = key file not reachable at keyLocation).
+        body_snippet = (r.text or "").strip()[:240]
+        hint = ""
+        if r.status_code == 403:
+            hint = f" · Hint: make sure {key_location} is publicly accessible"
+        elif r.status_code == 422:
+            hint = " · Hint: the key in your file must match the API key exactly"
+        elif r.status_code == 400:
+            hint = " · Hint: malformed payload, double-check the API key value"
+        detail = f"HTTP {r.status_code}: {body_snippet}{hint}"
+
     await _record_ping(db, "bing_webmaster", ok=ok, detail=detail)
-    return {"ok": ok, "mode": "live", "status": r.status_code, "detail": detail}
+    return {
+        "ok": ok,
+        "mode": "live",
+        "status": r.status_code,
+        "detail": detail,
+        "key_location": key_location,
+    }
 
 
 # ============================================================

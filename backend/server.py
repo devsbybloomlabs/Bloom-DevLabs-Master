@@ -97,6 +97,11 @@ from support_subscription_routes import (  # noqa: E402
 )
 from brief_contract_routes import brief_contract_router  # noqa: E402
 from ab_test_routes import public_ab_router, ab_admin_router  # noqa: E402
+from ab_v2_routes import (  # noqa: E402
+    public_v2_router,
+    admin_v2_router,
+    auto_complete_expired_tests,
+)
 from nifty_workspaces_routes import nifty_workspaces_router  # noqa: E402
 from google_calendar_client import GoogleCalendarClient  # noqa: E402
 from google_calendar_routes import (  # noqa: E402
@@ -284,6 +289,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             log.exception("SEO page-scan cron failed: %s", exc)
 
+    async def ab_v2_expiry_cron() -> None:
+        try:
+            res = await auto_complete_expired_tests(app.state.db)
+            if res.get("completed", 0) > 0:
+                log.info("A/B v2 expiry: %s", res)
+        except Exception as exc:
+            log.exception("A/B v2 expiry cron failed: %s", exc)
+
     # Hourly drip ticks
     scheduler.add_job(drip_cron, CronTrigger(minute=15))
     # Hourly prototype-buyer drip (offset by 5 min so it doesn't collide with
@@ -303,6 +316,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.add_job(warm_lead_reengagement_cron, CronTrigger(hour=10, minute=0))
     # Daily 11am UTC — SEO page-diff scan + (optional) OpenRouter enrichment
     scheduler.add_job(seo_page_scan_cron, CronTrigger(hour=11, minute=0))
+    # Hourly — auto-complete expired A/B tests (calc winner & notify)
+    scheduler.add_job(ab_v2_expiry_cron, CronTrigger(minute=25))
 
     app.state.scheduler = scheduler
 
@@ -454,6 +469,8 @@ api.include_router(support_sub_admin_router)
 api.include_router(brief_contract_router)
 api.include_router(public_ab_router)
 api.include_router(ab_admin_router)
+api.include_router(public_v2_router)
+api.include_router(admin_v2_router)
 api.include_router(nifty_workspaces_router)
 api.include_router(calendar_oauth_router)
 api.include_router(calendar_admin_router)

@@ -31,6 +31,9 @@ import ProjectFilesAdmin from "@/pages/admin/ProjectFilesAdmin";
 import SupportTriageAdmin from "@/pages/admin/SupportTriageAdmin";
 import IntegrationsAdmin from "@/pages/admin/IntegrationsAdmin";
 import SeoAdmin from "@/pages/admin/SeoAdmin";
+import AbTestsDashboard from "@/pages/admin/AbTestsDashboard";
+import AbTestWizard from "@/pages/admin/AbTestWizard";
+import AbTestDetail from "@/pages/admin/AbTestDetail";
 import ClientsAdmin from "@/pages/admin/ClientsAdmin";
 import CompaniesAdmin from "@/pages/admin/CompaniesAdmin";
 import ProposalsAdmin from "@/pages/admin/ProposalsAdmin";
@@ -183,6 +186,9 @@ function App() {
                 <Route path="companies" element={<CompaniesAdmin />} />
                 <Route path="integrations" element={<IntegrationsAdmin />} />
                 <Route path="seo" element={<SeoAdmin />} />
+                <Route path="ab-tests" element={<AbTestsDashboard />} />
+                <Route path="ab-tests/new" element={<AbTestWizard />} />
+                <Route path="ab-tests/:testId" element={<AbTestDetail />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

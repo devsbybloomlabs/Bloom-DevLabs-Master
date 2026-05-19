@@ -17,6 +17,14 @@ from models import (
     BlogPostCreate,
     BlogPostUpdate,
 )
+from pydantic import BaseModel, Field
+
+
+class BlogSeoSuggestRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    body: str = Field(min_length=10)
+    current_slug: str | None = None
+    current_tags: list[str] = Field(default_factory=list)
 
 log = logging.getLogger("blog")
 
@@ -206,6 +214,100 @@ async def admin_ai_draft(
     except Exception as exc:
         log.exception("Blog AI draft failed")
         raise HTTPException(502, f"AI generation failed: {exc}")
+
+
+@blog_admin_router.post("/ai/seo-suggest")
+async def admin_ai_seo_suggest(
+    req: BlogSeoSuggestRequest, request: Request
+) -> Dict[str, Any]:
+    """Analyse a draft post and return optimised SEO metadata + structured
+    suggestions powered by OpenRouter (Claude Sonnet 4.5)."""
+    openrouter = request.app.state.openrouter
+    # Trim very long bodies so we don't blow the context window
+    body_excerpt = (req.body or "")[:6000]
+    user_prompt = (
+        "Analyse the blog post below and return optimised SEO metadata as JSON.\n\n"
+        f"Title: {req.title}\n"
+        f"Current slug: {req.current_slug or '(none)'}\n"
+        f"Current tags: {', '.join(req.current_tags) if req.current_tags else '(none)'}\n\n"
+        "Body (markdown, may be truncated):\n"
+        "```\n"
+        f"{body_excerpt}\n"
+        "```\n\n"
+        "Return ONLY a valid JSON object with these exact keys:\n"
+        "{\n"
+        '  "seo_title": "55-60 char optimised title with primary keyword near the start",\n'
+        '  "seo_description": "150-158 char meta description, action-led, no fluff",\n'
+        '  "slug": "kebab-case-slug-3-to-6-words, primary keyword first",\n'
+        '  "primary_keyword": "the single highest-intent keyword the post targets",\n'
+        '  "secondary_keywords": ["3-5 related long-tail keywords"],\n'
+        '  "tags": ["4-6 short topical tags"],\n'
+        '  "og_image_prompt": "1-sentence prompt to generate a hero OG image (1200x630)",\n'
+        '  "internal_link_suggestions": [\n'
+        '     {"anchor": "anchor text", "target": "/path/on/bybloomlabs.com", "reason": "why"}\n'
+        "  ],\n"
+        '  "faq_schema": [\n'
+        '     {"q": "Question that matches search intent", "a": "Concise 2-3 sentence answer"}\n'
+        "  ]\n"
+        "}\n"
+        "Constraints: 3-5 internal_link_suggestions, 3-5 FAQ items. Anchors must "
+        "sound natural, not keyword-stuffed. Output JSON only, no prose, no fences."
+    )
+    try:
+        text = await openrouter.chat(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a senior technical SEO strategist working on "
+                        "bybloomlabs.com (an AI-native custom web app development "
+                        "agency targeting SaaS founders, gym/clinic owners, and "
+                        "agency operators). You return only valid JSON, never "
+                        "prose. Optimise for E-E-A-T and search intent, not "
+                        "keyword density."
+                    ),
+                },
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=1800,
+            temperature=0.25,
+        )
+        if not text:
+            raise HTTPException(502, "AI returned empty response")
+        import json as _json
+
+        # Strip code fences if Claude wraps the JSON
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.DOTALL)
+        try:
+            data = _json.loads(cleaned)
+        except Exception:
+            # Last-resort: extract the first {...} block
+            m = re.search(r"\{[\s\S]*\}", cleaned)
+            if not m:
+                raise HTTPException(502, "AI did not return valid JSON")
+            data = _json.loads(m.group(0))
+        # Normalise + clamp lengths
+        data["seo_title"] = (data.get("seo_title") or "")[:70]
+        data["seo_description"] = (data.get("seo_description") or "")[:170]
+        data["slug"] = _slugify(data.get("slug") or req.current_slug or req.title)
+        data["tags"] = [t for t in (data.get("tags") or []) if isinstance(t, str)][:8]
+        data["secondary_keywords"] = [
+            k for k in (data.get("secondary_keywords") or []) if isinstance(k, str)
+        ][:6]
+        data["internal_link_suggestions"] = [
+            x for x in (data.get("internal_link_suggestions") or []) if isinstance(x, dict)
+        ][:6]
+        data["faq_schema"] = [
+            x for x in (data.get("faq_schema") or []) if isinstance(x, dict)
+        ][:6]
+        return data
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("Blog SEO suggest failed")
+        raise HTTPException(502, f"AI suggestion failed: {exc}")
 
 
 def _draft_prompt(req: BlogDraftPromptRequest) -> str:

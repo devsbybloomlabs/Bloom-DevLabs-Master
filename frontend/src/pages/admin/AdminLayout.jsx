@@ -31,6 +31,7 @@ import {
   LifeBuoy,
   KanbanSquare,
   FolderUp,
+  FlaskConical,
   ArrowLeft,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -76,6 +77,7 @@ const NAV = [
 
   // ── System ─────────────────────────────────────────────────────────────
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3, group: "System" },
+  { to: "/admin/ab-tests", label: "A/B Tests", icon: FlaskConical, group: "System" },
   { to: "/admin/seo", label: "SEO Submit", icon: Search, group: "System" },
   { to: "/admin/integrations", label: "Integrations", icon: Plug, group: "System" },
   { to: "/admin/settings", label: "Settings", icon: SettingsIcon, group: "System" },
