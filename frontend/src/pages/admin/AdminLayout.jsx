@@ -33,6 +33,10 @@ import {
   FolderUp,
   FlaskConical,
   ArrowLeft,
+  Coins,
+  UserSquare2,
+  Link2,
+  ReceiptText,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { BRAND } from "@/lib/brand";
@@ -66,6 +70,13 @@ const NAV = [
   { to: "/admin/paypal-plans", label: "PayPal Plans", icon: Repeat, group: "Money" },
   { to: "/admin/paypal-orders", label: "PayPal Orders", icon: Receipt, group: "Money" },
 
+  // ── People & Commission ────────────────────────────────────────────────
+  { to: "/admin/commissions", label: "Commissions", icon: Coins, group: "People & Commission" },
+  { to: "/admin/people", label: "People", icon: UserSquare2, group: "People & Commission" },
+  { to: "/admin/commission-assignments", label: "Assignments", icon: Link2, group: "People & Commission" },
+  { to: "/admin/commission-ledger", label: "Ledger", icon: ReceiptText, group: "People & Commission" },
+  { to: "/admin/revenue", label: "Revenue", icon: BarChart3, group: "Money" },
+
   // ── Authority — content + brand ────────────────────────────────────────
   { to: "/admin/content", label: "Content AI", icon: PenSquare, group: "Authority" },
   { to: "/admin/lead-magnets", label: "Lead Magnets", icon: Sparkles, group: "Authority" },
@@ -85,7 +96,7 @@ const NAV = [
   { to: "/admin/settings", label: "Settings", icon: SettingsIcon, group: "System" },
 ];
 
-const GROUPS = ["Daily", "Pipeline", "Delivery", "Money", "Authority", "System"];
+const GROUPS = ["Daily", "Pipeline", "Delivery", "Money", "People & Commission", "Authority", "System"];
 
 function SidebarItem({ to, label, Icon, onClick }) {
   return (

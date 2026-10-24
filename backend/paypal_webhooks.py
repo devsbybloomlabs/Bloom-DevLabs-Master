@@ -255,6 +255,9 @@ async def _process_paypal_event(
         sub_record = await db.paypal_subscriptions.find_one({"id": sub_id}, {"_id": 0}) or {}
         sub_email = sub_record.get("customer_email")
         plan_name = sub_record.get("plan_name") or "Subscription cycle"
+        sale_id = resource.get("id")
+        if sale_id and await db.invoices.find_one({"paypal_sale_id": sale_id}, {"_id": 1}):
+            return  # webhook retry: this renewal already has an invoice
         if sub_email:
             try:
                 import invoice_service
@@ -283,8 +286,12 @@ async def _process_paypal_event(
                     notes="Recurring subscription cycle.",
                     source="subscription_cycle",
                     subscription_id=sub_id,
+                    paypal_sale_id=sale_id,
                 )
                 await db.invoices.insert_one(prepare_for_mongo(inv.model_dump()))
+                from commission_service import safe_sync
+
+                await safe_sync(db)
                 inv_dict = inv.model_dump()
                 try:
                     await invoice_service.cache_invoice_pdf(db, inv_dict)

@@ -118,6 +118,8 @@ from google_calendar_routes import (  # noqa: E402
 from blog_extras_routes import blog_extras_router  # noqa: E402
 from integrations_admin_routes import integrations_admin_router  # noqa: E402
 from seo_routes import seo_router, run_seo_scan  # noqa: E402
+from people_routes import people_admin_router  # noqa: E402
+from commission_routes import commission_admin_router  # noqa: E402
 from invoice_routes import (  # noqa: E402
     invoice_admin_router,
     invoice_client_router,
@@ -494,6 +496,8 @@ api.include_router(nifty_workspaces_router)
 api.include_router(calendar_oauth_router)
 api.include_router(calendar_admin_router)
 api.include_router(calendar_milestones_router)
+api.include_router(people_admin_router)
+api.include_router(commission_admin_router)
 
 app.include_router(api)
 

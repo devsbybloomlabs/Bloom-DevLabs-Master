@@ -85,6 +85,11 @@ const AbTestDetail = lazy(() => import("@/pages/admin/AbTestDetail"));
 const AuditsAdmin = lazy(() => import("@/pages/admin/AuditsAdmin"));
 const AuditDetailAdmin = lazy(() => import("@/pages/admin/AuditDetailAdmin"));
 const AffiliatesAdmin = lazy(() => import("@/pages/admin/AffiliatesAdmin"));
+const CommissionDashboard = lazy(() => import("@/pages/admin/CommissionDashboard"));
+const PeopleAdmin = lazy(() => import("@/pages/admin/PeopleAdmin"));
+const AssignmentsAdmin = lazy(() => import("@/pages/admin/AssignmentsAdmin"));
+const CommissionLedger = lazy(() => import("@/pages/admin/CommissionLedger"));
+const RevenuePage = lazy(() => import("@/pages/admin/RevenuePage"));
 const ClientsAdmin = lazy(() => import("@/pages/admin/ClientsAdmin"));
 const CompaniesAdmin = lazy(() => import("@/pages/admin/CompaniesAdmin"));
 const ProposalsAdmin = lazy(() => import("@/pages/admin/ProposalsAdmin"));
@@ -221,6 +226,11 @@ function App() {
                   <Route path="audits" element={<AuditsAdmin />} />
                   <Route path="audits/:auditId" element={<AuditDetailAdmin />} />
                   <Route path="affiliates" element={<AffiliatesAdmin />} />
+                  <Route path="commissions" element={<CommissionDashboard />} />
+                  <Route path="people" element={<PeopleAdmin />} />
+                  <Route path="commission-assignments" element={<AssignmentsAdmin />} />
+                  <Route path="commission-ledger" element={<CommissionLedger />} />
+                  <Route path="revenue" element={<RevenuePage />} />
                   <Route path="analytics" element={<AnalyticsPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                 </Route>

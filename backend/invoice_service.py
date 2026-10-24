@@ -158,6 +158,10 @@ async def get_or_create_invoice_for_capture(
         paypal_order_id=order_id,
     )
     await db.invoices.insert_one(prepare_for_mongo(inv.model_dump()))
+    if inv.status == "paid":
+        from commission_service import safe_sync
+
+        await safe_sync(db)
     return inv.model_dump()
 
 
@@ -441,3 +445,6 @@ async def mark_invoice_refunded(
             }
         },
     )
+    from commission_service import safe_sync
+
+    await safe_sync(db)

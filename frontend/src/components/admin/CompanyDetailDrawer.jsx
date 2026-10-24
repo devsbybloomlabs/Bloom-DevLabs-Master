@@ -219,6 +219,9 @@ export default function CompanyDetailDrawer({ companyId, onClose, onChanged }) {
                   <FileText className="h-3.5 w-3.5 mr-1.5" />
                   Documents
                 </TabsTrigger>
+                <TabsTrigger value="commission" data-testid="drawer-tab-commission">
+                  Commission
+                </TabsTrigger>
                 <TabsTrigger value="activity" data-testid="drawer-tab-activity">
                   <ActivityIcon className="h-3.5 w-3.5 mr-1.5" />
                   Activity
@@ -264,6 +267,10 @@ export default function CompanyDetailDrawer({ companyId, onClose, onChanged }) {
                 <DocumentsTab detail={detail} />
               </TabsContent>
 
+              <TabsContent value="commission" className="space-y-3 mt-4">
+                <CommissionTab companyId={companyId} api={api} />
+              </TabsContent>
+
               <TabsContent value="activity" className="space-y-3 mt-4">
                 <ActivityTab
                   companyId={companyId}
@@ -277,6 +284,41 @@ export default function CompanyDetailDrawer({ companyId, onClose, onChanged }) {
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+function CommissionTab({ companyId, api }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    api
+      .get("/admin/commissions/assignments", { params: { company_id: companyId, active: true } })
+      .then((r) => setItems(r.data.items))
+      .catch(() => setItems([]));
+  }, [api, companyId]);
+
+  if (items === null) return <Skeleton className="h-16" />;
+  return (
+    <div className="space-y-3" data-testid="company-commission-tab">
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No one earns commission on this company yet.</p>
+      ) : (
+        items.map((a) => (
+          <Card key={a.id}>
+            <CardContent className="p-3 flex items-center justify-between text-sm">
+              <span className="font-medium">{a.person_name}</span>
+              <span>
+                {a.effective_rate_type === "flat"
+                  ? `${fmtMoney(a.effective_rate_value)} / invoice`
+                  : `${a.effective_rate_value}%`}
+              </span>
+            </CardContent>
+          </Card>
+        ))
+      )}
+      <Button variant="outline" size="sm" asChild>
+        <a href="/admin/commission-assignments" data-testid="company-manage-commission-link">Manage assignments</a>
+      </Button>
+    </div>
   );
 }
 

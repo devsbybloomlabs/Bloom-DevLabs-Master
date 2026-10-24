@@ -94,6 +94,7 @@ class Prospect(BaseModel):
     deal_value: Optional[float] = None
     next_action: Optional[str] = None
     next_action_at: Optional[datetime] = None
+    owner_person_id: Optional[str] = None  # commission payee who owns this deal
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 
@@ -110,6 +111,7 @@ class ProspectCreate(BaseModel):
     deal_value: Optional[float] = None
     next_action: Optional[str] = None
     next_action_at: Optional[datetime] = None
+    owner_person_id: Optional[str] = None  # commission payee who owns this deal
 
 
 class ProspectUpdate(BaseModel):
@@ -124,6 +126,7 @@ class ProspectUpdate(BaseModel):
     deal_value: Optional[float] = None
     next_action: Optional[str] = None
     next_action_at: Optional[datetime] = None
+    owner_person_id: Optional[str] = None  # commission payee who owns this deal
 
 
 # ---------- Content Pieces ----------
@@ -768,6 +771,8 @@ class Invoice(BaseModel):
     source: str = "manual"  # paypal_order | subscription_cycle | manual
     paypal_order_id: Optional[str] = None
     subscription_id: Optional[str] = None
+    paypal_sale_id: Optional[str] = None  # renewal payment id; dedupes webhook retries
+    company_id: Optional[str] = None
     pdf_path: Optional[str] = None  # local relative path to cached PDF
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
