@@ -9,6 +9,7 @@ import PublicCaseStudies from "@/pages/PublicCaseStudies";
 import PublicBlog from "@/pages/PublicBlog";
 import PublicBlogPost from "@/pages/PublicBlogPost";
 import GetAuditPage from "@/pages/GetAuditPage";
+import NotFound from "@/pages/NotFound";
 import AffiliatePage from "@/pages/AffiliatePage";
 import ExitIntentPopup from "@/components/ExitIntentPopup";
 import AnalyticsTracker from "@/components/Analytics";
@@ -236,6 +237,7 @@ function App() {
                 </Route>
               </Routes>
             </Suspense>
+                <Route path="*" element={<NotFound />} />
           </AuthProvider>
         </ClientAuthProvider>
       </BrowserRouter>
