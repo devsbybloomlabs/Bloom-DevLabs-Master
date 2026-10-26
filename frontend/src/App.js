@@ -10,6 +10,7 @@ import PublicBlog from "@/pages/PublicBlog";
 import PublicBlogPost from "@/pages/PublicBlogPost";
 import GetAuditPage from "@/pages/GetAuditPage";
 import NotFound from "@/pages/NotFound";
+import ShowcasePage from "@/pages/ShowcasePage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import ExitIntentPopup from "@/components/ExitIntentPopup";
 import AnalyticsTracker from "@/components/Analytics";
@@ -117,6 +118,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/case-studies" element={<PublicCaseStudies />} />
+                <Route path="/showcase" element={<ShowcasePage />} />
                 <Route path="/blog" element={<PublicBlog />} />
                 <Route path="/blog/:slug" element={<PublicBlogPost />} />
                 <Route path="/get-audit" element={<GetAuditPage />} />
@@ -235,9 +237,9 @@ function App() {
                   <Route path="analytics" element={<AnalyticsPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                 </Route>
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
-                <Route path="*" element={<NotFound />} />
           </AuthProvider>
         </ClientAuthProvider>
       </BrowserRouter>
