@@ -239,7 +239,44 @@ code {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* /start landing: marquee ribbon, rotating stamp, float, sawtooth section edges */
+@keyframes start-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+@keyframes start-spin {
+    to { transform: rotate(360deg); }
+}
+@keyframes start-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+.start-marquee-track { animation: start-marquee 32s linear infinite; }
+.start-marquee:hover .start-marquee-track { animation-play-state: paused; }
+.start-spin { animation: start-spin 26s linear infinite; }
+.start-float { animation: start-float 6s ease-in-out infinite; }
+
+/* Sawtooth strip. Colour = currentColor. "down" hangs below a section, "up" sits on top of one. */
+.start-zig-down,
+.start-zig-up {
+    height: 14px;
+    background: currentColor;
+    -webkit-mask-repeat: repeat-x;
+    mask-repeat: repeat-x;
+    -webkit-mask-size: 28px 14px;
+    mask-size: 28px 14px;
+}
+.start-zig-down {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 14'%3E%3Cpolygon points='0,0 14,14 28,0'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 14'%3E%3Cpolygon points='0,0 14,14 28,0'/%3E%3C/svg%3E");
+}
+.start-zig-up {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 14'%3E%3Cpolygon points='0,14 14,0 28,14'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 14'%3E%3Cpolygon points='0,14 14,0 28,14'/%3E%3C/svg%3E");
+}
+
 @media (prefers-reduced-motion: reduce) {
     .animate-fade-up { animation: none; }
+    .start-marquee-track, .start-spin, .start-float { animation: none; }
     html { scroll-behavior: auto; }
 }
