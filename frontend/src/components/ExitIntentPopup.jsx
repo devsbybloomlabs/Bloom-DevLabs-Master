@@ -27,7 +27,8 @@ export default function ExitIntentPopup() {
       location.pathname.startsWith("/portal") ||
       location.pathname.startsWith("/login") ||
       location.pathname === "/get-audit" ||
-      location.pathname === "/win"
+      location.pathname === "/win" ||
+      location.pathname === "/start"
     ) {
       return;
     }

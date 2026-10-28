@@ -12,6 +12,7 @@ import GetAuditPage from "@/pages/GetAuditPage";
 import NotFound from "@/pages/NotFound";
 import ShowcasePage from "@/pages/ShowcasePage";
 import WinPage from "@/pages/WinPage";
+import StartPage from "@/pages/StartPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import ExitIntentPopup from "@/components/ExitIntentPopup";
 import AnalyticsTracker from "@/components/Analytics";
@@ -121,6 +122,7 @@ function App() {
                 <Route path="/case-studies" element={<PublicCaseStudies />} />
                 <Route path="/showcase" element={<ShowcasePage />} />
                 <Route path="/win" element={<WinPage />} />
+                <Route path="/start" element={<StartPage />} />
                 <Route path="/blog" element={<PublicBlog />} />
                 <Route path="/blog/:slug" element={<PublicBlogPost />} />
                 <Route path="/get-audit" element={<GetAuditPage />} />

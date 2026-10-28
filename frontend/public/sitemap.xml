@@ -97,6 +97,12 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://bybloomlabs.com/start</loc>
+    <lastmod>2026-10-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://bybloomlabs.com/showcase</loc>
     <lastmod>2026-10-26</lastmod>
     <changefreq>monthly</changefreq>
